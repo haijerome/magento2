@@ -1,42 +1,21 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Bundle
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Bundle\Block\Adminhtml\Catalog\Product\Edit\Tab\Bundle\Option;
 
 /**
  * Bundle selection renderer
  *
- * @category    Magento
- * @package     Magento_Bundle
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Bundle\Block\Adminhtml\Catalog\Product\Edit\Tab\Bundle\Option;
-
-class Selection
-    extends \Magento\Backend\Block\Widget
+class Selection extends \Magento\Backend\Block\Widget
 {
-    protected $_template = 'product/edit/bundle/option/selection.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Bundle::product/edit/bundle/option/selection.phtml';
 
     /**
      * Catalog data
@@ -48,7 +27,7 @@ class Selection
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
@@ -58,25 +37,25 @@ class Selection
     protected $_priceType;
 
     /**
-     * @var \Magento\Backend\Model\Config\Source\Yesno
+     * @var \Magento\Config\Model\Config\Source\Yesno
      */
     protected $_yesno;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Backend\Model\Config\Source\Yesno $yesno
+     * @param \Magento\Config\Model\Config\Source\Yesno $yesno
      * @param \Magento\Bundle\Model\Source\Option\Selection\Price\Type $priceType
      * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Backend\Model\Config\Source\Yesno $yesno,
+        \Magento\Config\Model\Config\Source\Yesno $yesno,
         \Magento\Bundle\Model\Source\Option\Selection\Price\Type $priceType,
         \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        array $data = []
     ) {
         $this->_catalogData = $catalogData;
         $this->_coreRegistry = $registry;
@@ -87,10 +66,11 @@ class Selection
 
     /**
      * Initialize bundle option selection block
+     *
+     * @return void
      */
     protected function _construct()
     {
-
         $this->setCanReadPrice(true);
         $this->setCanEditPrice(true);
     }
@@ -118,15 +98,15 @@ class Selection
     /**
      * Prepare block layout
      *
-     * @return \Magento\Bundle\Block\Adminhtml\Catalog\Product\Edit\Tab\Bundle\Option\Selection
+     * @return $this
      */
     protected function _prepareLayout()
     {
-        $this->addChild('selection_delete_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label' => __('Delete'),
-            'class' => 'delete icon-btn',
-            'on_click' => 'bSelection.remove(event)'
-        ));
+        $this->addChild(
+            'selection_delete_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Delete'), 'class' => 'action-delete', 'on_click' => 'bSelection.remove(event)']
+        );
         return parent::_prepareLayout();
     }
 
@@ -147,13 +127,18 @@ class Selection
      */
     public function getPriceTypeSelectHtml()
     {
-        $select = $this->getLayout()->createBlock('Magento\View\Element\Html\Select')
-            ->setData(array(
-                'id'    => $this->getFieldId() . '_{{index}}_price_type',
-                'class' => 'select select-product-option-type required-option-select'
-            ))
-            ->setName($this->getFieldName() . '[{{parentIndex}}][{{index}}][selection_price_type]')
-            ->setOptions($this->_priceType->toOptionArray());
+        $select = $this->getLayout()->createBlock(
+            \Magento\Framework\View\Element\Html\Select::class
+        )->setData(
+            [
+                'id' => $this->getFieldId() . '_<%- data.index %>_price_type',
+                'class' => 'select select-product-option-type required-option-select',
+            ]
+        )->setName(
+            $this->getFieldName() . '[<%- data.parentIndex %>][<%- data.index %>][selection_price_type]'
+        )->setOptions(
+            $this->_priceType->toOptionArray()
+        );
         if ($this->getCanEditPrice() === false) {
             $select->setExtraParams('disabled="disabled"');
         }
@@ -167,13 +152,15 @@ class Selection
      */
     public function getQtyTypeSelectHtml()
     {
-        $select = $this->getLayout()->createBlock('Magento\View\Element\Html\Select')
-            ->setData(array(
-                'id' => $this->getFieldId().'_{{index}}_can_change_qty',
-                'class' => 'select'
-            ))
-            ->setName($this->getFieldName().'[{{parentIndex}}][{{index}}][selection_can_change_qty]')
-            ->setOptions($this->_yesno->toOptionArray());
+        $select = $this->getLayout()->createBlock(
+            \Magento\Framework\View\Element\Html\Select::class
+        )->setData(
+            ['id' => $this->getFieldId() . '_<%- data.index %>_can_change_qty', 'class' => 'select']
+        )->setName(
+            $this->getFieldName() . '[<%- data.parentIndex %>][<%- data.index %>][selection_can_change_qty]'
+        )->setOptions(
+            $this->_yesno->toOptionArray()
+        );
 
         return $select->getHtml();
     }
@@ -208,13 +195,20 @@ class Selection
     {
         $checkboxHtml = '';
         if ($this->isUsedWebsitePrice()) {
-            $fieldsId = $this->getFieldId() . '_{{index}}_price_scope';
-            $name = $this->getFieldName() . '[{{parentIndex}}][{{index}}][default_price_scope]';
+            $fieldsId = $this->getFieldId() . '_<%- data.index %>_price_scope';
+            $name = $this->getFieldName() . '[<%- data.parentIndex %>][<%- data.index %>][default_price_scope]';
             $class = 'bundle-option-price-scope-checkbox';
             $label = __('Use Default Value');
-            $disabled = ($this->getCanEditPrice() === false) ? ' disabled="disabled"' : '';
-            $checkboxHtml = '<input type="checkbox" id="' . $fieldsId . '" class="' . $class . '" name="' . $name
-                . '"' . $disabled . ' value="1" />';
+            $disabled = $this->getCanEditPrice() === false ? ' disabled="disabled"' : '';
+            $checkboxHtml = '<input type="checkbox" id="' .
+                $fieldsId .
+                '" class="' .
+                $class .
+                '" name="' .
+                $name .
+                '"' .
+                $disabled .
+                ' value="1" />';
             $checkboxHtml .= '<label class="normal" for="' . $fieldsId . '">' . $label . '</label>';
         }
         return $checkboxHtml;

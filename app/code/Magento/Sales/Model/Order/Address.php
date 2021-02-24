@@ -1,79 +1,37 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Model\Order;
+
+use Magento\Customer\Model\Address\AddressModelInterface;
+use Magento\Sales\Api\Data\OrderAddressInterface;
+use Magento\Sales\Model\AbstractModel;
 
 /**
  * Sales order address model
  *
- * @method \Magento\Sales\Model\Resource\Order\Address _getResource()
- * @method \Magento\Sales\Model\Resource\Order\Address getResource()
- * @method int getParentId()
- * @method \Magento\Sales\Model\Order\Address setParentId(int $value)
- * @method int getCustomerAddressId()
- * @method \Magento\Sales\Model\Order\Address setCustomerAddressId(int $value)
- * @method int getQuoteAddressId()
- * @method \Magento\Sales\Model\Order\Address setQuoteAddressId(int $value)
- * @method \Magento\Sales\Model\Order\Address setRegionId(int $value)
- * @method int getCustomerId()
- * @method \Magento\Sales\Model\Order\Address setCustomerId(int $value)
- * @method string getFax()
- * @method \Magento\Sales\Model\Order\Address setFax(string $value)
- * @method \Magento\Sales\Model\Order\Address setRegion(string $value)
- * @method string getPostcode()
- * @method \Magento\Sales\Model\Order\Address setPostcode(string $value)
- * @method string getLastname()
- * @method \Magento\Sales\Model\Order\Address setLastname(string $value)
- * @method string getCity()
- * @method \Magento\Sales\Model\Order\Address setCity(string $value)
- * @method string getEmail()
- * @method \Magento\Sales\Model\Order\Address setEmail(string $value)
- * @method string getTelephone()
- * @method \Magento\Sales\Model\Order\Address setTelephone(string $value)
- * @method string getCountryId()
- * @method \Magento\Sales\Model\Order\Address setCountryId(string $value)
- * @method string getFirstname()
- * @method \Magento\Sales\Model\Order\Address setFirstname(string $value)
- * @method string getAddressType()
- * @method \Magento\Sales\Model\Order\Address setAddressType(string $value)
- * @method string getPrefix()
- * @method \Magento\Sales\Model\Order\Address setPrefix(string $value)
- * @method string getMiddlename()
- * @method \Magento\Sales\Model\Order\Address setMiddlename(string $value)
- * @method string getSuffix()
- * @method \Magento\Sales\Model\Order\Address setSuffix(string $value)
- * @method string getCompany()
- * @method \Magento\Sales\Model\Order\Address setCompany(string $value)
+ * @api
+ * @method \Magento\Customer\Api\Data\AddressInterface getCustomerAddressData()
+ * @method Address setCustomerAddressData(\Magento\Customer\Api\Data\AddressInterface $value)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.ExcessivePublicCount)
+ * @since 100.0.2
  */
-namespace Magento\Sales\Model\Order;
-
-class Address extends \Magento\Customer\Model\Address\AbstractAddress
+class Address extends AbstractModel implements OrderAddressInterface, AddressModelInterface
 {
+    /**
+     * Possible customer address types
+     */
+    const TYPE_BILLING = 'billing';
+
+    const TYPE_SHIPPING = 'shipping';
+
     /**
      * @var \Magento\Sales\Model\Order
      */
-    protected $_order;
+    protected $order;
 
     /**
      * @var string
@@ -88,66 +46,174 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     /**
      * @var \Magento\Sales\Model\OrderFactory
      */
-    protected $_orderFactory;
+    protected $orderFactory;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Directory\Helper\Data $directoryData
-     * @param \Magento\Eav\Model\Config $eavConfig
-     * @param \Magento\Customer\Model\Address\Config $addressConfig
-     * @param \Magento\Directory\Model\RegionFactory $regionFactory
-     * @param \Magento\Directory\Model\CountryFactory $countryFactory
+     * @var \Magento\Directory\Model\RegionFactory
+     */
+    protected $regionFactory;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory
      * @param \Magento\Sales\Model\OrderFactory $orderFactory
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Directory\Model\RegionFactory $regionFactory
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Directory\Helper\Data $directoryData,
-        \Magento\Eav\Model\Config $eavConfig,
-        \Magento\Customer\Model\Address\Config $addressConfig,
-        \Magento\Directory\Model\RegionFactory $regionFactory,
-        \Magento\Directory\Model\CountryFactory $countryFactory,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
         \Magento\Sales\Model\OrderFactory $orderFactory,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Directory\Model\RegionFactory $regionFactory,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
+        $data = $this->implodeStreetField($data);
+        $this->regionFactory = $regionFactory;
+        $this->orderFactory = $orderFactory;
         parent::__construct(
             $context,
             $registry,
-            $directoryData,
-            $eavConfig,
-            $addressConfig,
-            $regionFactory,
-            $countryFactory,
+            $extensionFactory,
+            $customAttributeFactory,
             $resource,
             $resourceCollection,
             $data
         );
-        $this->_orderFactory = $orderFactory;
     }
 
     /**
      * Initialize resource
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Sales\Model\Resource\Order\Address');
+        $this->_init(\Magento\Sales\Model\ResourceModel\Order\Address::class);
     }
 
     /**
      * Set order
      *
+     * @codeCoverageIgnore
+     *
      * @param \Magento\Sales\Model\Order $order
-     * @return \Magento\Sales\Model\Order\Address
+     * @return $this
      */
     public function setOrder(\Magento\Sales\Model\Order $order)
     {
-        $this->_order = $order;
+        $this->order = $order;
+        return $this;
+    }
+
+    /**
+     * Return 2 letter state code if available, otherwise full region name
+     *
+     * @return null|string
+     */
+    public function getRegionCode()
+    {
+        $regionId = (!$this->getRegionId() && is_numeric($this->getRegion())) ?
+            $this->getRegion() :
+            $this->getRegionId();
+        $model = $this->regionFactory->create()->load($regionId);
+        if ($model->getCountryId() == $this->getCountryId()) {
+            return $model->getCode();
+        } elseif (is_string($this->getRegion())) {
+            return $this->getRegion();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Get full customer name
+     *
+     * @return string
+     */
+    public function getName()
+    {
+        $name = '';
+        if ($this->getPrefix()) {
+            $name .= $this->getPrefix() . ' ';
+        }
+        $name .= $this->getFirstname();
+        if ($this->getMiddlename()) {
+            $name .= ' ' . $this->getMiddlename();
+        }
+        $name .= ' ' . $this->getLastname();
+        if ($this->getSuffix()) {
+            $name .= ' ' . $this->getSuffix();
+        }
+        return $name;
+    }
+
+    /**
+     * Combine values of street lines into a single string
+     *
+     * @param string[]|string $value
+     * @return string
+     */
+    protected function implodeStreetValue($value)
+    {
+        if (is_array($value)) {
+            $value = trim(implode(PHP_EOL, $value));
+        }
+        return $value;
+    }
+
+    /**
+     * Enforce format of the street field
+     *
+     * @param array|string $key
+     * @param array|string $value
+     *
+     * @return \Magento\Framework\DataObject
+     */
+    public function setData($key, $value = null)
+    {
+        if (is_array($key)) {
+            $key = $this->implodeStreetField($key);
+        } elseif ($key == OrderAddressInterface::STREET) {
+            $value = $this->implodeStreetValue($value);
+        }
+        return parent::setData($key, $value);
+    }
+
+    /**
+     * Implode value of the street field, if it is present among other fields
+     *
+     * @param array $data
+     * @return array
+     */
+    protected function implodeStreetField(array $data)
+    {
+        if (array_key_exists(OrderAddressInterface::STREET, $data)) {
+            $data[OrderAddressInterface::STREET] = $this->implodeStreetValue($data[OrderAddressInterface::STREET]);
+        }
+        return $data;
+    }
+
+    /**
+     * Create fields street1, street2, etc.
+     *
+     * To be used in controllers for views data
+     *
+     * @return $this
+     */
+    public function explodeStreetAddress()
+    {
+        $streetLines = $this->getStreet();
+        foreach ($streetLines as $lineNumber => $lineValue) {
+            $this->setData(OrderAddressInterface::STREET . ($lineNumber + 1), $lineValue);
+        }
         return $this;
     }
 
@@ -158,30 +224,523 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
      */
     public function getOrder()
     {
-        if (!$this->_order) {
-            $this->_order = $this->_orderFactory->create()->load($this->getParentId());
+        if (!$this->order) {
+            $this->order = $this->orderFactory->create()->load($this->getParentId());
         }
-        return $this->_order;
+        return $this->order;
     }
 
     /**
-     * Before object save manipulations
+     * Retrieve street field of an address
      *
-     * @return \Magento\Sales\Model\Order\Address
+     * @return string[]
      */
-    protected function _beforeSave()
+    public function getStreet()
     {
-        parent::_beforeSave();
-
-        if (!$this->getParentId() && $this->getOrder()) {
-            $this->setParentId($this->getOrder()->getId());
+        if (is_array($this->getData(OrderAddressInterface::STREET))) {
+            return $this->getData(OrderAddressInterface::STREET);
         }
-
-        // Init customer address id if customer address is assigned
-        if ($this->getCustomerAddress()) {
-            $this->setCustomerAddressId($this->getCustomerAddress()->getId());
-        }
-
-        return $this;
+        return explode(PHP_EOL, $this->getData(OrderAddressInterface::STREET));
     }
+
+    /**
+     * Get street line by number
+     *
+     * @param int $number
+     * @return string
+     */
+    public function getStreetLine($number)
+    {
+        $lines = $this->getStreet();
+        return $lines[$number - 1] ?? '';
+    }
+
+    //@codeCoverageIgnoreStart
+
+    /**
+     * Returns address_type
+     *
+     * @return string
+     */
+    public function getAddressType()
+    {
+        return $this->getData(OrderAddressInterface::ADDRESS_TYPE);
+    }
+
+    /**
+     * Returns city
+     *
+     * @return string
+     */
+    public function getCity()
+    {
+        return $this->getData(OrderAddressInterface::CITY);
+    }
+
+    /**
+     * Returns company
+     *
+     * @return string
+     */
+    public function getCompany()
+    {
+        return $this->getData(OrderAddressInterface::COMPANY);
+    }
+
+    /**
+     * Returns country_id
+     *
+     * @return string
+     */
+    public function getCountryId()
+    {
+        return $this->getData(OrderAddressInterface::COUNTRY_ID);
+    }
+
+    /**
+     * Returns customer_address_id
+     *
+     * @return int
+     */
+    public function getCustomerAddressId()
+    {
+        return $this->getData(OrderAddressInterface::CUSTOMER_ADDRESS_ID);
+    }
+
+    /**
+     * Returns customer_id
+     *
+     * @return int
+     */
+    public function getCustomerId()
+    {
+        return $this->getData(OrderAddressInterface::CUSTOMER_ID);
+    }
+
+    /**
+     * Returns email
+     *
+     * @return string
+     */
+    public function getEmail()
+    {
+        return $this->getData(OrderAddressInterface::EMAIL);
+    }
+
+    /**
+     * Returns entity_id
+     *
+     * @return int
+     */
+    public function getEntityId()
+    {
+        return $this->getData(OrderAddressInterface::ENTITY_ID);
+    }
+
+    /**
+     * Sets the ID for the order address.
+     *
+     * @param int $entityId
+     * @return $this
+     */
+    public function setEntityId($entityId)
+    {
+        return $this->setData(OrderAddressInterface::ENTITY_ID, $entityId);
+    }
+
+    /**
+     * Returns fax
+     *
+     * @return string
+     */
+    public function getFax()
+    {
+        return $this->getData(OrderAddressInterface::FAX);
+    }
+
+    /**
+     * Returns firstname
+     *
+     * @return string
+     */
+    public function getFirstname()
+    {
+        return $this->getData(OrderAddressInterface::FIRSTNAME);
+    }
+
+    /**
+     * Returns lastname
+     *
+     * @return string
+     */
+    public function getLastname()
+    {
+        return $this->getData(OrderAddressInterface::LASTNAME);
+    }
+
+    /**
+     * Returns middlename
+     *
+     * @return string
+     */
+    public function getMiddlename()
+    {
+        return $this->getData(OrderAddressInterface::MIDDLENAME);
+    }
+
+    /**
+     * Returns parent_id
+     *
+     * @return int
+     */
+    public function getParentId()
+    {
+        return $this->getData(OrderAddressInterface::PARENT_ID);
+    }
+
+    /**
+     * Returns postcode
+     *
+     * @return string
+     */
+    public function getPostcode()
+    {
+        return $this->getData(OrderAddressInterface::POSTCODE);
+    }
+
+    /**
+     * Returns prefix
+     *
+     * @return string
+     */
+    public function getPrefix()
+    {
+        return $this->getData(OrderAddressInterface::PREFIX);
+    }
+
+    /**
+     * Returns region
+     *
+     * @return string
+     */
+    public function getRegion()
+    {
+        return $this->getData(OrderAddressInterface::REGION);
+    }
+
+    /**
+     * Returns region_id
+     *
+     * @return int
+     */
+    public function getRegionId()
+    {
+        return $this->getData(OrderAddressInterface::REGION_ID);
+    }
+
+    /**
+     * Returns suffix
+     *
+     * @return string
+     */
+    public function getSuffix()
+    {
+        return $this->getData(OrderAddressInterface::SUFFIX);
+    }
+
+    /**
+     * Returns telephone
+     *
+     * @return string
+     */
+    public function getTelephone()
+    {
+        return $this->getData(OrderAddressInterface::TELEPHONE);
+    }
+
+    /**
+     * Returns vat_id
+     *
+     * @return string
+     */
+    public function getVatId()
+    {
+        return $this->getData(OrderAddressInterface::VAT_ID);
+    }
+
+    /**
+     * Returns vat_is_valid
+     *
+     * @return int
+     */
+    public function getVatIsValid()
+    {
+        return $this->getData(OrderAddressInterface::VAT_IS_VALID);
+    }
+
+    /**
+     * Returns vat_request_date
+     *
+     * @return string
+     */
+    public function getVatRequestDate()
+    {
+        return $this->getData(OrderAddressInterface::VAT_REQUEST_DATE);
+    }
+
+    /**
+     * Returns vat_request_id
+     *
+     * @return string
+     */
+    public function getVatRequestId()
+    {
+        return $this->getData(OrderAddressInterface::VAT_REQUEST_ID);
+    }
+
+    /**
+     * Returns vat_request_success
+     *
+     * @return int
+     */
+    public function getVatRequestSuccess()
+    {
+        return $this->getData(OrderAddressInterface::VAT_REQUEST_SUCCESS);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setParentId($id)
+    {
+        return $this->setData(OrderAddressInterface::PARENT_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setCustomerAddressId($id)
+    {
+        return $this->setData(OrderAddressInterface::CUSTOMER_ADDRESS_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setRegionId($id)
+    {
+        return $this->setData(OrderAddressInterface::REGION_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setStreet($street)
+    {
+        return $this->setData(OrderAddressInterface::STREET, $street);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setCustomerId($id)
+    {
+        return $this->setData(OrderAddressInterface::CUSTOMER_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setFax($fax)
+    {
+        return $this->setData(OrderAddressInterface::FAX, $fax);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setRegion($region)
+    {
+        return $this->setData(OrderAddressInterface::REGION, $region);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setPostcode($postcode)
+    {
+        return $this->setData(OrderAddressInterface::POSTCODE, $postcode);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setLastname($lastname)
+    {
+        return $this->setData(OrderAddressInterface::LASTNAME, $lastname);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setCity($city)
+    {
+        return $this->setData(OrderAddressInterface::CITY, $city);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setEmail($email)
+    {
+        return $this->setData(OrderAddressInterface::EMAIL, $email);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setTelephone($telephone)
+    {
+        return $this->setData(OrderAddressInterface::TELEPHONE, trim($telephone));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setCountryId($id)
+    {
+        return $this->setData(OrderAddressInterface::COUNTRY_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setFirstname($firstname)
+    {
+        return $this->setData(OrderAddressInterface::FIRSTNAME, $firstname);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setAddressType($addressType)
+    {
+        return $this->setData(OrderAddressInterface::ADDRESS_TYPE, $addressType);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setPrefix($prefix)
+    {
+        return $this->setData(OrderAddressInterface::PREFIX, $prefix);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setMiddlename($middlename)
+    {
+        return $this->setData(OrderAddressInterface::MIDDLENAME, $middlename);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setSuffix($suffix)
+    {
+        return $this->setData(OrderAddressInterface::SUFFIX, $suffix);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setCompany($company)
+    {
+        return $this->setData(OrderAddressInterface::COMPANY, $company);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setVatId($id)
+    {
+        return $this->setData(OrderAddressInterface::VAT_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setVatIsValid($vatIsValid)
+    {
+        return $this->setData(OrderAddressInterface::VAT_IS_VALID, $vatIsValid);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setVatRequestId($id)
+    {
+        return $this->setData(OrderAddressInterface::VAT_REQUEST_ID, $id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setRegionCode($regionCode)
+    {
+        return $this->setData(OrderAddressInterface::KEY_REGION_CODE, $regionCode);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setVatRequestDate($vatRequestDate)
+    {
+        return $this->setData(OrderAddressInterface::VAT_REQUEST_DATE, $vatRequestDate);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setVatRequestSuccess($vatRequestSuccess)
+    {
+        return $this->setData(OrderAddressInterface::VAT_REQUEST_SUCCESS, $vatRequestSuccess);
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * @return \Magento\Sales\Api\Data\OrderAddressExtensionInterface|null
+     */
+    public function getExtensionAttributes()
+    {
+        return $this->_getExtensionAttributes();
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * @param \Magento\Sales\Api\Data\OrderAddressExtensionInterface $extensionAttributes
+     *
+     * @return $this
+     */
+    public function setExtensionAttributes(\Magento\Sales\Api\Data\OrderAddressExtensionInterface $extensionAttributes)
+    {
+        return $this->_setExtensionAttributes($extensionAttributes);
+    }
+
+    /**
+     * @inheritdoc
+     * @since 102.0.3
+     */
+    public function beforeSave()
+    {
+        if ($this->getEmail() === null) {
+            $this->setEmail($this->getOrder()->getCustomerEmail());
+        }
+        return parent::beforeSave();
+    }
+
+    //@codeCoverageIgnoreEnd
 }

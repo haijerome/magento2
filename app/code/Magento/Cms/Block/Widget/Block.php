@@ -1,40 +1,24 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
+declare(strict_types=1);
+
+namespace Magento\Cms\Block\Widget;
+
+use Magento\Framework\DataObject\IdentityInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Cms\Model\Block as CmsBlock;
+use Magento\Widget\Block\BlockInterface;
 
 /**
  * Cms Static Block Widget
  *
- * @category   Magento
- * @package    Magento_Cms
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @author Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Cms\Block\Widget;
-
-class Block extends \Magento\View\Element\Template implements \Magento\Widget\Block\BlockInterface
+class Block extends \Magento\Framework\View\Element\Template implements BlockInterface, IdentityInterface
 {
     /**
      * @var \Magento\Cms\Model\Template\FilterProvider
@@ -46,7 +30,7 @@ class Block extends \Magento\View\Element\Template implements \Magento\Widget\Bl
      *
      * @var array
      */
-    static protected $_widgetUsageMap = array();
+    protected static $_widgetUsageMap = [];
 
     /**
      * Block factory
@@ -56,16 +40,21 @@ class Block extends \Magento\View\Element\Template implements \Magento\Widget\Bl
     protected $_blockFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @var CmsBlock
+     */
+    private $block;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Cms\Model\Template\FilterProvider $filterProvider
      * @param \Magento\Cms\Model\BlockFactory $blockFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Cms\Model\Template\FilterProvider $filterProvider,
         \Magento\Cms\Model\BlockFactory $blockFactory,
-        array $data = array()
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_filterProvider = $filterProvider;
@@ -73,10 +62,11 @@ class Block extends \Magento\View\Element\Template implements \Magento\Widget\Bl
     }
 
     /**
-     * Prepare block text and determine whether block output enabled or not
-     * Prevent blocks recursion if needed
+     * Prepare block text and determine whether block output enabled or not.
      *
-     * @return \Magento\Cms\Block\Widget\Block
+     * Prevent blocks recursion if needed.
+     *
+     * @return $this
      */
     protected function _beforeToHtml()
     {
@@ -89,20 +79,63 @@ class Block extends \Magento\View\Element\Template implements \Magento\Widget\Bl
         }
         self::$_widgetUsageMap[$blockHash] = true;
 
-        if ($blockId) {
-            $storeId = $this->_storeManager->getStore()->getId();
-            /** @var \Magento\Cms\Model\Block $block */
-            $block = $this->_blockFactory->create();
-            $block->setStoreId($storeId)
-                ->load($blockId);
-            if ($block->getIsActive()) {
+        $block = $this->getBlock();
+
+        if ($block && $block->isActive()) {
+            try {
+                $storeId = $this->getData('store_id') ?? $this->_storeManager->getStore()->getId();
                 $this->setText(
                     $this->_filterProvider->getBlockFilter()->setStoreId($storeId)->filter($block->getContent())
                 );
+            } catch (NoSuchEntityException $e) {
+            }
+        }
+        unset(self::$_widgetUsageMap[$blockHash]);
+        return $this;
+    }
+
+    /**
+     * Get identities of the Cms Block
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        $block = $this->getBlock();
+
+        if ($block) {
+            return $block->getIdentities();
+        }
+
+        return [];
+    }
+
+    /**
+     * Get block
+     *
+     * @return CmsBlock|null
+     */
+    private function getBlock(): ?CmsBlock
+    {
+        if ($this->block) {
+            return $this->block;
+        }
+
+        $blockId = $this->getData('block_id');
+
+        if ($blockId) {
+            try {
+                $storeId = $this->_storeManager->getStore()->getId();
+                /** @var \Magento\Cms\Model\Block $block */
+                $block = $this->_blockFactory->create();
+                $block->setStoreId($storeId)->load($blockId);
+                $this->block = $block;
+
+                return $block;
+            } catch (NoSuchEntityException $e) {
             }
         }
 
-        unset(self::$_widgetUsageMap[$blockHash]);
-        return $this;
+        return null;
     }
 }

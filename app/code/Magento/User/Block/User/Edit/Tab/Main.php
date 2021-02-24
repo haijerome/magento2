@@ -1,28 +1,13 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\User\Block\User\Edit\Tab;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Locale\OptionInterface;
 
 /**
  * Cms page edit form main tab
@@ -31,29 +16,50 @@ namespace Magento\User\Block\User\Edit\Tab;
  */
 class Main extends \Magento\Backend\Block\Widget\Form\Generic
 {
+    const CURRENT_USER_PASSWORD_FIELD = 'current_password';
+
     /**
      * @var \Magento\Backend\Model\Auth\Session
      */
     protected $_authSession;
 
     /**
+     * @var \Magento\Framework\Locale\ListsInterface
+     */
+    protected $_LocaleLists;
+
+    /**
+     * Operates with deployed locales.
+     *
+     * @var OptionInterface
+     */
+    private $deployedLocales;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Data\FormFactory $formFactory
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Data\FormFactory $formFactory
      * @param \Magento\Backend\Model\Auth\Session $authSession
+     * @param \Magento\Framework\Locale\ListsInterface $localeLists
      * @param array $data
+     * @param OptionInterface $deployedLocales Operates with deployed locales.
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Data\FormFactory $formFactory,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Data\FormFactory $formFactory,
         \Magento\Backend\Model\Auth\Session $authSession,
-        array $data = array()
+        \Magento\Framework\Locale\ListsInterface $localeLists,
+        array $data = [],
+        OptionInterface $deployedLocales = null
     ) {
         $this->_authSession = $authSession;
+        $this->_LocaleLists = $localeLists;
+        $this->deployedLocales = $deployedLocales
+            ?: ObjectManager::getInstance()->get(OptionInterface::class);
         parent::__construct($context, $registry, $formFactory, $data);
     }
-    
+
     /**
      * Prepare form fields
      *
@@ -65,57 +71,68 @@ class Main extends \Magento\Backend\Block\Widget\Form\Generic
         /** @var $model \Magento\User\Model\User */
         $model = $this->_coreRegistry->registry('permissions_user');
 
-        /** @var \Magento\Data\Form $form */
+        /** @var \Magento\Framework\Data\Form $form */
         $form = $this->_formFactory->create();
         $form->setHtmlIdPrefix('user_');
 
-        $fieldset = $form->addFieldset(
-            'base_fieldset',
-            array('legend'=>__('Account Information'))
-        );
+        $baseFieldset = $form->addFieldset('base_fieldset', ['legend' => __('Account Information')]);
 
         if ($model->getUserId()) {
-            $fieldset->addField('user_id', 'hidden', array(
-                'name' => 'user_id',
-            ));
+            $baseFieldset->addField('user_id', 'hidden', ['name' => 'user_id']);
         } else {
-            if (! $model->hasData('is_active')) {
+            if (!$model->hasData('is_active')) {
                 $model->setIsActive(1);
             }
         }
 
-        $fieldset->addField('username', 'text', array(
-            'name'  => 'username',
-            'label' => __('User Name'),
-            'id'    => 'username',
-            'title' => __('User Name'),
-            'required' => true,
-        ));
+        $baseFieldset->addField(
+            'username',
+            'text',
+            [
+                'name' => 'username',
+                'label' => __('User Name'),
+                'id' => 'username',
+                'title' => __('User Name'),
+                'required' => true
+            ]
+        );
 
-        $fieldset->addField('firstname', 'text', array(
-            'name'  => 'firstname',
-            'label' => __('First Name'),
-            'id'    => 'firstname',
-            'title' => __('First Name'),
-            'required' => true,
-        ));
+        $baseFieldset->addField(
+            'firstname',
+            'text',
+            [
+                'name' => 'firstname',
+                'label' => __('First Name'),
+                'id' => 'firstname',
+                'title' => __('First Name'),
+                'required' => true
+            ]
+        );
 
-        $fieldset->addField('lastname', 'text', array(
-            'name'  => 'lastname',
-            'label' => __('Last Name'),
-            'id'    => 'lastname',
-            'title' => __('Last Name'),
-            'required' => true,
-        ));
+        $baseFieldset->addField(
+            'lastname',
+            'text',
+            [
+                'name' => 'lastname',
+                'label' => __('Last Name'),
+                'id' => 'lastname',
+                'title' => __('Last Name'),
+                'required' => true
+            ]
+        );
 
-        $fieldset->addField('email', 'text', array(
-            'name'  => 'email',
-            'label' => __('Email'),
-            'id'    => 'customer_email',
-            'title' => __('User Email'),
-            'class' => 'required-entry validate-email',
-            'required' => true,
-        ));
+        $baseFieldset->addField(
+            'email',
+            'text',
+            [
+                'name' => 'email',
+                'label' => __('Email'),
+                'id' => 'customer_email',
+                'title' => __('User Email'),
+                'class' => 'required-entry validate-email',
+                'required' => true
+            ]
+        );
 
         $isNewObject = $model->isObjectNew();
         if ($isNewObject) {
@@ -124,40 +141,57 @@ class Main extends \Magento\Backend\Block\Widget\Form\Generic
             $passwordLabel = __('New Password');
         }
         $confirmationLabel = __('Password Confirmation');
-        $this->_addPasswordFields($fieldset, $passwordLabel, $confirmationLabel, $isNewObject);
+        $this->_addPasswordFields($baseFieldset, $passwordLabel, $confirmationLabel, $isNewObject);
 
-        $fieldset->addField('interface_locale', 'select', array(
-            'name'   => 'interface_locale',
-            'label'  => __('Interface Locale'),
-            'title'  => __('Interface Locale'),
-            'values' => $this->_locale->getTranslatedOptionLocales(),
-            'class'  => 'select',
-        ));
+        $baseFieldset->addField(
+            'interface_locale',
+            'select',
+            [
+                'name' => 'interface_locale',
+                'label' => __('Interface Locale'),
+                'title' => __('Interface Locale'),
+                'values' => $this->deployedLocales->getOptionLocales(),
+                'class' => 'select'
+            ]
+        );
 
         if ($this->_authSession->getUser()->getId() != $model->getUserId()) {
-            $fieldset->addField('is_active', 'select', array(
-                'name'      => 'is_active',
-                'label'     => __('This account is'),
-                'id'        => 'is_active',
-                'title'     => __('Account Status'),
-                'class'     => 'input-select',
-                'style'     => 'width: 80px',
-                'options'   => array(
-                    '1' => __('Active'),
-                    '0' => __('Inactive')
-                ),
-            ));
+            $baseFieldset->addField(
+                'is_active',
+                'select',
+                [
+                    'name' => 'is_active',
+                    'label' => __('This account is'),
+                    'id' => 'is_active',
+                    'title' => __('Account Status'),
+                    'class' => 'input-select',
+                    'options' => ['1' => __('Active'), '0' => __('Inactive')]
+                ]
+            );
         }
 
-        $fieldset->addField('user_roles', 'hidden', array(
-            'name' => 'user_roles',
-            'id'   => '_user_roles',
-        ));
+        $baseFieldset->addField('user_roles', 'hidden', ['name' => 'user_roles', 'id' => '_user_roles']);
+
+        $currentUserVerificationFieldset = $form->addFieldset(
+            'current_user_verification_fieldset',
+            ['legend' => __('Current User Identity Verification')]
+        );
+        $currentUserVerificationFieldset->addField(
+            self::CURRENT_USER_PASSWORD_FIELD,
+            'password',
+            [
+                'name' => self::CURRENT_USER_PASSWORD_FIELD,
+                'label' => __('Your Password'),
+                'id' => self::CURRENT_USER_PASSWORD_FIELD,
+                'title' => __('Your Password'),
+                'class' => 'validate-current-password required-entry',
+                'required' => true
+            ]
+        );
 
         $data = $model->getData();
-
         unset($data['password']);
-
+        unset($data[self::CURRENT_USER_PASSWORD_FIELD]);
         $form->setValues($data);
 
         $this->setForm($form);
@@ -168,30 +202,42 @@ class Main extends \Magento\Backend\Block\Widget\Form\Generic
     /**
      * Add password input fields
      *
-     * @param \Magento\Data\Form\Element\Fieldset $fieldset
+     * @param \Magento\Framework\Data\Form\Element\Fieldset $fieldset
      * @param string $passwordLabel
      * @param string $confirmationLabel
      * @param bool $isRequired
+     * @return void
      */
     protected function _addPasswordFields(
-        \Magento\Data\Form\Element\Fieldset $fieldset, $passwordLabel, $confirmationLabel, $isRequired = false
+        \Magento\Framework\Data\Form\Element\Fieldset $fieldset,
+        $passwordLabel,
+        $confirmationLabel,
+        $isRequired = false
     ) {
-        $requiredFieldClass = ($isRequired ? ' required-entry' : '');
-        $fieldset->addField('password', 'password', array(
-            'name'  => 'password',
-            'label' => $passwordLabel,
-            'id'    => 'customer_pass',
-            'title' => $passwordLabel,
-            'class' => 'input-text validate-admin-password' . $requiredFieldClass,
-            'required' => $isRequired,
-        ));
-        $fieldset->addField('confirmation', 'password', array(
-            'name'  => 'password_confirmation',
-            'label' => $confirmationLabel,
-            'id'    => 'confirmation',
-            'title' => $confirmationLabel,
-            'class' => 'input-text validate-cpassword' . $requiredFieldClass,
-            'required' => $isRequired,
-        ));
+        $requiredFieldClass = $isRequired ? ' required-entry' : '';
+        $fieldset->addField(
+            'password',
+            'password',
+            [
+                'name' => 'password',
+                'label' => $passwordLabel,
+                'id' => 'customer_pass',
+                'title' => $passwordLabel,
+                'class' => 'input-text validate-admin-password' . $requiredFieldClass,
+                'required' => $isRequired
+            ]
+        );
+        $fieldset->addField(
+            'confirmation',
+            'password',
+            [
+                'name' => 'password_confirmation',
+                'label' => $confirmationLabel,
+                'id' => 'confirmation',
+                'title' => $confirmationLabel,
+                'class' => 'input-text validate-cpassword' . $requiredFieldClass,
+                'required' => $isRequired
+            ]
+        );
     }
 }

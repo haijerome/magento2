@@ -1,47 +1,19 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_ProductAlert
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\ProductAlert\Block\Product;
 
 /**
  * Product view price and stock alerts
  */
-namespace Magento\ProductAlert\Block\Product;
-
-class View extends \Magento\View\Element\Template
+class View extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_registry;
-
-    /**
-     * Current product instance
-     *
-     * @var null|\Magento\Catalog\Model\Product
-     */
-    protected $_product = null;
 
     /**
      * Helper instance
@@ -51,34 +23,51 @@ class View extends \Magento\View\Element\Template
     protected $_helper;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @var \Magento\Framework\Data\Helper\PostHelper
+     */
+    protected $coreHelper;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\ProductAlert\Helper\Data $helper
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Data\Helper\PostHelper $coreHelper
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\ProductAlert\Helper\Data $helper,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Data\Helper\PostHelper $coreHelper,
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_registry = $registry;
         $this->_helper = $helper;
+        $this->coreHelper = $coreHelper;
     }
 
     /**
-     * Get current product instance
+     * Retrieve currently edited product object
      *
-     * @return \Magento\ProductAlert\Block\Product\View
+     * @return \Magento\Catalog\Model\Product|boolean
      */
-    protected function _prepareLayout()
+    protected function getProduct()
     {
         $product = $this->_registry->registry('current_product');
         if ($product && $product->getId()) {
-            $this->_product = $product;
+            return $product;
         }
+        return false;
+    }
 
-        return parent::_prepareLayout();
+    /**
+     * Retrieve post action config
+     *
+     * @return string
+     */
+    public function getPostAction()
+    {
+        return $this->coreHelper->getPostData($this->getSignupUrl());
     }
 }

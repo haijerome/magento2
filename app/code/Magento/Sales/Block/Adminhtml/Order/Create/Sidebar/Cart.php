@@ -1,40 +1,24 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Sidebar;
+
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Pricing\Price\FinalPrice;
+use Magento\Store\Model\ScopeInterface;
 
 /**
  * Adminhtml sales order create sidebar cart block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Sidebar;
-
-class Cart
-    extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\AbstractSidebar
+class Cart extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\AbstractSidebar
 {
     /**
      * Storage action on selected item
@@ -43,6 +27,11 @@ class Cart
      */
     protected $_sidebarStorageAction = 'add_cart_item';
 
+    /**
+     * Constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -50,6 +39,11 @@ class Cart
         $this->setDataId('cart');
     }
 
+    /**
+     * Get header text
+     *
+     * @return \Magento\Framework\Phrase
+     */
     public function getHeaderText()
     {
         return __('Shopping Cart');
@@ -63,13 +57,31 @@ class Cart
     public function getItemCollection()
     {
         $collection = $this->getData('item_collection');
-        if (is_null($collection)) {
+        if ($collection === null) {
             $collection = $this->getCreateOrderModel()->getCustomerCart()->getAllVisibleItems();
             $this->setData('item_collection', $collection);
         }
         return $collection;
     }
 
+    /**
+     * @inheritdoc
+     * @since 102.0.1
+     */
+    public function getItemPrice(Product $product)
+    {
+        $customPrice = $this->getCartItemCustomPrice($product);
+
+        return $customPrice !== null
+            ? $this->convertPrice($customPrice)
+            : $this->priceCurrency->format($product->getPriceInfo()->getPrice(FinalPrice::PRICE_CODE)->getValue());
+    }
+
+    /**
+     * Retrieve display item qty availability
+     *
+     * @return true
+     */
     public function canDisplayItemQty()
     {
         return true;
@@ -78,7 +90,7 @@ class Cart
     /**
      * Retrieve identifier of block item
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return int
      */
     public function getIdentifierId($item)
@@ -89,8 +101,8 @@ class Cart
     /**
      * Retrieve product identifier linked with item
      *
-     * @param   \Magento\Sales\Model\Quote\Item $item
-     * @return  int
+     * @param \Magento\Quote\Model\Quote\Item $item
+     * @return int
      */
     public function getProductId($item)
     {
@@ -102,16 +114,66 @@ class Cart
      *
      * Add button that clears customer's shopping cart
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Cart
+     * @return $this
      */
     protected function _prepareLayout()
     {
         $deleteAllConfirmString = __('Are you sure you want to delete all items from shopping cart?');
-        $this->addChild('empty_customer_cart_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label' => __('Clear Shopping Cart'),
-            'onclick' => 'order.clearShoppingCart(\'' . $deleteAllConfirmString . '\')'
-        ));
+        $this->addChild(
+            'empty_customer_cart_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Clear Shopping Cart'),
+                'onclick' => 'order.clearShoppingCart(\'' . $deleteAllConfirmString . '\')'
+            ]
+        );
 
         return parent::_prepareLayout();
+    }
+
+    /**
+     * Returns cart item custom price.
+     *
+     * @param Product $product
+     * @return float|null
+     */
+    private function getCartItemCustomPrice(Product $product): ?float
+    {
+        $items = $this->getItemCollection();
+        foreach ($items as $item) {
+            $productItemId = $this->getProduct($item)->getId();
+            if ($productItemId === $product->getId() && $item->getCustomPrice()) {
+                return (float)$item->getCustomPrice();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @inheritdoc
+     * @since 102.0.4
+     */
+    public function getItemCount()
+    {
+        $count = $this->getData('item_count');
+        if ($count === null) {
+            $useQty = $this->_scopeConfig->getValue(
+                'checkout/cart_link/use_qty',
+                ScopeInterface::SCOPE_STORE
+            );
+            $allItems = $this->getItems();
+            if ($useQty) {
+                $count = 0;
+                foreach ($allItems as $item) {
+                    $count += $item->getQty();
+                }
+            } else {
+                $count = count($allItems);
+            }
+            $this->setData('item_count', $count);
+        }
+
+        return $count;
     }
 }

@@ -1,58 +1,38 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Adminhtml Catalog Attribute Set Main Block
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Block\Adminhtml\Product\Attribute\Set;
 
+/**
+ * @author      Magento Core Team <core@magentocommerce.com>
+ */
+use Magento\Catalog\Model\Entity\Product\Attribute\Group\AttributeMapperInterface;
+
+/**
+ * Adminhtml Catalog Attribute Set Main Block.
+ *
+ * @api
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
+ */
 class Main extends \Magento\Backend\Block\Template
 {
-    protected $_template = 'catalog/product/attribute/set/main.phtml';
-
     /**
-     * Catalog product
-     *
-     * @var \Magento\Catalog\Helper\Product
+     * @var string
      */
-    protected $_catalogProduct = null;
+    protected $_template = 'Magento_Catalog::catalog/product/attribute/set/main.phtml';
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Product\Attribute\CollectionFactory
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory
      */
     protected $_collectionFactory;
 
@@ -67,99 +47,120 @@ class Main extends \Magento\Backend\Block\Template
     protected $_groupFactory;
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Product\Type\Configurable\AttributeFactory
-     */
-    protected $_attributeFactory;
-
-    /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
+     * @var \Magento\Catalog\Model\Entity\Product\Attribute\Group\AttributeMapperInterface
+     */
+    protected $attributeMapper;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
      * @param \Magento\Eav\Model\Entity\TypeFactory $typeFactory
      * @param \Magento\Eav\Model\Entity\Attribute\GroupFactory $groupFactory
-     * @param \Magento\Catalog\Model\Resource\Product\Type\Configurable\AttributeFactory $attributeFactory
-     * @param \Magento\Catalog\Model\Resource\Product\Attribute\CollectionFactory $collectionFactory
-     * @param \Magento\Catalog\Helper\Product $catalogProduct
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory $collectionFactory
+     * @param \Magento\Framework\Registry $registry
+     * @param AttributeMapperInterface $attributeMapper
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
         \Magento\Eav\Model\Entity\TypeFactory $typeFactory,
         \Magento\Eav\Model\Entity\Attribute\GroupFactory $groupFactory,
-        \Magento\Catalog\Model\Resource\Product\Type\Configurable\AttributeFactory $attributeFactory,
-        \Magento\Catalog\Model\Resource\Product\Attribute\CollectionFactory $collectionFactory,
-        \Magento\Catalog\Helper\Product $catalogProduct,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory $collectionFactory,
+        \Magento\Framework\Registry $registry,
+        AttributeMapperInterface $attributeMapper,
+        array $data = []
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_typeFactory = $typeFactory;
         $this->_groupFactory = $groupFactory;
-        $this->_attributeFactory = $attributeFactory;
         $this->_collectionFactory = $collectionFactory;
         $this->_coreRegistry = $registry;
-        $this->_catalogProduct = $catalogProduct;
+        $this->attributeMapper = $attributeMapper;
         parent::__construct($context, $data);
     }
 
     /**
      * Prepare Global Layout
      *
-     * @return \Magento\Catalog\Block\Adminhtml\Product\Attribute\Set\Main
+     * @return $this
      */
     protected function _prepareLayout()
     {
         $setId = $this->_getSetId();
 
-        $this->addChild('group_tree', 'Magento\Catalog\Block\Adminhtml\Product\Attribute\Set\Main\Tree\Group');
+        $this->addChild('group_tree', \Magento\Catalog\Block\Adminhtml\Product\Attribute\Set\Main\Tree\Group::class);
 
-        $this->addChild('edit_set_form', 'Magento\Catalog\Block\Adminhtml\Product\Attribute\Set\Main\Formset');
+        $this->addChild('edit_set_form', \Magento\Catalog\Block\Adminhtml\Product\Attribute\Set\Main\Formset::class);
 
-        $this->addChild('delete_group_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Delete Selected Group'),
-            'onclick'   => 'editSet.submit();',
-            'class'     => 'delete'
-        ));
+        $this->addChild(
+            'delete_group_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Delete Selected Group'), 'onclick' => 'editSet.submit();', 'class' => 'delete']
+        );
 
-        $this->addChild('add_group_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Add New'),
-            'onclick'   => 'editSet.addGroup();',
-            'class'     => 'add'
-        ));
+        $this->addChild(
+            'add_group_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Add New'), 'onclick' => 'editSet.addGroup();', 'class' => 'add']
+        );
 
-        $this->addChild('back_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Back'),
-            'onclick'   => 'setLocation(\''.$this->getUrl('catalog/*/').'\')',
-            'class'     => 'back'
-        ));
+        $this->getToolbar()->addChild(
+            'back_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Back'),
+                'onclick' => 'setLocation(\'' . $this->getUrl('catalog/*/') . '\')',
+                'class' => 'back'
+            ]
+        );
 
-        $this->addChild('reset_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Reset'),
-            'onclick'   => 'window.location.reload()'
-        ));
+        $this->getToolbar()->addChild(
+            'reset_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Reset'), 'onclick' => 'window.location.reload()', 'class' => 'reset']
+        );
 
-        $this->addChild('save_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Save Attribute Set'),
-            'onclick'   => 'editSet.save();',
-            'class'     => 'save'
-        ));
+        if (!$this->getIsCurrentSetDefault()) {
+            $this->getToolbar()->addChild(
+                'delete_button',
+                \Magento\Backend\Block\Widget\Button::class,
+                [
+                    'label' => __('Delete'),
+                    'onclick' => 'deleteConfirm(\'' . $this->escapeJs(
+                        __(
+                            'You are about to delete all products in this attribute set. '
+                            . 'Are you sure you want to do that?'
+                        )
+                    ) . '\', \'' . $this->getUrl(
+                        'catalog/*/delete',
+                        ['id' => $setId]
+                    ) . '\',{data: {}})',
+                    'class' => 'delete'
+                ]
+            );
+        }
 
-        $this->addChild('delete_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Delete Attribute Set'),
-            'onclick'   => 'deleteConfirm(\''. $this->escapeJsQuote(__('You are about to delete all products in this set. Are you sure you want to delete this attribute set?')) . '\', \'' . $this->getUrl('catalog/*/delete', array('id' => $setId)) . '\')',
-            'class'     => 'delete'
-        ));
+        $this->getToolbar()->addChild(
+            'save_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Save'),
+                'onclick' => 'editSet.save();',
+                'class' => 'save primary save-attribute-set'
+            ]
+        );
 
-        $this->addChild('rename_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('New Set Name'),
-            'onclick'   => 'editSet.rename()'
-        ));
+        $this->addChild(
+            'rename_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('New Set Name'), 'onclick' => 'editSet.rename()']
+        );
 
         return parent::_prepareLayout();
     }
@@ -187,7 +188,7 @@ class Main extends \Magento\Backend\Block\Template
     /**
      * Retrieve Block Header Text
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     protected function _getHeader()
     {
@@ -201,7 +202,7 @@ class Main extends \Magento\Backend\Block\Template
      */
     public function getMoveUrl()
     {
-        return $this->getUrl('catalog/product_set/save', array('id' => $this->_getSetId()));
+        return $this->getUrl('catalog/product_set/save', ['id' => $this->_getSetId()]);
     }
 
     /**
@@ -211,7 +212,7 @@ class Main extends \Magento\Backend\Block\Template
      */
     public function getGroupUrl()
     {
-        return $this->getUrl('catalog/product_group/save', array('id' => $this->_getSetId()));
+        return $this->getUrl('catalog/product_group/save', ['id' => $this->_getSetId()]);
     }
 
     /**
@@ -221,55 +222,31 @@ class Main extends \Magento\Backend\Block\Template
      */
     public function getGroupTreeJson()
     {
-        $items = array();
+        $items = [];
         $setId = $this->_getSetId();
 
-        /* @var $groups \Magento\Eav\Model\Resource\Entity\Attribute\Group\Collection */
-        $groups = $this->_groupFactory->create()
-            ->getResourceCollection()
-            ->setAttributeSetFilter($setId)
-            ->setSortOrder()
-            ->load();
-
-        $configurable = $this->_attributeFactory->create()->getUsedAttributes($setId);
-
-        $unassignableAttributes = $this->_catalogProduct->getUnassignableAttributes();
+        /* @var $groups \Magento\Eav\Model\ResourceModel\Entity\Attribute\Group\Collection */
+        $groups = $this->_groupFactory->create()->getResourceCollection()->setAttributeSetFilter(
+            $setId
+        )->setSortOrder()->load();
 
         /* @var $node \Magento\Eav\Model\Entity\Attribute\Group */
         foreach ($groups as $node) {
-            $item = array();
-            $item['text']       = $node->getAttributeGroupName();
-            $item['id']         = $node->getAttributeGroupId();
-            $item['cls']        = 'folder';
-            $item['allowDrop']  = true;
-            $item['allowDrag']  = true;
+            $item = [];
+            $item['text'] = $this->escapeHtml($node->getAttributeGroupName());
+            $item['id'] = $node->getAttributeGroupId();
+            $item['cls'] = 'folder';
+            $item['allowDrop'] = true;
+            $item['allowDrag'] = true;
 
-            $nodeChildren = $this->_collectionFactory->create()
-                ->setAttributeGroupFilter($node->getId())
-                ->addVisibleFilter()
-                ->load();
+            $nodeChildren = $this->_collectionFactory->create()->setAttributeGroupFilter(
+                $node->getId()
+            )->addVisibleFilter()->load();
 
             if ($nodeChildren->getSize() > 0) {
-                $item['children'] = array();
+                $item['children'] = [];
                 foreach ($nodeChildren->getItems() as $child) {
-                    /* @var $child \Magento\Eav\Model\Entity\Attribute */
-
-                    $isUnassignable = !in_array($child->getAttributeCode(), $unassignableAttributes);
-
-                    $attr = array(
-                        'text'              => $child->getAttributeCode(),
-                        'id'                => $child->getAttributeId(),
-                        'cls'               => $isUnassignable ? 'leaf' : 'system-leaf',
-                        'allowDrop'         => false,
-                        'allowDrag'         => true,
-                        'leaf'              => true,
-                        'is_user_defined'   => $child->getIsUserDefined(),
-                        'is_configurable'   => (int)in_array($child->getAttributeId(), $configurable),
-                        'is_unassignable'   => $isUnassignable,
-                        'entity_id'         => $child->getEntityAttributeId()
-                    );
-
-                    $item['children'][] = $attr;
+                    $item['children'][] = $this->attributeMapper->map($child);
                 }
             }
 
@@ -286,94 +263,47 @@ class Main extends \Magento\Backend\Block\Template
      */
     public function getAttributeTreeJson()
     {
-        $items = array();
+        $items = [];
         $setId = $this->_getSetId();
 
-        $collection = $this->_collectionFactory->create()
-            ->setAttributeSetFilter($setId)
-            ->load();
+        $collection = $this->_collectionFactory->create()->setAttributeSetFilter($setId)->load();
 
-        $attributesIds = array('0');
+        $attributesIds = ['0'];
         /* @var $item \Magento\Eav\Model\Entity\Attribute */
         foreach ($collection->getItems() as $item) {
             $attributesIds[] = $item->getAttributeId();
         }
 
-        $attributes = $this->_collectionFactory->create()
-            ->setAttributesExcludeFilter($attributesIds)
-            ->addVisibleFilter()
-            ->load();
+        $attributes = $this->_collectionFactory->create()->setAttributesExcludeFilter(
+            $attributesIds
+        )->addVisibleFilter()->load();
 
         foreach ($attributes as $child) {
-            $attr = array(
-                'text'              => $child->getAttributeCode(),
-                'id'                => $child->getAttributeId(),
-                'cls'               => 'leaf',
-                'allowDrop'         => false,
-                'allowDrag'         => true,
-                'leaf'              => true,
-                'is_user_defined'   => $child->getIsUserDefined(),
-                'is_configurable'   => false,
-                'entity_id'         => $child->getEntityId()
-            );
+            $attr = [
+                'text' => $this->escapeHtml($child->getAttributeCode()),
+                'id' => $child->getAttributeId(),
+                'cls' => 'leaf',
+                'allowDrop' => false,
+                'allowDrag' => true,
+                'leaf' => true,
+                'is_user_defined' => $child->getIsUserDefined(),
+                'entity_id' => $child->getEntityId(),
+            ];
 
             $items[] = $attr;
         }
 
         if (count($items) == 0) {
-            $items[] = array(
-                'text'      => __('Empty'),
-                'id'        => 'empty',
-                'cls'       => 'folder',
+            $items[] = [
+                'text' => __('Empty'),
+                'id' => 'empty',
+                'cls' => 'folder',
                 'allowDrop' => false,
                 'allowDrag' => false,
-            );
+            ];
         }
 
         return $this->_jsonEncoder->encode($items);
-    }
-
-    /**
-     * Retrieve Back Button HTML
-     *
-     * @return string
-     */
-    public function getBackButtonHtml()
-    {
-        return $this->getChildHtml('back_button');
-    }
-
-    /**
-     * Retrieve Reset Button HTML
-     *
-     * @return string
-     */
-    public function getResetButtonHtml()
-    {
-        return $this->getChildHtml('reset_button');
-    }
-
-    /**
-     * Retrieve Save Button HTML
-     *
-     * @return string
-     */
-    public function getSaveButtonHtml()
-    {
-        return $this->getChildHtml('save_button');
-    }
-
-    /**
-     * Retrieve Delete Button HTML
-     *
-     * @return string
-     */
-    public function getDeleteButtonHtml()
-    {
-        if ($this->getIsCurrentSetDefault()) {
-            return '';
-        }
-        return $this->getChildHtml('delete_button');
     }
 
     /**
@@ -394,16 +324,6 @@ class Main extends \Magento\Backend\Block\Template
     public function getAddGroupButton()
     {
         return $this->getChildHtml('add_group_button');
-    }
-
-    /**
-     * Retrieve Rename Button HTML
-     *
-     * @return string
-     */
-    public function getRenameButton()
-    {
-        return $this->getChildHtml('rename_button');
     }
 
     /**
@@ -430,14 +350,15 @@ class Main extends \Magento\Backend\Block\Template
      * Check Current Attribute Set is a default
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsCurrentSetDefault()
     {
         $isDefault = $this->getData('is_current_set_default');
-        if (is_null($isDefault)) {
-            $defaultSetId = $this->_typeFactory->create()
-                ->load($this->_coreRegistry->registry('entityType'))
-                ->getDefaultAttributeSetId();
+        if ($isDefault === null) {
+            $defaultSetId = $this->_typeFactory->create()->load(
+                $this->_coreRegistry->registry('entityType')
+            )->getDefaultAttributeSetId();
             $isDefault = $this->_getSetId() == $defaultSetId;
             $this->setData('is_current_set_default', $isDefault);
         }
@@ -451,7 +372,10 @@ class Main extends \Magento\Backend\Block\Template
      */
     protected function _toHtml()
     {
-        $this->_eventManager->dispatch('adminhtml_catalog_product_attribute_set_main_html_before', array('block' => $this));
+        $this->_eventManager->dispatch(
+            'adminhtml_catalog_product_attribute_set_main_html_before',
+            ['block' => $this]
+        );
         return parent::_toHtml();
     }
 }

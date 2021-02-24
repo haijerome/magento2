@@ -1,44 +1,43 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\System\Store\Delete;
 
+use Magento\Backup\Helper\Data as BackupHelper;
+use Magento\Framework\App\ObjectManager;
 
 /**
  * Adminhtml cms block edit form
  *
- * @category    Magento
- * @package     Magento_Backend
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Backend\Block\System\Store\Delete;
-
 class Form extends \Magento\Backend\Block\Widget\Form\Generic
 {
+    /**
+     * @var BackupHelper
+     */
+    private $backup;
+
+    /**
+     * @inheritDoc
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Data\FormFactory $formFactory,
+        array $data = [],
+        ?BackupHelper $backup = null
+    ) {
+        parent::__construct($context, $registry, $formFactory, $data);
+        $this->backup = $backup ?? ObjectManager::getInstance()->get(BackupHelper::class);
+    }
 
     /**
      * Init form
+     *
+     * @return void
      */
     protected function _construct()
     {
@@ -47,43 +46,48 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
         $this->setTitle(__('Block Information'));
     }
 
+    /**
+     * @inheritDoc
+     */
     protected function _prepareForm()
     {
         $dataObject = $this->getDataObject();
 
-        /** @var \Magento\Data\Form $form */
-        $form = $this->_formFactory->create(array(
-            'data' => array(
-                'id' => 'edit_form',
-                'action' => $this->getData('action'),
-                'method' => 'post',
-            ))
+        /** @var \Magento\Framework\Data\Form $form */
+        $form = $this->_formFactory->create(
+            ['data' => ['id' => 'edit_form', 'action' => $this->getData('action'), 'method' => 'post']]
         );
 
         $form->setHtmlIdPrefix('store_');
 
-        $fieldset = $form->addFieldset('base_fieldset', array('legend' => __('Backup Options'), 'class' => 'fieldset-wide'));
+        $fieldset = $form->addFieldset(
+            'base_fieldset',
+            ['legend' => __('Backup Options'), 'class' => 'fieldset-wide']
+        );
 
-        $fieldset->addField('item_id', 'hidden', array(
-            'name'  => 'item_id',
-            'value' => $dataObject->getId(),
-        ));
+        $fieldset->addField('item_id', 'hidden', ['name' => 'item_id', 'value' => $dataObject->getId()]);
 
-        $fieldset->addField('create_backup', 'select', array(
-            'label'     => __('Create DB Backup'),
-            'title'     => __('Create DB Backup'),
-            'name'      => 'create_backup',
-            'options'   => array(
-                '1' => __('Yes'),
-                '0' => __('No'),
-            ),
-            'value'     => '1',
-        ));
+        $backupOptions = ['0' => __('No')];
+        $backupSelected = '0';
+        if ($this->backup->isEnabled()) {
+            $backupOptions['1'] = __('Yes');
+            $backupSelected = '1';
+        }
+        $fieldset->addField(
+            'create_backup',
+            'select',
+            [
+                'label' => __('Create DB Backup'),
+                'title' => __('Create DB Backup'),
+                'name' => 'create_backup',
+                'options' => $backupOptions,
+                'value' => $backupSelected
+            ]
+        );
 
         $form->setUseContainer(true);
         $this->setForm($form);
 
         return parent::_prepareForm();
     }
-
 }

@@ -1,97 +1,62 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_ImportExport
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\ImportExport\Model;
+
+use Magento\Framework\App\Filesystem\DirectoryList;
 
 /**
  * Operation abstract class
  *
- * @category    Magento
- * @package     Magento_ImportExport
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\ImportExport\Model;
-
-abstract class AbstractModel extends \Magento\Object
+abstract class AbstractModel extends \Magento\Framework\DataObject
 {
     /**
-     * Enable loging
+     * Enable logging
      *
-     * @var boolean
+     * @var bool
      */
     protected $_debugMode = false;
 
     /**
-     * Loger instance
-     * @var \Magento\Core\Model\Log\Adapter
-     */
-    protected $_logInstance;
-
-    /**
      * Fields that should be replaced in debug with '***'
      *
-     * @var array
+     * @var string[]
      */
-    protected $_debugReplacePrivateDataKeys = array();
+    protected $_debugReplacePrivateDataKeys = [];
 
     /**
      * Contains all log information
      *
-     * @var array
+     * @var string[]
      */
-    protected $_logTrace = array();
+    protected $_logTrace = [];
 
     /**
-     * @var \Magento\Logger
+     * @var \Psr\Log\LoggerInterface
      */
     protected $_logger;
 
     /**
-     * @var \Magento\App\Dir
+     * @var \Magento\Framework\Filesystem\Directory\WriteInterface
      */
-    protected $_dir;
+    protected $_varDirectory;
 
     /**
-     * @var \Magento\Core\Model\Log\AdapterFactory
-     */
-    protected $_adapterFactory;
-
-    /**
-     * @param \Magento\Logger $logger
-     * @param \Magento\App\Dir $dir
-     * @param \Magento\Core\Model\Log\AdapterFactory $adapterFactory
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Filesystem $filesystem
      * @param array $data
      */
     public function __construct(
-        \Magento\Logger $logger,
-        \Magento\App\Dir $dir,
-        \Magento\Core\Model\Log\AdapterFactory $adapterFactory,
-        array $data = array()
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Filesystem $filesystem,
+        array $data = []
     ) {
         $this->_logger = $logger;
-        $this->_dir = $dir;
-        $this->_adapterFactory = $adapterFactory;
+        $this->_varDirectory = $filesystem->getDirectoryWrite(DirectoryList::VAR_IMPORT_EXPORT);
         parent::__construct($data);
     }
 
@@ -100,7 +65,7 @@ abstract class AbstractModel extends \Magento\Object
      * Log file dir: var/log/import_export/%Y/%m/%d/%time%_%operation_type%_%entity_type%.log
      *
      * @param mixed $debugData
-     * @return \Magento\ImportExport\Model\AbstractModel
+     * @return $this
      */
     public function addLogComment($debugData)
     {
@@ -109,36 +74,18 @@ abstract class AbstractModel extends \Magento\Object
         } else {
             $this->_logTrace[] = $debugData;
         }
-        if (!$this->_debugMode) {
-            return $this;
+
+        if ($this->_debugMode) {
+            $this->_logger->debug(var_export($debugData, true));
         }
 
-        if (!$this->_logInstance) {
-            $dirName  = date('Y' . DS .'m' . DS .'d' . DS);
-            $fileName = join('_', array(
-                str_replace(':', '-', $this->getRunAt()),
-                $this->getScheduledOperationId(),
-                $this->getOperationType(),
-                $this->getEntity()
-            ));
-            $dirPath = $this->_dir->getDir('var') . DS . \Magento\ImportExport\Model\Scheduled\Operation::LOG_DIRECTORY
-                . $dirName;
-            if (!is_dir($dirPath)) {
-                mkdir($dirPath, 0777, true);
-            }
-            $fileName = substr(strstr(\Magento\ImportExport\Model\Scheduled\Operation::LOG_DIRECTORY, DS), 1)
-                . $dirName . $fileName . '.log';
-            $this->_logInstance = $this->_adapterFactory->create(array('fileName' => $fileName))
-                ->setFilterDataKeys($this->_debugReplacePrivateDataKeys);
-        }
-        $this->_logInstance->log($debugData);
         return $this;
     }
 
     /**
      * Return human readable debug trace.
      *
-     * @return array
+     * @return string
      */
     public function getFormatedLogTrace()
     {

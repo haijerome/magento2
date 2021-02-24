@@ -1,40 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Invoice\Create;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Tax\Helper\Data as TaxHelper;
 
 /**
  * Adminhtml invoice create form
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Invoice\Create;
-
 class Form extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
 {
+    /**
+     * @param \Magento\Backend\Block\Template\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Sales\Helper\Admin $adminHelper
+     * @param array $data
+     * @param TaxHelper|null $taxHelper
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Sales\Helper\Admin $adminHelper,
+        array $data = [],
+        ?TaxHelper $taxHelper = null
+    ) {
+        $data['taxHelper'] = $taxHelper ?? ObjectManager::getInstance()->get(TaxHelper::class);
+        parent::__construct($context, $registry, $adminHelper, $data);
+    }
+
     /**
      * Retrieve invoice order
      *
@@ -65,18 +65,21 @@ class Form extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
         return $this->_coreRegistry->registry('current_invoice');
     }
 
-    protected function _prepareLayout()
-    {
-        $trackingBlock = $this->getLayout()->createBlock('Magento\Sales\Block\Adminhtml\Order\Invoice\Create\Tracking');
-        $this->setChild('tracking', $trackingBlock);
-        return parent::_prepareLayout();
-    }
-
+    /**
+     * Get save url
+     *
+     * @return string
+     */
     public function getSaveUrl()
     {
-        return $this->getUrl('sales/*/save', array('order_id' => $this->getInvoice()->getOrderId()));
+        return $this->getUrl('sales/*/save', ['order_id' => $this->getInvoice()->getOrderId()]);
     }
 
+    /**
+     * Check shipment availability for current invoice
+     *
+     * @return bool
+     */
     public function canCreateShipment()
     {
         foreach ($this->getInvoice()->getAllItems() as $item) {
@@ -87,6 +90,11 @@ class Form extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
         return false;
     }
 
+    /**
+     * Check invoice shipment type mismatch
+     *
+     * @return bool
+     */
     public function hasInvoiceShipmentTypeMismatch()
     {
         foreach ($this->getInvoice()->getAllItems() as $item) {
@@ -97,10 +105,15 @@ class Form extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
         return false;
     }
 
+    /**
+     * Check shipment availability for partially item
+     *
+     * @return bool
+     */
     public function canShipPartiallyItem()
     {
         $value = $this->getOrder()->getCanShipPartiallyItem();
-        if (!is_null($value) && !$value) {
+        if ($value !== null && !$value) {
             return false;
         }
         return true;
@@ -109,7 +122,7 @@ class Form extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
     /**
      * Return forced creating of shipment flag
      *
-     * @return integer
+     * @return int
      */
     public function getForcedShipmentCreate()
     {

@@ -1,63 +1,42 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Product type model
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Product;
 
-class Type
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Type\Pool;
+use Magento\Catalog\Model\Product\Type\Price;
+use Magento\Catalog\Model\Product\Type\Price\Factory as PriceFactory;
+use Magento\Catalog\Model\Product\Type\Simple;
+use Magento\Catalog\Model\ProductTypes\ConfigInterface;
+use Magento\Framework\Data\OptionSourceInterface;
+use Magento\Framework\Pricing\PriceInfo\Factory as PriceInfoFactory;
+
+/**
+ * Product type model
+ *
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Type implements OptionSourceInterface
 {
-    /**#@+
-     * Available product types
-     */
-    const TYPE_SIMPLE       = 'simple';
-    const TYPE_BUNDLE       = 'bundle';
-    const TYPE_CONFIGURABLE = 'configurable';
-    const TYPE_GROUPED      = 'grouped';
-    const TYPE_VIRTUAL      = 'virtual';
-    /**#@-*/
+    const TYPE_SIMPLE = 'simple';
+
+    const TYPE_BUNDLE = 'bundle';
+
+    const TYPE_VIRTUAL = 'virtual';
+
+    const DEFAULT_TYPE = 'simple';
+
+    const DEFAULT_TYPE_MODEL = Simple::class;
+
+    const DEFAULT_PRICE_MODEL = Price::class;
 
     /**
-     * Default product type
-     */
-    const DEFAULT_TYPE      = 'simple';
-
-    /**
-     * Default product type model
-     */
-    const DEFAULT_TYPE_MODEL    = 'Magento\Catalog\Model\Product\Type\Simple';
-
-    /**
-     * Default price model
-     */
-    const DEFAULT_PRICE_MODEL   = 'Magento\Catalog\Model\Product\Type\Price';
-
-    /**
-     * @var \Magento\Catalog\Model\ProductTypes\ConfigInterface
+     * @var ConfigInterface
      */
     protected $_config;
 
@@ -92,39 +71,47 @@ class Type
     /**
      * Product type factory
      *
-     * @var \Magento\Catalog\Model\Product\Type\Pool
+     * @var Pool
      */
     protected $_productTypePool;
 
     /**
      * Price model factory
      *
-     * @var \Magento\Catalog\Model\Product\Type\Price\Factory
+     * @var PriceFactory
      */
     protected $_priceFactory;
 
     /**
+     * @var PriceInfoFactory
+     */
+    protected $_priceInfoFactory;
+
+    /**
      * Construct
      *
-     * @param \Magento\Catalog\Model\ProductTypes\ConfigInterface $config
-     * @param \Magento\Catalog\Model\Product\Type\Pool $productTypePool
-     * @param \Magento\Catalog\Model\Product\Type\Price\Factory $priceFactory
+     * @param ConfigInterface $config
+     * @param Pool $productTypePool
+     * @param PriceFactory $priceFactory
+     * @param PriceInfoFactory $priceInfoFactory
      */
     public function __construct(
-        \Magento\Catalog\Model\ProductTypes\ConfigInterface $config,
-        \Magento\Catalog\Model\Product\Type\Pool $productTypePool,
-        \Magento\Catalog\Model\Product\Type\Price\Factory $priceFactory
+        ConfigInterface $config,
+        Pool $productTypePool,
+        PriceFactory $priceFactory,
+        PriceInfoFactory $priceInfoFactory
     ) {
         $this->_config = $config;
         $this->_productTypePool = $productTypePool;
         $this->_priceFactory = $priceFactory;
+        $this->_priceInfoFactory = $priceInfoFactory;
     }
 
     /**
      * Factory to product singleton product type instances
      *
-     * @param   \Magento\Catalog\Model\Product $product
-     * @return  \Magento\Catalog\Model\Product\Type\AbstractType
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @return \Magento\Catalog\Model\Product\Type\AbstractType
      */
     public function factory($product)
     {
@@ -146,8 +133,8 @@ class Type
     /**
      * Product type price model factory
      *
-     * @param   string $productType
-     * @return  \Magento\Catalog\Model\Product\Type\Price
+     * @param string $productType
+     * @return \Magento\Catalog\Model\Product\Type\Price
      */
     public function priceFactory($productType)
     {
@@ -168,15 +155,26 @@ class Type
     }
 
     /**
+     * Get Product Price Info object
+     *
+     * @param Product $saleableItem
+     * @return \Magento\Framework\Pricing\PriceInfoInterface
+     */
+    public function getPriceInfo(Product $saleableItem)
+    {
+        return $this->_priceInfoFactory->create($saleableItem);
+    }
+
+    /**
      * Get product type labels array
      *
      * @return array
      */
     public function getOptionArray()
     {
-        $options = array();
+        $options = [];
         foreach ($this->getTypes() as $typeId => $type) {
-            $options[$typeId] = __($type['label']);
+            $options[$typeId] = (string)$type['label'];
         }
         return $options;
     }
@@ -189,7 +187,7 @@ class Type
     public function getAllOption()
     {
         $options = $this->getOptionArray();
-        array_unshift($options, array('value' => '', 'label' => ''));
+        array_unshift($options, ['value' => '', 'label' => '']);
         return $options;
     }
 
@@ -200,14 +198,8 @@ class Type
      */
     public function getAllOptions()
     {
-        $res = array();
-        $res[] = array('value' => '', 'label' => '');
-        foreach ($this->getOptionArray() as $index => $value) {
-            $res[] = array(
-               'value' => $index,
-               'label' => $value
-            );
-        }
+        $res = $this->getOptions();
+        array_unshift($res, ['value' => '', 'label' => '']);
         return $res;
     }
 
@@ -218,12 +210,9 @@ class Type
      */
     public function getOptions()
     {
-        $res = array();
+        $res = [];
         foreach ($this->getOptionArray() as $index => $value) {
-            $res[] = array(
-               'value' => $index,
-               'label' => $value
-            );
+            $res[] = ['value' => $index, 'label' => $value];
         }
         return $res;
     }
@@ -237,7 +226,7 @@ class Type
     public function getOptionText($optionId)
     {
         $options = $this->getOptionArray();
-        return isset($options[$optionId]) ? $options[$optionId] : null;
+        return $options[$optionId] ?? null;
     }
 
     /**
@@ -247,7 +236,7 @@ class Type
      */
     public function getTypes()
     {
-        if (is_null($this->_types)) {
+        if ($this->_types === null) {
             $productTypes = $this->_config->getAll();
             foreach ($productTypes as $productTypeKey => $productTypeConfig) {
                 $productTypes[$productTypeKey]['label'] = __($productTypeConfig['label']);
@@ -264,8 +253,8 @@ class Type
      */
     public function getCompositeTypes()
     {
-        if (is_null($this->_compositeTypes)) {
-            $this->_compositeTypes = array();
+        if ($this->_compositeTypes === null) {
+            $this->_compositeTypes = [];
             $types = $this->getTypes();
             foreach ($types as $typeId => $typeInfo) {
                 if (array_key_exists('composite', $typeInfo) && $typeInfo['composite']) {
@@ -283,14 +272,14 @@ class Type
      */
     public function getTypesByPriority()
     {
-        if (is_null($this->_typesPriority)) {
-            $this->_typesPriority = array();
-            $simplePriority = array();
-            $compositePriority = array();
+        if ($this->_typesPriority === null) {
+            $this->_typesPriority = [];
+            $simplePriority = [];
+            $compositePriority = [];
 
             $types = $this->getTypes();
             foreach ($types as $typeId => $typeInfo) {
-                $priority = isset($typeInfo['index_priority']) ? abs(intval($typeInfo['index_priority'])) : 0;
+                $priority = isset($typeInfo['index_priority']) ? abs((int) $typeInfo['index_priority']) : 0;
                 if (!empty($typeInfo['composite'])) {
                     $compositePriority[$typeId] = $priority;
                 } else {
@@ -309,5 +298,13 @@ class Type
             }
         }
         return $this->_typesPriority;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function toOptionArray()
+    {
+        return $this->getOptions();
     }
 }

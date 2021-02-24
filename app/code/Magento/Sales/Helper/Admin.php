@@ -1,32 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
 namespace Magento\Sales\Helper;
 
-class Admin extends \Magento\App\Helper\AbstractHelper
+use Magento\Framework\App\ObjectManager;
+
+/**
+ * Sales admin helper.
+ */
+class Admin extends \Magento\Framework\App\Helper\AbstractHelper
 {
     /**
      * @var \Magento\Sales\Model\Config
@@ -34,29 +20,54 @@ class Admin extends \Magento\App\Helper\AbstractHelper
     protected $_salesConfig;
 
     /**
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
+     * @var \Magento\Framework\Pricing\PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
+     * @var \Magento\Framework\Escaper
+     */
+    protected $escaper;
+
+    /**
+     * @var \DOMDocumentFactory
+     */
+    private $domDocumentFactory;
+
+    /**
+     * @param \Magento\Framework\App\Helper\Context $context
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param \Magento\Sales\Model\Config $salesConfig
+     * @param \Magento\Framework\Pricing\PriceCurrencyInterface $priceCurrency
+     * @param \Magento\Framework\Escaper $escaper
+     * @param \DOMDocumentFactory|null $domDocumentFactory
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Sales\Model\Config $salesConfig
+        \Magento\Framework\App\Helper\Context $context,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Sales\Model\Config $salesConfig,
+        \Magento\Framework\Pricing\PriceCurrencyInterface $priceCurrency,
+        \Magento\Framework\Escaper $escaper,
+        \DOMDocumentFactory $domDocumentFactory = null
     ) {
+        $this->priceCurrency = $priceCurrency;
         $this->_storeManager = $storeManager;
         $this->_salesConfig = $salesConfig;
+        $this->escaper = $escaper;
+        $this->domDocumentFactory = $domDocumentFactory
+            ?: ObjectManager::getInstance()->get(\DOMDocumentFactory::class);
         parent::__construct($context);
     }
 
     /**
      * Display price attribute value in base order currency and in place order currency
      *
-     * @param   \Magento\Object $dataObject
+     * @param   \Magento\Framework\DataObject $dataObject
      * @param   string $code
      * @param   bool $strong
      * @param   string $separator
@@ -64,9 +75,13 @@ class Admin extends \Magento\App\Helper\AbstractHelper
      */
     public function displayPriceAttribute($dataObject, $code, $strong = false, $separator = '<br/>')
     {
+        // Fix for 'bs_customer_bal_total_refunded' attribute
+        $baseValue = $dataObject->hasData('bs_' . $code)
+            ? $dataObject->getData('bs_' . $code)
+            : $dataObject->getData('base_' . $code);
         return $this->displayPrices(
             $dataObject,
-            $dataObject->getData('base_'.$code),
+            $baseValue,
             $dataObject->getData($code),
             $strong,
             $separator
@@ -76,7 +91,7 @@ class Admin extends \Magento\App\Helper\AbstractHelper
     /**
      * Get "double" prices html (block with base and place currency)
      *
-     * @param   \Magento\Object $dataObject
+     * @param   \Magento\Framework\DataObject $dataObject
      * @param   float $basePrice
      * @param   float $price
      * @param   bool $strong
@@ -85,7 +100,6 @@ class Admin extends \Magento\App\Helper\AbstractHelper
      */
     public function displayPrices($dataObject, $basePrice, $price, $strong = false, $separator = '<br/>')
     {
-        $order = false;
         if ($dataObject instanceof \Magento\Sales\Model\Order) {
             $order = $dataObject;
         } else {
@@ -94,18 +108,18 @@ class Admin extends \Magento\App\Helper\AbstractHelper
 
         if ($order && $order->isCurrencyDifferent()) {
             $res = '<strong>';
-            $res.= $order->formatBasePrice($basePrice);
-            $res.= '</strong>'.$separator;
-            $res.= '['.$order->formatPrice($price).']';
+            $res .= $order->formatBasePrice($basePrice);
+            $res .= '</strong>' . $separator;
+            $res .= '[' . $order->formatPrice($price) . ']';
         } elseif ($order) {
             $res = $order->formatPrice($price);
             if ($strong) {
-                $res = '<strong>'.$res.'</strong>';
+                $res = '<strong>' . $res . '</strong>';
             }
         } else {
-            $res = $this->_storeManager->getStore()->formatPrice($price);
+            $res = $this->priceCurrency->format($price);
             if ($strong) {
-                $res = '<strong>'.$res.'</strong>';
+                $res = '<strong>' . $res . '</strong>';
             }
         }
         return $res;
@@ -114,18 +128,18 @@ class Admin extends \Magento\App\Helper\AbstractHelper
     /**
      * Filter collection by removing not available product types
      *
-     * @param \Magento\Core\Model\Resource\Db\Collection\AbstractCollection $collection
-     * @return \Magento\Core\Model\Resource\Db\Collection\AbstractCollection
+     * @param \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection $collection
+     * @return \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
      */
     public function applySalableProductTypesFilter($collection)
     {
         $productTypes = $this->_salesConfig->getAvailableProductTypes();
-        foreach($collection->getItems() as $key => $item) {
+        foreach ($collection->getItems() as $key => $item) {
             if ($item instanceof \Magento\Catalog\Model\Product) {
                 $type = $item->getTypeId();
-            } else if ($item instanceof \Magento\Sales\Model\Order\Item) {
+            } elseif ($item instanceof \Magento\Sales\Model\Order\Item) {
                 $type = $item->getProductType();
-            } else if ($item instanceof \Magento\Sales\Model\Quote\Item) {
+            } elseif ($item instanceof \Magento\Quote\Model\Quote\Item) {
                 $type = $item->getProductType();
             } else {
                 $type = '';
@@ -135,5 +149,79 @@ class Admin extends \Magento\App\Helper\AbstractHelper
             }
         }
         return $collection;
+    }
+
+    /**
+     * Escape string preserving links
+     *
+     * @param string $data
+     * @param null|array $allowedTags
+     * @return string
+     */
+    public function escapeHtmlWithLinks($data, $allowedTags = null)
+    {
+        if (!empty($data) && is_array($allowedTags) && in_array('a', $allowedTags)) {
+            $wrapperElementId = uniqid();
+            $domDocument = $this->domDocumentFactory->create();
+
+            $internalErrors = libxml_use_internal_errors(true);
+
+            $data = mb_convert_encoding($data, 'HTML-ENTITIES', 'UTF-8');
+            $domDocument->loadHTML(
+                '<html><body id="' . $wrapperElementId . '">' . $data . '</body></html>'
+            );
+
+            libxml_use_internal_errors($internalErrors);
+
+            $linkTags = $domDocument->getElementsByTagName('a');
+
+            foreach ($linkTags as $linkNode) {
+                $linkAttributes = [];
+                foreach ($linkNode->attributes as $attribute) {
+                    $linkAttributes[$attribute->name] = $attribute->value;
+                }
+
+                foreach ($linkAttributes as $attributeName => $attributeValue) {
+                    if ($attributeName === 'href') {
+                        $url = $this->filterUrl($attributeValue ?? '');
+                        $url = $this->escaper->escapeUrl($url);
+                        $linkNode->setAttribute('href', $url);
+                    } else {
+                        $linkNode->removeAttribute($attributeName);
+                    }
+                }
+            }
+
+            $result = mb_convert_encoding($domDocument->saveHTML(), 'UTF-8', 'HTML-ENTITIES');
+            preg_match('/<body id="' . $wrapperElementId . '">(.+)<\/body><\/html>$/si', $result, $matches);
+            $data = !empty($matches) ? $matches[1] : '';
+        }
+
+        return $this->escaper->escapeHtml($data, $allowedTags);
+    }
+
+    /**
+     * Filter the URL for allowed protocols.
+     *
+     * @param string $url
+     * @return string
+     */
+    private function filterUrl(string $url): string
+    {
+        if ($url) {
+            //Revert the sprintf escaping
+            // phpcs:ignore Magento2.Functions.DiscouragedFunction
+            $urlScheme = parse_url($url, PHP_URL_SCHEME);
+            $urlScheme = $urlScheme ? strtolower($urlScheme) : '';
+            if ($urlScheme !== 'http' && $urlScheme !== 'https') {
+                $url = null;
+            }
+        }
+
+        if (!$url) {
+            $url = '#';
+        }
+
+        return $url;
     }
 }

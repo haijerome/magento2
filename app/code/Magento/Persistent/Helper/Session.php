@@ -1,34 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Persistent
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Persistent\Helper;
 
 /**
  * Persistent Shopping Cart Data Helper
+ *
+ * @api
+ * @since 100.0.2
  */
-class Session extends \Magento\Core\Helper\Data
+class Session extends \Magento\Framework\App\Helper\AbstractHelper
 {
     /**
      * Instance of Session Model
@@ -36,13 +19,6 @@ class Session extends \Magento\Core\Helper\Data
      * @var \Magento\Persistent\Model\Session
      */
     protected $_sessionModel;
-
-    /**
-     * Persistent customer
-     *
-     * @var null|\Magento\Customer\Model\Customer
-     */
-    protected $_customer;
 
     /**
      * Is "Remember Me" checked
@@ -66,13 +42,6 @@ class Session extends \Magento\Core\Helper\Data
     protected $_sessionFactory;
 
     /**
-     * Customer factory
-     *
-     * @var \Magento\Customer\Model\CustomerFactory
-     */
-    protected $_customerFactory;
-
-    /**
      * Checkout session
      *
      * @var \Magento\Checkout\Model\Session
@@ -80,40 +49,23 @@ class Session extends \Magento\Core\Helper\Data
     protected $_checkoutSession;
 
     /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Locale $locale
-     * @param \Magento\App\State $appState
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param Data $persistentData
      * @param \Magento\Checkout\Model\Session $checkoutSession
-     * @param \Magento\Customer\Model\CustomerFactory $customerFactory
      * @param \Magento\Persistent\Model\SessionFactory $sessionFactory
-     * @param bool $dbCompatibleMode
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Locale $locale,
-        \Magento\App\State $appState,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Persistent\Helper\Data $persistentData,
         \Magento\Checkout\Model\Session $checkoutSession,
-        \Magento\Customer\Model\CustomerFactory $customerFactory,
-        \Magento\Persistent\Model\SessionFactory $sessionFactory,
-        $dbCompatibleMode = true
+        \Magento\Persistent\Model\SessionFactory $sessionFactory
     ) {
         $this->_persistentData = $persistentData;
         $this->_checkoutSession = $checkoutSession;
-        $this->_customerFactory = $customerFactory;
         $this->_sessionFactory = $sessionFactory;
+
         parent::__construct(
-            $context,
-            $coreStoreConfig,
-            $storeManager,
-            $locale,
-            $appState,
-            $dbCompatibleMode
+            $context
         );
     }
 
@@ -124,7 +76,7 @@ class Session extends \Magento\Core\Helper\Data
      */
     public function getSession()
     {
-        if (is_null($this->_sessionModel)) {
+        if ($this->_sessionModel === null) {
             $this->_sessionModel = $this->_sessionFactory->create();
             $this->_sessionModel->loadByCookieKey();
         }
@@ -136,6 +88,7 @@ class Session extends \Magento\Core\Helper\Data
      *
      * @param \Magento\Persistent\Model\Session $sessionModel
      * @return \Magento\Persistent\Model\Session
+     * @codeCoverageIgnore
      */
     public function setSession($sessionModel)
     {
@@ -160,10 +113,10 @@ class Session extends \Magento\Core\Helper\Data
      */
     public function isRememberMeChecked()
     {
-        if (is_null($this->_isRememberMeChecked)) {
+        if ($this->_isRememberMeChecked === null) {
             //Try to get from checkout session
             $isRememberMeChecked = $this->_checkoutSession->getRememberMeChecked();
-            if (!is_null($isRememberMeChecked)) {
+            if ($isRememberMeChecked !== null) {
                 $this->_isRememberMeChecked = $isRememberMeChecked;
                 $this->_checkoutSession->unsRememberMeChecked();
                 return $isRememberMeChecked;
@@ -181,23 +134,11 @@ class Session extends \Magento\Core\Helper\Data
      * Set "Remember Me" checked or not
      *
      * @param bool $checked
+     * @return void
+     * @codeCoverageIgnore
      */
     public function setRememberMeChecked($checked = true)
     {
         $this->_isRememberMeChecked = $checked;
-    }
-
-    /**
-     * Return persistent customer
-     *
-     * @return \Magento\Customer\Model\Customer|bool
-     */
-    public function getCustomer()
-    {
-        if (is_null($this->_customer)) {
-            $customerId = $this->getSession()->getCustomerId();
-            $this->_customer = $this->_customerFactory->create()->load($customerId);
-        }
-        return $this->_customer;
     }
 }

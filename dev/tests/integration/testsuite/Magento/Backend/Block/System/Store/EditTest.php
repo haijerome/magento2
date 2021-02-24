@@ -1,44 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Backend\Block\System\Store;
 
 /**
  * @magentoAppArea adminhtml
  */
-class EditTest extends \PHPUnit_Framework_TestCase
+class EditTest extends \PHPUnit\Framework\TestCase
 {
-    protected function tearDown()
+    protected function tearDown(): void
     {
         /** @var $objectManager \Magento\TestFramework\ObjectManager */
         $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
-        $objectManager->get('Magento\Core\Model\Registry')->unregister('store_type');
-        $objectManager->get('Magento\Core\Model\Registry')->unregister('store_data');
-        $objectManager->get('Magento\Core\Model\Registry')->unregister('store_action');
+        $objectManager->get(\Magento\Framework\Registry::class)->unregister('store_type');
+        $objectManager->get(\Magento\Framework\Registry::class)->unregister('store_data');
+        $objectManager->get(\Magento\Framework\Registry::class)->unregister('store_action');
     }
 
     /**
@@ -52,7 +30,7 @@ class EditTest extends \PHPUnit_Framework_TestCase
             if ($key == 'store_data') {
                 $value = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create($value);
             }
-            $objectManager->get('Magento\Core\Model\Registry')->register($key, $value);
+            $objectManager->get(\Magento\Framework\Registry::class)->register($key, $value);
         }
     }
 
@@ -66,10 +44,12 @@ class EditTest extends \PHPUnit_Framework_TestCase
     {
         $this->_initStoreTypesInRegistry($registryData);
 
-        /** @var $layout \Magento\Core\Model\Layout */
-        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\LayoutInterface');
+        /** @var $layout \Magento\Framework\View\Layout */
+        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+            \Magento\Framework\View\LayoutInterface::class
+        );
         /** @var $block \Magento\Backend\Block\System\Store\Edit */
-        $block = $layout->createBlock('Magento\Backend\Block\System\Store\Edit', 'block');
+        $block = $layout->createBlock(\Magento\Backend\Block\System\Store\Edit::class, 'block');
         $block->setArea(\Magento\Backend\App\Area\FrontNameResolver::AREA_CODE);
 
         $this->assertInstanceOf($expected, $block->getChildBlock('form'));
@@ -80,30 +60,22 @@ class EditTest extends \PHPUnit_Framework_TestCase
      */
     public function getStoreTypesForLayout()
     {
-        return array(
-            array(
-                array(
-                    'store_type' => 'website',
-                    'store_data' => 'Magento\Core\Model\Website',
-                ),
-                'Magento\Backend\Block\System\Store\Edit\Form\Website',
-            ),
-            array(
-                array(
-                    'store_type' => 'group',
-                    'store_data' => 'Magento\Core\Model\Store\Group',
-                ),
-                'Magento\Backend\Block\System\Store\Edit\Form\Group',
-            ),
-            array(
-                array(
-                    'store_type' => 'store',
-                    'store_data' => 'Magento\Core\Model\Store',
-                ),
-                'Magento\Backend\Block\System\Store\Edit\Form\Store',
-            ),
-        );
+        return [
+            [
+                ['store_type' => 'website', 'store_data' => \Magento\Store\Model\Website::class],
+                \Magento\Backend\Block\System\Store\Edit\Form\Website::class,
+            ],
+            [
+                ['store_type' => 'group', 'store_data' => \Magento\Store\Model\Store::class],
+                \Magento\Backend\Block\System\Store\Edit\Form\Group::class
+            ],
+            [
+                ['store_type' => 'store', 'store_data' => \Magento\Store\Model\Store::class],
+                \Magento\Backend\Block\System\Store\Edit\Form\Store::class
+            ]
+        ];
     }
+
     /**
      * @magentoAppIsolation enabled
      * @param $registryData
@@ -114,10 +86,12 @@ class EditTest extends \PHPUnit_Framework_TestCase
     {
         $this->_initStoreTypesInRegistry($registryData);
 
-        /** @var $layout \Magento\Core\Model\Layout */
-        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\LayoutInterface');
+        /** @var $layout \Magento\Framework\View\Layout */
+        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+            \Magento\Framework\View\LayoutInterface::class
+        );
         /** @var $block \Magento\Backend\Block\System\Store\Edit */
-        $block = $layout->createBlock('Magento\Backend\Block\System\Store\Edit', 'block');
+        $block = $layout->createBlock(\Magento\Backend\Block\System\Store\Edit::class, 'block');
         $block->setArea(\Magento\Backend\App\Area\FrontNameResolver::AREA_CODE);
 
         $this->assertEquals($expected, $block->getHeaderText());
@@ -128,55 +102,39 @@ class EditTest extends \PHPUnit_Framework_TestCase
      */
     public function getStoreDataForBlock()
     {
-        return array(
-            array(
-                array(
+        return [
+            [
+                [
                     'store_type' => 'website',
-                    'store_data' => 'Magento\Core\Model\Website',
+                    'store_data' => \Magento\Store\Model\Website::class,
                     'store_action' => 'add',
-                ),
+                ],
                 'New Web Site',
-            ),
-            array(
-                array(
+            ],
+            [
+                [
                     'store_type' => 'website',
-                    'store_data' => 'Magento\Core\Model\Website',
+                    'store_data' => \Magento\Store\Model\Website::class,
                     'store_action' => 'edit',
-                ),
-                'Edit Web Site',
-            ),
-            array(
-                array(
-                    'store_type' => 'group',
-                    'store_data' => 'Magento\Core\Model\Store\Group',
-                    'store_action' => 'add',
-                ),
-                'New Store',
-            ),
-            array(
-                array(
-                    'store_type' => 'group',
-                    'store_data' => 'Magento\Core\Model\Store\Group',
-                    'store_action' => 'edit',
-                ),
-                'Edit Store',
-            ),
-            array(
-                array(
-                    'store_type' => 'store',
-                    'store_data' => 'Magento\Core\Model\Store',
-                    'store_action' => 'add',
-                ),
-                'New Store View',
-            ),
-            array(
-                array(
-                    'store_type' => 'store',
-                    'store_data' => 'Magento\Core\Model\Store',
-                    'store_action' => 'edit',
-                ),
-                'Edit Store View',
-            ),
-        );
+                ],
+                'Edit Web Site'
+            ],
+            [
+                ['store_type' => 'group', 'store_data' => \Magento\Store\Model\Store::class, 'store_action' => 'add'],
+                'New Store'
+            ],
+            [
+                ['store_type' => 'group', 'store_data' => \Magento\Store\Model\Store::class, 'store_action' => 'edit'],
+                'Edit Store'
+            ],
+            [
+                ['store_type' => 'store', 'store_data' => \Magento\Store\Model\Store::class, 'store_action' => 'add'],
+                'New Store View'
+            ],
+            [
+                ['store_type' => 'store', 'store_data' => \Magento\Store\Model\Store::class, 'store_action' => 'edit'],
+                'Edit Store View'
+            ]
+        ];
     }
 }

@@ -1,48 +1,48 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Checkout\Block\Cart\Item;
+
+use Magento\Catalog\Pricing\Price\ConfiguredPriceInterface;
+use Magento\Checkout\Block\Cart\Item\Renderer\Actions;
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+use Magento\Framework\View\Element\AbstractBlock;
+use Magento\Framework\View\Element\Message\InterpretationStrategyInterface;
+use Magento\Quote\Model\Quote\Item\AbstractItem;
+use Magento\Framework\App\ObjectManager;
+use Magento\Catalog\Model\Product\Configuration\Item\ItemResolverInterface;
 
 /**
  * Shopping cart item render block
  *
- * @category    Magento
- * @package     Magento_Checkout
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
  *
  * @method \Magento\Checkout\Block\Cart\Item\Renderer setProductName(string)
  * @method \Magento\Checkout\Block\Cart\Item\Renderer setDeleteUrl(string)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
+ * @since 100.0.2
  */
-namespace Magento\Checkout\Block\Cart\Item;
-
-class Renderer extends \Magento\View\Element\Template
+class Renderer extends \Magento\Framework\View\Element\Template implements
+    \Magento\Framework\DataObject\IdentityInterface
 {
-    /** @var \Magento\Checkout\Model\Session */
+    /**
+     * @var \Magento\Checkout\Model\Session
+     */
     protected $_checkoutSession;
+
+    /**
+     * @var AbstractItem
+     */
     protected $_item;
+
+    /**
+     * @var string
+     */
     protected $_productUrl;
-    protected $_productThumbnail;
 
     /**
      * Whether qty will be converted to number
@@ -66,29 +66,87 @@ class Renderer extends \Magento\View\Element\Template
     protected $_productConfig = null;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @var \Magento\Framework\Url\Helper\Data
+     */
+    protected $_urlHelper;
+
+    /**
+     * @var \Magento\Framework\Message\ManagerInterface
+     */
+    protected $messageManager;
+
+    /**
+     * @var \Magento\Catalog\Block\Product\ImageBuilder
+     */
+    protected $imageBuilder;
+
+    /**
+     * @var PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
+     * @var \Magento\Framework\Module\Manager
+     */
+    public $moduleManager;
+
+    /**
+     * @var InterpretationStrategyInterface
+     */
+    private $messageInterpretationStrategy;
+
+    /** @var ItemResolverInterface */
+    private $itemResolver;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Catalog\Helper\Product\Configuration $productConfig
      * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @param \Magento\Catalog\Block\Product\ImageBuilder $imageBuilder
+     * @param \Magento\Framework\Url\Helper\Data $urlHelper
+     * @param \Magento\Framework\Message\ManagerInterface $messageManager
+     * @param PriceCurrencyInterface $priceCurrency
+     * @param \Magento\Framework\Module\Manager $moduleManager
+     * @param InterpretationStrategyInterface $messageInterpretationStrategy
      * @param array $data
+     * @param ItemResolverInterface|null $itemResolver
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Catalog\Helper\Product\Configuration $productConfig,
         \Magento\Checkout\Model\Session $checkoutSession,
-        array $data = array()
+        \Magento\Catalog\Block\Product\ImageBuilder $imageBuilder,
+        \Magento\Framework\Url\Helper\Data $urlHelper,
+        \Magento\Framework\Message\ManagerInterface $messageManager,
+        PriceCurrencyInterface $priceCurrency,
+        \Magento\Framework\Module\Manager $moduleManager,
+        InterpretationStrategyInterface $messageInterpretationStrategy,
+        array $data = [],
+        ItemResolverInterface $itemResolver = null
     ) {
+        $this->priceCurrency = $priceCurrency;
+        $this->imageBuilder = $imageBuilder;
+        $this->_urlHelper = $urlHelper;
         $this->_productConfig = $productConfig;
         $this->_checkoutSession = $checkoutSession;
+        $this->messageManager = $messageManager;
         parent::__construct($context, $data);
+        $this->_isScopePrivate = true;
+        $this->moduleManager = $moduleManager;
+        $this->messageInterpretationStrategy = $messageInterpretationStrategy;
+        $this->itemResolver = $itemResolver ?: ObjectManager::getInstance()->get(ItemResolverInterface::class);
     }
 
     /**
      * Set item for render
      *
-     * @param \Magento\Sales\Model\Quote\Item\AbstractItem $item
+     * @param AbstractItem $item
      * @return $this
+     * @codeCoverageIgnore
      */
-    public function setItem(\Magento\Sales\Model\Quote\Item\AbstractItem $item)
+    public function setItem(AbstractItem $item)
     {
         $this->_item = $item;
         return $this;
@@ -97,7 +155,8 @@ class Renderer extends \Magento\View\Element\Template
     /**
      * Get quote item
      *
-     * @return \Magento\Sales\Model\Quote\Item
+     * @return AbstractItem
+     * @codeCoverageIgnore
      */
     public function getItem()
     {
@@ -108,83 +167,31 @@ class Renderer extends \Magento\View\Element\Template
      * Get item product
      *
      * @return \Magento\Catalog\Model\Product
+     * @codeCoverageIgnore
      */
     public function getProduct()
     {
         return $this->getItem()->getProduct();
     }
 
-    public function overrideProductThumbnail($productThumbnail)
+    /**
+     * Identify the product from which thumbnail should be taken.
+     *
+     * @return \Magento\Catalog\Model\Product
+     * @codeCoverageIgnore
+     */
+    public function getProductForThumbnail()
     {
-        $this->_productThumbnail = $productThumbnail;
-        return $this;
+        return $this->itemResolver->getFinalProduct($this->getItem());
     }
 
     /**
-     * Thumbnail image getter
+     * Override product url.
      *
-     * @return \Magento\Catalog\Helper\Image
+     * @param string $productUrl
+     * @return $this
+     * @codeCoverageIgnore
      */
-    protected function _getThumbnail()
-    {
-        if (is_null($this->_productThumbnail)) {
-            $product = $this->getProduct();
-            if ($this->getProduct()->isConfigurable()) {
-                $children = $this->getItem()->getChildren();
-                if (isset($children[0])
-                    && $children[0]->getProduct()->getThumbnail()
-                    && $children[0]->getProduct()->getThumbnail() != 'no_selection'
-                ) {
-                    $product = $children[0]->getProduct();
-                }
-            }
-            $thumbnail = $this->helper('Magento\Catalog\Helper\Image')->init($product, 'thumbnail');
-        } else {
-            $thumbnail = $this->_productThumbnail;
-        }
-        return $thumbnail;
-    }
-
-    /**
-     * Get product thumbnail image url
-     *
-     * @return \Magento\Catalog\Model\Product\Image
-     */
-    public function getProductThumbnailUrl()
-    {
-        return (string) $this->_getThumbnail()->resize($this->getThumbnailSize());
-    }
-
-    /**
-     * Product image thumbnail getter
-     *
-     * @return int
-     */
-    public function getThumbnailSize()
-    {
-        return $this->getVar('product_thumbnail_image_size', 'Magento_Catalog');
-    }
-
-    /**
-     * Get product thumbnail image url for sidebar
-     *
-     * @return \Magento\Catalog\Model\Product\Image
-     */
-    public function getProductThumbnailSidebarUrl()
-    {
-        return (string) $this->_getThumbnail()->resize($this->getThumbnailSidebarSize())->setWatermarkSize('30x10');
-    }
-
-    /**
-     * Product image thumbnail getter
-     *
-     * @return int
-     */
-    public function getThumbnailSidebarSize()
-    {
-        return $this->getVar('product_thumbnail_image_sidebar_size', 'Magento_Catalog');
-    }
-
     public function overrideProductUrl($productUrl)
     {
         $this->_productUrl = $productUrl;
@@ -207,15 +214,14 @@ class Renderer extends \Magento\View\Element\Template
         }
 
         $product = $this->getProduct();
-        $option  = $this->getItem()->getOptionByCode('product_type');
+        $option = $this->getItem()->getOptionByCode('product_type');
         if ($option) {
             $product = $option->getProduct();
         }
 
         if ($product->isVisibleInSiteVisibility()) {
             return true;
-        }
-        else {
+        } else {
             if ($product->hasUrlDataObject()) {
                 $data = $product->getUrlDataObject();
                 if (in_array($data->getVisibility(), $product->getVisibleInSiteVisibilities())) {
@@ -223,7 +229,6 @@ class Renderer extends \Magento\View\Element\Template
                 }
             }
         }
-
         return false;
     }
 
@@ -234,7 +239,7 @@ class Renderer extends \Magento\View\Element\Template
      */
     public function getProductUrl()
     {
-        if (!is_null($this->_productUrl)) {
+        if ($this->_productUrl !== null) {
             return $this->_productUrl;
         }
         if ($this->getItem()->getRedirectUrl()) {
@@ -242,7 +247,7 @@ class Renderer extends \Magento\View\Element\Template
         }
 
         $product = $this->getProduct();
-        $option  = $this->getItem()->getOptionByCode('product_type');
+        $option = $this->getItem()->getOptionByCode('product_type');
         if ($option) {
             $product = $option->getProduct();
         }
@@ -266,7 +271,7 @@ class Renderer extends \Magento\View\Element\Template
     /**
      * Get product customize options
      *
-     * @return array || false
+     * @return array
      */
     public function getProductOptions()
     {
@@ -276,9 +281,10 @@ class Renderer extends \Magento\View\Element\Template
     }
 
     /**
-     * Get list of all otions for product
+     * Get list of all options for product
      *
      * @return array
+     * @codeCoverageIgnore
      */
     public function getOptionList()
     {
@@ -286,43 +292,9 @@ class Renderer extends \Magento\View\Element\Template
     }
 
     /**
-     * Get item configure url
-     *
-     * @return string
-     */
-    public function getConfigureUrl()
-    {
-        return $this->getUrl(
-            'checkout/cart/configure',
-            array('id' => $this->getItem()->getId())
-        );
-    }
-
-    /**
-     * Get item delete url
-     *
-     * @return string
-     */
-    public function getDeleteUrl()
-    {
-        if ($this->hasDeleteUrl()) {
-            return $this->getData('delete_url');
-        }
-
-        $encodedUrl = $this->helper('Magento\Core\Helper\Url')->getEncodedUrl();
-        return $this->getUrl(
-            'checkout/cart/delete',
-            array(
-                'id'=>$this->getItem()->getId(),
-                \Magento\App\Action\Action::PARAM_NAME_URL_ENCODED => $encodedUrl
-            )
-        );
-    }
-
-    /**
      * Get quote item qty
      *
-     * @return float|int|string
+     * @return float|int
      */
     public function getQty()
     {
@@ -336,6 +308,7 @@ class Renderer extends \Magento\View\Element\Template
      * Get checkout session
      *
      * @return \Magento\Checkout\Model\Session
+     * @codeCoverageIgnore
      */
     public function getCheckoutSession()
     {
@@ -343,46 +316,36 @@ class Renderer extends \Magento\View\Element\Template
     }
 
     /**
-     * Retrieve item messages
-     * Return array with keys
-     *
-     * text => the message text
-     * type => type of a message
+     * Retrieve item messages, return array with keys, text => the message text, type => type of a message
      *
      * @return array
      */
     public function getMessages()
     {
-        $messages = array();
+        $messages = [];
         $quoteItem = $this->getItem();
 
-        // Add basic messages occuring during this page load
+        // Add basic messages occurring during this page load
         $baseMessages = $quoteItem->getMessage(false);
         if ($baseMessages) {
             foreach ($baseMessages as $message) {
-                $messages[] = array(
-                    'text' => $message,
-                    'type' => $quoteItem->getHasError() ? 'error' : 'notice'
-                );
+                $messages[] = ['text' => $message, 'type' => $quoteItem->getHasError() ? 'error' : 'notice'];
             }
         }
 
-        // Add messages saved previously in checkout session
-        $checkoutSession = $this->getCheckoutSession();
-        if ($checkoutSession) {
-            /* @var $collection \Magento\Message\Collection */
-            $collection = $checkoutSession->getQuoteItemMessages($quoteItem->getId(), true);
-            if ($collection) {
-                $additionalMessages = $collection->getItems();
-                foreach ($additionalMessages as $message) {
-                    /* @var $message \Magento\Message\AbstractMessage */
-                    $messages[] = array(
-                        'text' => $message->getCode(),
-                        'type' => ($message->getType() == \Magento\Message\Factory::ERROR) ? 'error' : 'notice'
-                    );
-                }
+        /* @var $collection \Magento\Framework\Message\Collection */
+        $collection = $this->messageManager->getMessages(true, 'quote_item' . $quoteItem->getId());
+        if ($collection) {
+            $additionalMessages = $collection->getItems();
+            foreach ($additionalMessages as $message) {
+                /* @var $message \Magento\Framework\Message\MessageInterface */
+                $messages[] = [
+                    'text' => $this->messageInterpretationStrategy->interpret($message),
+                    'type' => $message->getType()
+                ];
             }
         }
+        $this->messageManager->getMessages(true, 'quote_item' . $quoteItem->getId())->clear();
 
         return $messages;
     }
@@ -390,7 +353,7 @@ class Renderer extends \Magento\View\Element\Template
     /**
      * Accept option value and return its formatted view
      *
-     * @param mixed $optionValue
+     * @param string|array $optionValue
      * Method works well with these $optionValue format:
      *      1. String
      *      2. Indexed array e.g. array(val1, val2, ...)
@@ -411,10 +374,10 @@ class Renderer extends \Magento\View\Element\Template
     {
         /* @var $helper \Magento\Catalog\Helper\Product\Configuration */
         $helper = $this->_productConfig;
-        $params = array(
+        $params = [
             'max_length' => 55,
-            'cut_replacer' => ' <a href="#" class="dots" onclick="return false">...</a>'
-        );
+            'cut_replacer' => ' <a href="#" class="dots tooltip toggle" onclick="return false">...</a>'
+        ];
         return $helper->getFormattedOptionValue($optionValue, $params);
     }
 
@@ -422,6 +385,7 @@ class Renderer extends \Magento\View\Element\Template
      * Check whether Product is visible in site
      *
      * @return bool
+     * @codeCoverageIgnore
      */
     public function isProductVisible()
     {
@@ -431,7 +395,8 @@ class Renderer extends \Magento\View\Element\Template
     /**
      * Return product additional information block
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return AbstractBlock
+     * @codeCoverageIgnore
      */
     public function getProductAdditionalInformationBlock()
     {
@@ -439,24 +404,11 @@ class Renderer extends \Magento\View\Element\Template
     }
 
     /**
-     * Get html for MAP product enabled
-     *
-     * @param \Magento\Sales\Model\Quote\Item $item
-     * @return string
-     */
-    public function getMsrpHtml($item)
-    {
-        return $this->getLayout()->createBlock('Magento\Catalog\Block\Product\Price')
-            ->setTemplate('product/price_msrp_item.phtml')
-            ->setProduct($item->getProduct())
-            ->toHtml();
-    }
-
-    /**
      * Set qty mode to be strict or not
      *
      * @param bool $strict
-     * @return \Magento\Checkout\Block\Cart\Item\Renderer
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function setQtyMode($strict)
     {
@@ -468,11 +420,207 @@ class Renderer extends \Magento\View\Element\Template
      * Set ignore product URL rendering
      *
      * @param bool $ignore
-     * @return \Magento\Checkout\Block\Cart\Item\Renderer
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function setIgnoreProductUrl($ignore = true)
     {
         $this->_ignoreProductUrl = $ignore;
         return $this;
+    }
+
+    /**
+     * Return identifiers for produced content
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        $identities = [];
+        if ($this->getItem()) {
+            $identities = $this->getProduct()->getIdentities();
+        }
+        return $identities;
+    }
+
+    /**
+     * Get product price formatted with html (final price, special price, mrp price)
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return string
+     */
+    public function getProductPriceHtml(\Magento\Catalog\Model\Product $product)
+    {
+        $priceRender = $this->getPriceRender();
+        $priceRender->setItem($this->getItem());
+
+        $price = '';
+        if ($priceRender) {
+            $price = $priceRender->render(
+                ConfiguredPriceInterface::CONFIGURED_PRICE_CODE,
+                $product,
+                [
+                    'include_container' => true,
+                    'display_minimal_price' => true,
+                    'zone' => \Magento\Framework\Pricing\Render::ZONE_ITEM_LIST
+                ]
+            );
+        }
+
+        return $price;
+    }
+
+    /**
+     * Get price renderer.
+     *
+     * @return \Magento\Framework\Pricing\Render
+     * @codeCoverageIgnore
+     */
+    protected function getPriceRender()
+    {
+        return $this->getLayout()->getBlock('product.price.render.default');
+    }
+
+    /**
+     * Convert prices for template
+     *
+     * @param float $amount
+     * @param bool $format
+     * @return float
+     */
+    public function convertPrice($amount, $format = false)
+    {
+        return $format
+            ? $this->priceCurrency->convertAndFormat($amount)
+            : $this->priceCurrency->convert($amount);
+    }
+
+    /**
+     * Return the unit price html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getUnitPriceHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.item.price.unit');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Return row total html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getRowTotalHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.item.price.row');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Return item price html for sidebar
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getSidebarItemPriceHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.cart.item.price.sidebar');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Get unit price excluding tax html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getUnitPriceExclTaxHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.onepage.review.item.price.unit.excl');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Get unit price including tax html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getUnitPriceInclTaxHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.onepage.review.item.price.unit.incl');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Get row total excluding tax html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getRowTotalExclTaxHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.onepage.review.item.price.rowtotal.excl');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Get row total including tax html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getRowTotalInclTaxHtml(AbstractItem $item)
+    {
+        /** @var Renderer $block */
+        $block = $this->getLayout()->getBlock('checkout.onepage.review.item.price.rowtotal.incl');
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Get row total including tax html
+     *
+     * @param AbstractItem $item
+     * @return string
+     */
+    public function getActions(AbstractItem $item)
+    {
+        /** @var Actions $block */
+        $block = $this->getChildBlock('actions');
+        if ($block instanceof Actions) {
+            $block->setItem($item);
+            return $block->toHtml();
+        } else {
+            return '';
+        }
+    }
+
+    /**
+     * Retrieve product image
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @param string $imageId
+     * @param array $attributes
+     * @return \Magento\Catalog\Block\Product\Image
+     */
+    public function getImage($product, $imageId, $attributes = [])
+    {
+        return $this->imageBuilder->create($product, $imageId, $attributes);
     }
 }

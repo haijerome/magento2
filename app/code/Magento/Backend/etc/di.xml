@@ -1,153 +1,199 @@
 <?xml version="1.0"?>
 <!--
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 -->
-<config>
-    <preference for="Magento\Core\Model\Config\Storage\WriterInterface" type="Magento\Core\Model\Config\Storage\Writer\Db" />
-    <preference for="Magento\App\Request\PathInfoProcessorInterface" type="Magento\Backend\App\Request\PathInfoProcessor" />
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Magento\Framework\App\Config\Storage\WriterInterface" type="Magento\Framework\App\Config\Storage\Writer" />
+    <preference for="Magento\Framework\App\Request\PathInfoProcessorInterface" type="Magento\Backend\App\Request\PathInfoProcessor" />
     <preference for="Magento\Backend\Model\Auth\StorageInterface" type="Magento\Backend\Model\Auth\Session" />
-    <preference for="Magento\Backend\Model\Config\Structure\SearchInterface" type="Magento\Backend\Model\Config\Structure" />
-    <preference for="Magento\Backend\Model\Config\Backend\File\RequestData\RequestDataInterface" type="Magento\Backend\Model\Config\Backend\File\RequestData" />
     <preference for="Magento\Backend\Model\Auth\Credential\StorageInterface" type="Magento\User\Model\User" />
-    <preference for="Magento\Adminhtml\Helper\Data" type="Magento\Backend\Helper\Data" />
     <preference for="Magento\Backend\App\ConfigInterface" type="Magento\Backend\App\Config" />
-    <type name="Magento\App\AreaList">
-        <param name="areas">
-            <value>
-                <adminhtml>
-                    <frontNameResolver>Magento\Backend\App\Area\FrontNameResolver</frontNameResolver>
-                    <router>admin</router>
-                </adminhtml>
-            </value>
-        </param>
-    </type>
-    <type name="Magento\Backend\App\Router\DefaultRouter">
-        <param name="routerId">
-            <value>admin</value>
-        </param>
-    </type>
-    <type name="Magento\Backend\Controller\Adminhtml\System\Config\Save">
-        <param name="cache">
-            <instance type="Magento\App\Cache\Type\Layout" />
-        </param>
+    <preference for="Magento\Backend\Model\UrlInterface" type="Magento\Backend\Model\Url" />
+    <preference for="Magento\Backend\Block\Widget\Button\ToolbarInterface" type="Magento\Backend\Block\Widget\Button\Toolbar" />
+    <preference for="Magento\Backend\Service\V1\ModuleServiceInterface" type="Magento\Backend\Service\V1\ModuleService" />
+    <type name="Magento\Backend\Block\Widget\Button\ButtonList" shared="false" />
+    <type name="Magento\Framework\App\AreaList">
+        <arguments>
+            <argument name="areas" xsi:type="array">
+                <item name="adminhtml" xsi:type="array">
+                    <item name="frontNameResolver" xsi:type="string">Magento\Backend\App\Area\FrontNameResolver</item>
+                    <item name="router" xsi:type="string">admin</item>
+                </item>
+            </argument>
+        </arguments>
     </type>
     <type name="Magento\Backend\Model\Menu\Config">
-        <param name="menuDirector"><instance type="Magento\Backend\Model\Menu\Director\Director"/></param>
-    </type>
-    <type name="Magento\Backend\App\Area\FrontNameResolver">
-        <param name="defaultFrontName">
-            <value type="argument">Magento\Backend\App\Area\FrontNameResolver::PARAM_BACKEND_FRONT_NAME</value>
-        </param>
+        <arguments>
+            <argument name="menuDirector" xsi:type="object">Magento\Backend\Model\Menu\Director\Director</argument>
+        </arguments>
     </type>
     <type name="Magento\Backend\Helper\Data">
-        <param name="backendUrl">
-            <instance type="Magento\Backend\Model\Url\Proxy" />
-        </param>
-        <param name="auth">
-            <instance type="Magento\Backend\Model\Auth\Proxy" />
-        </param>
+        <arguments>
+            <argument name="backendUrl" xsi:type="object">Magento\Backend\Model\UrlInterface\Proxy</argument>
+            <argument name="auth" xsi:type="object">Magento\Backend\Model\Auth\Proxy</argument>
+            <argument name="locale" xsi:type="object">Magento\Backend\Model\Locale\Resolver\Proxy</argument>
+        </arguments>
     </type>
-    <type name="Magento\App\Router\NoRouteHandlerList">
-        <param name="handlerClassesList">
-            <value>
-                <backend>
-                    <instance>Magento\Backend\App\Router\NoRouteHandler</instance>
-                    <sortOrder>10</sortOrder>
-                </backend>
-            </value>
-        </param>
+    <type name="Magento\Framework\App\Router\NoRouteHandlerList">
+        <arguments>
+            <argument name="handlerClassesList" xsi:type="array">
+                <item name="backend" xsi:type="array">
+                    <item name="class" xsi:type="string">Magento\Backend\App\Router\NoRouteHandler</item>
+                    <item name="sortOrder" xsi:type="string">10</item>
+                </item>
+            </argument>
+        </arguments>
     </type>
     <type name="Magento\Backend\Model\Widget\Grid\Row\UrlGenerator">
-        <param name="backendUrl">
-            <instance type="Magento\Backend\Model\Url\Proxy" />
-        </param>
+        <arguments>
+            <argument name="backendUrl" xsi:type="object">Magento\Backend\Model\UrlInterface\Proxy</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Backend\Model\Url\ScopeResolver">
+        <arguments>
+            <argument name="areaCode" xsi:type="string">adminhtml</argument>
+        </arguments>
     </type>
     <type name="Magento\Backend\Model\Url">
-        <param name="authSession">
-            <instance type="Magento\Backend\Model\Auth\Session\Proxy" />
-        </param>
-        <param name="formKey">
-            <instance type="Magento\Data\Form\FormKey\Proxy" />
-        </param>
-        <param name="areaCode">
-            <value>adminhtml</value>
-        </param>
+        <arguments>
+            <argument name="scopeResolver" xsi:type="object">Magento\Backend\Model\Url\ScopeResolver</argument>
+            <argument name="authSession" xsi:type="object">Magento\Backend\Model\Auth\Session\Proxy</argument>
+            <argument name="formKey" xsi:type="object">Magento\Framework\Data\Form\FormKey\Proxy</argument>
+            <argument name="scopeType" xsi:type="const">Magento\Store\Model\ScopeInterface::SCOPE_STORE</argument>
+            <argument name="backendHelper" xsi:type="object">Magento\Backend\Helper\Data\Proxy</argument>
+        </arguments>
     </type>
-    <type name="Magento\Core\Model\Url">
-        <param name="areaCode">
-            <value>frontend</value>
-        </param>
+    <preference for="Magento\Framework\Authorization\PolicyInterface" type="Magento\Framework\Authorization\Policy\Acl"/>
+    <preference for="Magento\Framework\Acl\AclResource\ProviderInterface" type="Magento\Framework\Acl\AclResource\Provider"/>
+    <type name="Magento\Framework\Acl\AclResource\Config\Reader\Filesystem">
+        <arguments>
+            <argument name="converter" xsi:type="object">Magento\Framework\Acl\AclResource\Config\Converter\Dom</argument>
+        </arguments>
     </type>
-    <type name="Magento\Backend\Helper\Dashboard\Data">
-        <param name="installDate">
-            <value type="argument">Magento\App\State::PARAM_INSTALL_DATE</value>
-        </param>
+    <type name="Magento\Framework\Acl\AclResource\Provider">
+        <arguments>
+            <argument name="configReader" xsi:type="object">Magento\Framework\Acl\AclResource\Config\Reader\Filesystem</argument>
+        </arguments>
     </type>
-    <preference for="Magento\Authorization\RoleLocator" type="Magento\Backend\Model\Authorization\RoleLocator" />
-    <preference for="Magento\Authorization\Policy" type="Magento\Authorization\Policy\Acl"/>
-    <preference for="Magento\Acl\Resource\ProviderInterface" type="Magento\Acl\Resource\Provider"/>
-    <type name="Magento\Acl\Resource\Config\Reader\Filesystem">
-        <param name="converter">
-            <instance type="Magento\Acl\Resource\Config\Converter\Dom"/>
-        </param>
+    <type name="Magento\Framework\Acl\Builder">
+        <arguments>
+            <argument name="resourceLoader" xsi:type="object">Magento\Framework\Acl\Loader\ResourceLoader</argument>
+        </arguments>
     </type>
-    <type name="Magento\Acl\Resource\Provider">
-        <param name="configReader">
-            <instance type="Magento\Acl\Resource\Config\Reader\Filesystem"/>
-        </param>
+    <type name="Magento\Framework\Acl\RootResource">
+        <arguments>
+            <argument name="identifier" xsi:type="string">Magento_Backend::all</argument>
+        </arguments>
     </type>
-    <type name="Magento\Acl\Builder">
-        <param name="resourceLoader">
-            <instance type="Magento\Acl\Loader\Resource"/>
-        </param>
+    <type name="Magento\Backend\Controller\Adminhtml\Index\GlobalSearch">
+        <arguments>
+            <argument name="searchModules" xsi:type="array">
+                <item name="customers" xsi:type="array">
+                    <item name="class" xsi:type="string">Magento\Backend\Model\Search\Customer</item>
+                    <item name="acl" xsi:type="string">Magento_Customer::customer</item>
+                </item>
+                <item name="sales" xsi:type="array">
+                    <item name="class" xsi:type="string">Magento\Backend\Model\Search\Order</item>
+                    <item name="acl" xsi:type="string">Magento_Sales::sales</item>
+                </item>
+                <item name="config" xsi:type="array">
+                    <item name="class" xsi:type="string">Magento\Backend\Model\Search\Config</item>
+                    <item name="acl" xsi:type="string">Magento_Config::config</item>
+                </item>
+            </argument>
+        </arguments>
     </type>
-    <type name="Magento\Core\Model\Acl\Cache">
-        <param name="cacheKey">
-            <value>backend_acl_resources</value>
-        </param>
+    <virtualType name="Magento\Backend\Model\Auth\Session\Storage" type="Magento\Framework\Session\Storage">
+        <arguments>
+            <argument name="namespace" xsi:type="string">admin</argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Backend\Model\Auth\Session">
+        <arguments>
+            <argument name="aclBuilder" xsi:type="object">Magento\Framework\Acl\Builder\Proxy</argument>
+            <argument name="storage" xsi:type="object">Magento\Backend\Model\Auth\Session\Storage</argument>
+        </arguments>
     </type>
-    <type name="Magento\Core\Model\Acl\RootResource">
-        <param name="identifier">
-            <value>Magento_Adminhtml::all</value>
-        </param>
+    <virtualType name="Magento\Backend\Model\Session\Storage" type="Magento\Framework\Session\Storage">
+        <arguments>
+            <argument name="namespace" xsi:type="string">adminhtml</argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Backend\Model\Session">
+        <arguments>
+            <argument name="storage" xsi:type="object">Magento\Backend\Model\Session\Storage</argument>
+        </arguments>
     </type>
-    <type name="Magento\Backend\Controller\Adminhtml\Index">
-        <param name="searchModules">
-            <value>
-                <products>
-                    <class>Magento\Backend\Model\Search\Catalog</class>
-                    <acl>Magento_Catalog::catalog</acl>
-                </products>
-                <customers>
-                    <class>Magento\Backend\Model\Search\Customer</class>
-                    <acl>Magento_Customer::customer</acl>
-                </customers>
-                <sales>
-                    <class>Magento\Backend\Model\Search\Order</class>
-                    <acl>Magento_Sales::sales</acl>
-                </sales>
-            </value>
-        </param>
+    <type name="Magento\Framework\App\Request\DataPersistor">
+        <arguments>
+            <argument name="session" xsi:type="object">Magento\Backend\Model\Session</argument>
+        </arguments>
+    </type>
+    <virtualType name="Magento\Backend\Model\Session\Quote\Storage" type="Magento\Framework\Session\Storage">
+        <arguments>
+            <argument name="namespace" xsi:type="string">adminhtml_quote</argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Backend\Model\Session\Quote">
+        <arguments>
+            <argument name="storage" xsi:type="object">Magento\Backend\Model\Session\Quote\Storage</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="cacheEnableCommand" xsi:type="object">Magento\Backend\Console\Command\CacheEnableCommand</item>
+                <item name="cacheDisableCommand" xsi:type="object">Magento\Backend\Console\Command\CacheDisableCommand</item>
+                <item name="cacheFlushCommand" xsi:type="object">Magento\Backend\Console\Command\CacheFlushCommand</item>
+                <item name="cacheCleanCommand" xsi:type="object">Magento\Backend\Console\Command\CacheCleanCommand</item>
+                <item name="cacheStatusCommand" xsi:type="object">Magento\Backend\Console\Command\CacheStatusCommand</item>
+                <item name="maintenanceAllowIps" xsi:type="object">Magento\Backend\Console\Command\MaintenanceAllowIpsCommand</item>
+                <item name="maintenanceDisable" xsi:type="object">Magento\Backend\Console\Command\MaintenanceDisableCommand</item>
+                <item name="maintenanceEnableCommand" xsi:type="object">Magento\Backend\Console\Command\MaintenanceDisableCommand</item>
+                <item name="maintenanceStatusCommand" xsi:type="object">Magento\Backend\Console\Command\MaintenanceStatusCommand</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Framework\App\Response\HeaderManager">
+        <arguments>
+            <argument name="headerProviderList" xsi:type="array">
+                <item name="x-frame-options" xsi:type="object">Magento\Framework\App\Response\HeaderProvider\XFrameOptions</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Config\Model\Config\TypePool">
+        <arguments>
+            <argument name="sensitive" xsi:type="array">
+                <item name="admin/url/custom" xsi:type="string">1</item>
+                <item name="admin/url/custom_path" xsi:type="string">1</item>
+                <item name="trans_email/ident_custom1/email" xsi:type="string">1</item>
+                <item name="trans_email/ident_custom1/name" xsi:type="string">1</item>
+                <item name="trans_email/ident_custom2/email" xsi:type="string">1</item>
+                <item name="trans_email/ident_custom2/name" xsi:type="string">1</item>
+                <item name="trans_email/ident_general/email" xsi:type="string">1</item>
+                <item name="trans_email/ident_general/name" xsi:type="string">1</item>
+                <item name="trans_email/ident_sales/email" xsi:type="string">1</item>
+                <item name="trans_email/ident_sales/name" xsi:type="string">1</item>
+                <item name="trans_email/ident_support/email" xsi:type="string">1</item>
+                <item name="trans_email/ident_support/name" xsi:type="string">1</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Backend\Block\Menu">
+        <arguments>
+            <argument name="menuItemChecker" xsi:type="object">Magento\Backend\Block\MenuItemChecker</argument>
+            <argument name="anchorRenderer" xsi:type="object">Magento\Backend\Block\AnchorRenderer</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Backend\Model\Validator\UrlKey\CompositeUrlKey">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="frontNameValidator" xsi:type="object">Magento\Backend\Model\Validator\UrlKey\FrontName</item>
+                <item name="restrictedWordsValidator" xsi:type="object">Magento\Backend\Model\Validator\UrlKey\RestrictedWords</item>
+            </argument>
+        </arguments>
     </type>
 </config>

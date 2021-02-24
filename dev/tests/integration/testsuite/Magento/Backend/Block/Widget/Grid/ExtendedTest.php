@@ -1,65 +1,54 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Backend\Block\Widget\Grid;
+
+use Laminas\Stdlib\Parameters;
+use Magento\Backend\Block\Template\Context;
+use Magento\Framework\Data\Collection;
+use Magento\Framework\View\LayoutInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @magentoAppArea adminhtml
  */
-class ExtendedTest extends \PHPUnit_Framework_TestCase
+class ExtendedTest extends TestCase
 {
     /**
-     * @var \Magento\Backend\Block\Widget\Grid\Extended
+     * @var Extended
      */
     protected $_block;
 
     /**
-     * @var \Magento\View\LayoutInterface
+     * @var LayoutInterface
      */
     protected $_layoutMock;
 
-    protected function setUp()
+    /**
+     * @inheritDoc
+     */
+    protected function setUp(): void
     {
         parent::setUp();
 
-        $this->_layoutMock = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->get('Magento\View\LayoutInterface');
-        $context = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Backend\Block\Template\Context', array('layout' => $this->_layoutMock));
+        $this->_layoutMock = Bootstrap::getObjectManager()->get(
+            LayoutInterface::class
+        );
+        $context = Bootstrap::getObjectManager()->create(
+            Context::class,
+            ['layout' => $this->_layoutMock]
+        );
         $this->_block = $this->_layoutMock->createBlock(
-            'Magento\Backend\Block\Widget\Grid\Extended', 'grid', array('context' => $context)
+            Extended::class,
+            'grid',
+            ['context' => $context]
         );
 
-        $this->_block->addColumn('column1',
-            array('id' => 'columnId1')
-        );
-        $this->_block->addColumn('column2',
-            array('id' => 'columnId2')
-        );
+        $this->_block->addColumn('column1', ['id' => 'columnId1']);
+        $this->_block->addColumn('column2', ['id' => 'columnId2']);
     }
 
     /**
@@ -68,7 +57,7 @@ class ExtendedTest extends \PHPUnit_Framework_TestCase
     public function testAddColumnAddsChildToColumnSet()
     {
         $this->assertInstanceOf(
-            'Magento\Backend\Block\Widget\Grid\Column',
+            Column::class,
             $this->_block->getColumnSet()->getChildBlock('column1')
         );
         $this->assertCount(2, $this->_block->getColumnSet()->getChildNames());
@@ -104,5 +93,33 @@ class ExtendedTest extends \PHPUnit_Framework_TestCase
     {
         $this->_block->setFilterVisibility(false);
         $this->assertEquals('', $this->_block->getMainButtonsHtml());
+    }
+
+    /**
+     * Checks that template does not have redundant div close tag
+     *
+     * @return void
+     */
+    public function testExtendedTemplateMarkup(): void
+    {
+        $mockCollection = $this->getMockBuilder(Collection::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $this->_block->setCollection($mockCollection);
+        $this->_block->getRequest()
+            ->setQuery(
+                Bootstrap::getObjectManager()
+                ->create(
+                    Parameters::class,
+                    [
+                        'values' => [
+                            'ajax' => true
+                        ]
+                    ]
+                )
+            );
+        $html = $this->_block->getHtml();
+        $html = str_replace(["\n", " "], '', $html);
+        $this->assertStringEndsWith("</table></div>", $html);
     }
 }

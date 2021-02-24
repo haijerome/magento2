@@ -1,53 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Review\Block\Adminhtml\Grid\Renderer;
 
 /**
  * Adminhtml review grid item renderer for item type
  *
- * @category   Magento
- * @package    Magento_Review
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
-namespace Magento\Review\Block\Adminhtml\Grid\Renderer;
-
-class Type extends \Magento\Adminhtml\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+class Type extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
-    public function render(\Magento\Object $row)
+    /**
+     * Render review type
+     *
+     * @param \Magento\Framework\DataObject $row
+     * @return \Magento\Framework\Phrase
+     */
+    public function render(\Magento\Framework\DataObject $row)
     {
-
-        if (is_null($row->getCustomerId())) {
-            if ($row->getStoreId() == \Magento\Core\Model\Store::DEFAULT_STORE_ID) {
-                return __('Administrator');
-            } else {
-                return __('Guest');
-            }
-        } elseif ($row->getCustomerId() > 0) {
+        if ($row->getCustomerId()) {
             return __('Customer');
         }
-//		return ($row->getCustomerId() ? __('Customer') : __('Guest'));
+        if ($row->getStoreId() == \Magento\Store\Model\Store::DEFAULT_STORE_ID) {
+            return __('Administrator');
+        }
+        return __('Guest');
     }
 }// Class \Magento\Review\Block\Adminhtml\Grid\Renderer\Type END

@@ -1,72 +1,60 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Model\Menu\Item;
 
+/**
+ * Class Validator
+ *
+ * @package Magento\Backend\Model\Menu\Item
+ * @api
+ * @since 100.0.2
+ */
 class Validator
 {
     /**
      * The list of required params
      *
-     * @var array
+     * @var string[]
      */
-    protected $_required = array(
-        'id', 'title', 'resource'
-    );
+    protected $_required = ['id', 'title', 'resource'];
 
     /**
      * List of created item ids
      *
      * @var array
      */
-    protected $_ids = array();
+    protected $_ids = [];
 
     /**
      * The list of primitive validators
      *
      * @var \Zend_Validate[]
      */
-    protected $_validators = array();
+    protected $_validators = [];
 
+    /**
+     * Constructor
+     */
     public function __construct()
     {
         $idValidator = new \Zend_Validate();
-        $idValidator->addValidator(new \Zend_Validate_StringLength(array('min' => 3)));
+        $idValidator->addValidator(new \Zend_Validate_StringLength(['min' => 3]));
         $idValidator->addValidator(new \Zend_Validate_Regex('/^[A-Za-z0-9\/:_]+$/'));
 
         $resourceValidator = new \Zend_Validate();
-        $resourceValidator->addValidator(new \Zend_Validate_StringLength(array('min' => 8)));
+        $resourceValidator->addValidator(new \Zend_Validate_StringLength(['min' => 8]));
         $resourceValidator->addValidator(
             new \Zend_Validate_Regex('/^[A-Z][A-Za-z0-9]+_[A-Z][A-Za-z0-9]+::[A-Za-z_0-9]+$/')
         );
 
         $attributeValidator = new \Zend_Validate();
-        $attributeValidator->addValidator(new \Zend_Validate_StringLength(array('min' => 3)));
-        $attributeValidator->addValidator(new \Zend_Validate_Regex('/^[A-Za-z0-9\/_]+$/'));
+        $attributeValidator->addValidator(new \Zend_Validate_StringLength(['min' => 3]));
+        $attributeValidator->addValidator(new \Zend_Validate_Regex('/^[A-Za-z0-9\/_\-]+$/'));
 
-        $textValidator = new \Zend_Validate_StringLength(array('min' => 3, 'max' => 50));
+        $textValidator = new \Zend_Validate_StringLength(['min' => 3, 'max' => 50]);
 
         $titleValidator = $tooltipValidator = $textValidator;
         $actionValidator = $moduleDepValidator = $configDepValidator = $attributeValidator;
@@ -79,37 +67,97 @@ class Validator
         $this->_validators['dependsOnConfig'] = $configDepValidator;
         $this->_validators['toolTip'] = $tooltipValidator;
     }
+
     /**
      * Validate menu item params
      *
-     * @param $data
+     * @param array $data
+     * @return void
      * @throws \InvalidArgumentException
      * @throws \BadMethodCallException
      */
     public function validate($data)
+    {
+        if ($this->checkMenuItemIsRemoved($data)) {
+            return;
+        }
+
+        $this->assertContainsRequiredParameters($data);
+        $this->assertIdentifierIsNotUsed($data['id']);
+
+        foreach ($data as $param => $value) {
+            $this->validateMenuItemParameter($param, $value);
+        }
+        $this->_ids[] = $data['id'];
+    }
+
+    /**
+     * Check that menu item is not deleted
+     *
+     * @param array $data
+     * @return bool
+     */
+    private function checkMenuItemIsRemoved($data)
+    {
+        return isset($data['id'], $data['removed']) && $data['removed'] === true;
+    }
+
+    /**
+     * Check that menu item contains all required data
+     *
+     * @param array $data
+     *
+     * @throws \BadMethodCallException
+     */
+    private function assertContainsRequiredParameters($data)
     {
         foreach ($this->_required as $param) {
             if (!isset($data[$param])) {
                 throw new \BadMethodCallException('Missing required param ' . $param);
             }
         }
+    }
 
-        if (array_search($data['id'], $this->_ids) !== false) {
-            throw new \InvalidArgumentException('Item with id ' . $data ['id'] . ' already exists');
+    /**
+     * Check that menu item id is not used
+     *
+     * @param string $id
+     * @throws \InvalidArgumentException
+     */
+    private function assertIdentifierIsNotUsed($id)
+    {
+        if (array_search($id, $this->_ids) !== false) {
+            throw new \InvalidArgumentException('Item with id ' . $id . ' already exists');
+        }
+    }
+
+    /**
+     * Validate menu item parameter value
+     *
+     * @param string $param
+     * @param mixed $value
+     * @throws \InvalidArgumentException
+     */
+    private function validateMenuItemParameter($param, $value)
+    {
+        if ($value === null) {
+            return;
+        }
+        if (!isset($this->_validators[$param])) {
+            return;
         }
 
-        foreach ($data as $param => $value) {
-            if (!is_null($data[$param])
-                && isset($this->_validators[$param])
-                && !$this->_validators[$param]->isValid($value)
-            ) {
-                throw new \InvalidArgumentException(
-                    "Param " . $param . " doesn't pass validation: "
-                        . implode('; ', $this->_validators[$param]->getMessages())
-                );
-            }
+        $validator = $this->_validators[$param];
+        if ($validator->isValid($value)) {
+            return;
         }
-        $this->_ids[] = $data['id'];
+
+        throw new \InvalidArgumentException(
+            "Param " . $param . " doesn't pass validation: " . implode(
+                '; ',
+                $validator->getMessages()
+            )
+        );
     }
 
     /**
@@ -117,18 +165,21 @@ class Validator
      *
      * @param string $param
      * @param mixed $value
+     * @return void
      * @throws \InvalidArgumentException
      */
     public function validateParam($param, $value)
     {
-        if (in_array($param, $this->_required) && is_null($value)) {
+        if (in_array($param, $this->_required) && $value === null) {
             throw new \InvalidArgumentException('Param ' . $param . ' is required');
         }
 
-        if (!is_null($value) && isset($this->_validators[$param]) && !$this->_validators[$param]->isValid($value)) {
+        if ($value !== null && isset($this->_validators[$param]) && !$this->_validators[$param]->isValid($value)) {
             throw new \InvalidArgumentException(
-                'Param ' . $param . ' doesn\'t pass validation: '
-                    . implode('; ', $this->_validators[$param]->getMessages())
+                'Param ' . $param . ' doesn\'t pass validation: ' . implode(
+                    '; ',
+                    $this->_validators[$param]->getMessages()
+                )
             );
         }
     }

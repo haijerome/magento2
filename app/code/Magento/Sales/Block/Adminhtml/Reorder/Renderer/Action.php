@@ -1,48 +1,23 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Reorder\Renderer;
 
 /**
  * Adminhtml alert queue grid block action item renderer
  *
- * @category   Magento
- * @package    Magento_Sales
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
-namespace Magento\Sales\Block\Adminhtml\Reorder\Renderer;
-
-class Action
-    extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+class Action extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
     /**
      * Array to store all options data
      *
      * @var array
      */
-    protected $_actions = array();
+    protected $_actions = [];
 
     /**
      * Sales reorder
@@ -59,32 +34,47 @@ class Action
     public function __construct(
         \Magento\Backend\Block\Context $context,
         \Magento\Sales\Helper\Reorder $salesReorder,
-        array $data = array()
+        array $data = []
     ) {
         $this->_salesReorder = $salesReorder;
         parent::__construct($context, $data);
     }
 
-    public function render(\Magento\Object $row)
+    /**
+     * Render actions
+     *
+     * @param \Magento\Framework\DataObject $row
+     * @return string
+     */
+    public function render(\Magento\Framework\DataObject $row)
     {
-        $this->_actions = array();
-        if ($this->_salesReorder->canReorder($row)) {
-            $reorderAction = array(
-                '@' => array('href' => $this->getUrl('sales/order_create/reorder', array('order_id'=>$row->getId()))),
-                '#' =>  __('Reorder')
-            );
+        $this->_actions = [];
+        if ($this->_salesReorder->canReorder($row->getId())) {
+            $reorderAction = [
+                '@' => [
+                    'href' => $this->getUrl('sales/order_create/reorder', ['order_id' => $row->getId()]),
+                ],
+                '#' => __('Reorder'),
+            ];
             $this->addToActions($reorderAction);
         }
-        $this->_eventManager->dispatch('adminhtml_customer_orders_add_action_renderer', array(
-            'renderer' => $this,
-            'row' => $row,
-        ));
+        $this->_eventManager->dispatch(
+            'adminhtml_customer_orders_add_action_renderer',
+            ['renderer' => $this, 'row' => $row]
+        );
         return $this->_actionsToHtml();
     }
 
+    /**
+     * Get escaped value
+     *
+     * @param string $value
+     * @return string
+     */
     protected function _getEscapedValue($value)
     {
-        return addcslashes(htmlspecialchars($value), '\\\'');
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        return addcslashes($this->escapeHtml($value), '\\\'');
     }
 
     /**
@@ -93,10 +83,10 @@ class Action
      * @param array $actions
      * @return string
      */
-    protected function _actionsToHtml(array $actions = array())
+    protected function _actionsToHtml(array $actions = [])
     {
-        $html = array();
-        $attributesObject = new \Magento\Object();
+        $html = [];
+        $attributesObject = new \Magento\Framework\DataObject();
 
         if (empty($actions)) {
             $actions = $this->_actions;
@@ -106,7 +96,7 @@ class Action
             $attributesObject->setData($action['@']);
             $html[] = '<a ' . $attributesObject->serialize() . '>' . $action['#'] . '</a>';
         }
-        return  implode($html, '<span class="separator">|</span>');
+        return implode('', $html);
     }
 
     /**

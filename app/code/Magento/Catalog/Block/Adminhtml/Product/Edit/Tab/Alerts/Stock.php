@@ -1,47 +1,27 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Alerts;
 
+use Magento\Backend\Block\Widget\Grid;
+use Magento\Backend\Block\Widget\Grid\Extended;
 
 /**
  * Sign up for an alert when the product price changes grid
  *
- * @category   Magento
- * @package    Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Alerts;
-
-class Stock extends \Magento\Adminhtml\Block\Widget\Grid
+class Stock extends Extended
 {
     /**
      * Catalog data
      *
-     * @var \Magento\Catalog\Helper\Data
+     * @var \Magento\Framework\Module\Manager
      */
-    protected $_catalogData = null;
+    protected $moduleManager;
 
     /**
      * @var \Magento\ProductAlert\Model\StockFactory
@@ -50,23 +30,28 @@ class Stock extends \Magento\Adminhtml\Block\Widget\Grid
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
+     * @param \Magento\Backend\Helper\Data $backendHelper
      * @param \Magento\ProductAlert\Model\StockFactory $stockFactory
-     * @param \Magento\Catalog\Helper\Data $catalogData
+     * @param \Magento\Framework\Module\Manager $moduleManager
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
+        \Magento\Backend\Helper\Data $backendHelper,
         \Magento\ProductAlert\Model\StockFactory $stockFactory,
-        \Magento\Catalog\Helper\Data $catalogData,
-        array $data = array()
+        \Magento\Framework\Module\Manager $moduleManager,
+        array $data = []
     ) {
         $this->_stockFactory = $stockFactory;
-        $this->_catalogData = $catalogData;
-        parent::__construct($context, $urlModel, $data);
+        $this->moduleManager = $moduleManager;
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Construct.
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -79,6 +64,11 @@ class Stock extends \Magento\Adminhtml\Block\Widget\Grid
         $this->setEmptyText(__('There are no customers for this alert.'));
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return Grid
+     */
     protected function _prepareCollection()
     {
         $productId = $this->getRequest()->getParam('id');
@@ -86,62 +76,50 @@ class Stock extends \Magento\Adminhtml\Block\Widget\Grid
         if ($store = $this->getRequest()->getParam('store')) {
             $websiteId = $this->_storeManager->getStore($store)->getWebsiteId();
         }
-        if ($this->_catalogData->isModuleEnabled('Magento_ProductAlert')) {
-            $collection = $this->_stockFactory->create()
-                ->getCustomerCollection()
-                ->join($productId, $websiteId);
+        if ($this->moduleManager->isEnabled('Magento_ProductAlert')) {
+            $collection = $this->_stockFactory->create()->getCustomerCollection()->join($productId, $websiteId);
             $this->setCollection($collection);
         }
         return parent::_prepareCollection();
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return $this
+     */
     protected function _prepareColumns()
     {
-        $this->addColumn('firstname', array(
-            'header'    => __('First Name'),
-            'index'     => 'firstname',
-        ));
+        $this->addColumn('firstname', ['header' => __('First Name'), 'index' => 'firstname']);
 
-        $this->addColumn('lastname', array(
-            'header'    => __('Last Name'),
-            'index'     => 'lastname',
-        ));
+        $this->addColumn('lastname', ['header' => __('Last Name'), 'index' => 'lastname']);
 
-        $this->addColumn('email', array(
-            'header'    => __('Email'),
-            'index'     => 'email',
-        ));
+        $this->addColumn('email', ['header' => __('Email'), 'index' => 'email']);
 
-        $this->addColumn('add_date', array(
-            'header'    => __('Subscribe Date'),
-            'index'     => 'add_date',
-            'type'      => 'date'
-        ));
+        $this->addColumn('add_date', ['header' => __('Subscribe Date'), 'index' => 'add_date', 'type' => 'date']);
 
-        $this->addColumn('send_date', array(
-            'header'    => __('Last Notified'),
-            'index'     => 'send_date',
-            'type'      => 'date'
-        ));
+        $this->addColumn(
+            'send_date',
+            ['header' => __('Last Notified'), 'index' => 'send_date', 'type' => 'date']
+        );
 
-        $this->addColumn('send_count', array(
-            'header'    => __('Send Count'),
-            'index'     => 'send_count',
-        ));
+        $this->addColumn('send_count', ['header' => __('Send Count'), 'index' => 'send_count']);
 
         return parent::_prepareColumns();
     }
 
+    /**
+     * Get grid url.
+     *
+     * @return string
+     */
     public function getGridUrl()
     {
         $productId = $this->getRequest()->getParam('id');
-        $storeId   = $this->getRequest()->getParam('store', 0);
+        $storeId = $this->getRequest()->getParam('store', 0);
         if ($storeId) {
             $storeId = $this->_storeManager->getStore($storeId)->getId();
         }
-        return $this->getUrl('catalog/product/alertsStockGrid', array(
-            'id'    => $productId,
-            'store' => $storeId
-        ));
+        return $this->getUrl('catalog/product/alertsStockGrid', ['id' => $productId, 'store' => $storeId]);
     }
 }

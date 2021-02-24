@@ -1,38 +1,20 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_ImportExport
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Block before edit form
  *
- * @category    Magento
- * @package     Magento_ImportExport
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\ImportExport\Block\Adminhtml\Import\Edit;
 
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Before extends \Magento\Backend\Block\Template
 {
     /**
@@ -43,21 +25,21 @@ class Before extends \Magento\Backend\Block\Template
     protected $_importModel;
 
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
      * @param \Magento\ImportExport\Model\Import $importModel
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
         \Magento\ImportExport\Model\Import $importModel,
-        array $data = array()
+        array $data = []
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_importModel = $importModel;
@@ -74,6 +56,20 @@ class Before extends \Magento\Backend\Block\Template
         $behaviors = $this->_importModel->getEntityBehaviors();
         foreach ($behaviors as $entityCode => $behavior) {
             $behaviors[$entityCode] = $behavior['code'];
+        }
+        return $this->_jsonEncoder->encode($behaviors);
+    }
+
+    /**
+     * Returns json-encoded entity behaviors notes array
+     *
+     * @return string
+     */
+    public function getEntityBehaviorsNotes()
+    {
+        $behaviors = $this->_importModel->getEntityBehaviors();
+        foreach ($behaviors as $entityCode => $behavior) {
+            $behaviors[$entityCode] = $behavior['notes'];
         }
         return $this->_jsonEncoder->encode($behaviors);
     }

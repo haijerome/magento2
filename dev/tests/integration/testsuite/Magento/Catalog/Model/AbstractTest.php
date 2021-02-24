@@ -1,33 +1,11 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Model;
 
-class AbstractTest extends \PHPUnit_Framework_TestCase
+class AbstractTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Stub class name for class under test
@@ -46,23 +24,27 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
      */
     protected static $_isStubClass = false;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         if (!self::$_isStubClass) {
-            $this->getMockForAbstractClass('Magento\Catalog\Model\AbstractModel', array(), self::STUB_CLASS, false);
+            $this->getMockForAbstractClass(
+                \Magento\Catalog\Model\AbstractModel\Stub::class,
+                [],
+                self::STUB_CLASS,
+                false
+            );
             self::$_isStubClass = true;
         }
 
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create(self::STUB_CLASS);
+        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(self::STUB_CLASS);
 
         $resourceProperty = new \ReflectionProperty(get_class($this->_model), '_resourceName');
         $resourceProperty->setAccessible(true);
-        $resourceProperty->setValue($this->_model, 'Magento\Catalog\Model\Resource\Product');
+        $resourceProperty->setValue($this->_model, \Magento\Catalog\Model\ResourceModel\Product::class);
 
         $collectionProperty = new \ReflectionProperty(get_class($this->_model), '_collectionName');
         $collectionProperty->setAccessible(true);
-        $collectionProperty->setValue($this->_model, 'Magento\Catalog\Model\Resource\Product\Collection');
+        $collectionProperty->setValue($this->_model, \Magento\Catalog\Model\ResourceModel\Product\Collection::class);
     }
 
     /**
@@ -75,13 +57,13 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
      */
     public function testLockedAttributeApi()
     {
-        $this->assertEquals(array(), $this->_model->getLockedAttributes());
+        $this->assertEquals([], $this->_model->getLockedAttributes());
         $this->assertFalse($this->_model->hasLockedAttributes());
         $this->assertFalse($this->_model->isLockedAttribute('some_code'));
 
         $this->_model->lockAttribute('code');
         $this->assertTrue($this->_model->isLockedAttribute('code'));
-        $this->assertEquals(array('code'), $this->_model->getLockedAttributes());
+        $this->assertEquals(['code'], $this->_model->getLockedAttributes());
         $this->assertTrue($this->_model->hasLockedAttributes());
 
         $this->_model->unlockAttribute('code');
@@ -90,7 +72,7 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
         $this->_model->lockAttribute('code1');
         $this->_model->lockAttribute('code2');
         $this->_model->unlockAttributes();
-        $this->assertEquals(array(), $this->_model->getLockedAttributes());
+        $this->assertEquals([], $this->_model->getLockedAttributes());
         $this->assertFalse($this->_model->hasLockedAttributes());
     }
 
@@ -98,24 +80,24 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
     {
         // locked filter on setting all
         $this->_model->lockAttribute('key1');
-        $this->_model->setData(array('key1' => 'value1', 'key2' => 'value2'));
-        $this->assertEquals(array('key2' => 'value2'), $this->_model->getData());
+        $this->_model->setData(['key1' => 'value1', 'key2' => 'value2']);
+        $this->assertEquals(['key2' => 'value2'], $this->_model->getData());
 
         // locked filter per setting one
         $this->_model->setData('key1', 'value1');
         $this->_model->setData('key3', 'value3');
-        $this->assertEquals(array('key2' => 'value2', 'key3' => 'value3'), $this->_model->getData());
+        $this->assertEquals(['key2' => 'value2', 'key3' => 'value3'], $this->_model->getData());
 
         // set one with read only
         $this->_model->unlockAttributes()->unsetData();
         $this->_model->setIsReadonly(true);
         $this->_model->setData(uniqid(), uniqid());
-        $this->assertEquals(array(), $this->_model->getData());
+        $this->assertEquals([], $this->_model->getData());
     }
 
     public function testUnsetData()
     {
-        $data = array('key1' => 'value1', 'key2' => 'value2');
+        $data = ['key1' => 'value1', 'key2' => 'value2'];
         $this->_model->setData($data);
 
         // unset one locked
@@ -128,14 +110,17 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
 
         // unset all
         $this->_model->unlockAttributes()->setIsReadonly(false)->unsetData();
-        $this->assertEquals(array(), $this->_model->getData());
+        $this->assertEquals([], $this->_model->getData());
     }
 
     public function testGetResourceCollection()
     {
         $this->_model->setStoreId(99);
         $collection = $this->_model->getResourceCollection();
-        $this->assertInstanceOf('Magento\Catalog\Model\Resource\Collection\AbstractCollection', $collection);
+        $this->assertInstanceOf(
+            \Magento\Catalog\Model\ResourceModel\Collection\AbstractCollection::class,
+            $collection
+        );
         $this->assertEquals(99, $collection->getStoreId());
     }
 
@@ -146,9 +131,10 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
     {
         $object = $this->_model->loadByAttribute('sku', 'simple');
         $this->assertNotSame($object, $this->_model);
-        $this->assertEquals(1, $object->getId()); // fixture
+        // fixture
 
-        $result = $this->_model->loadByAttribute('sku', uniqid()); // specifying wrong attribute code leads to fatal
+        $result = $this->_model->loadByAttribute('sku', uniqid());
+        // specifying wrong attribute code leads to fatal
         $this->assertFalse($result);
     }
 
@@ -157,17 +143,19 @@ class AbstractTest extends \PHPUnit_Framework_TestCase
         $store = $this->_model->getStore();
         $this->assertSame(
             $store,
-            \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\StoreManagerInterface')
-                ->getStore()
+            \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+                \Magento\Store\Model\StoreManagerInterface::class
+            )->getStore()
         );
     }
 
     public function testGetWebsiteStoreIds()
     {
         $ids = $this->_model->getWebsiteStoreIds();
-        $storeId = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->get('Magento\Core\Model\StoreManagerInterface')->getStore()->getId();
-        $this->assertEquals(array($storeId => $storeId), $ids);
+        $storeId = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+            \Magento\Store\Model\StoreManagerInterface::class
+        )->getStore()->getId();
+        $this->assertEquals([$storeId => $storeId], $ids);
     }
 
     public function testSetGetAttributeDefaultValue()

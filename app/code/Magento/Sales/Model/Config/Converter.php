@@ -1,35 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
- * Converts sales totals (incl. nominal, creditmemo, invoice) from \DOMDocument to array
+ * Converts sales totals (incl. creditmemo, invoice) from \DOMDocument to array
  */
 namespace Magento\Sales\Model\Config;
 
-class Converter implements \Magento\Config\ConverterInterface
+class Converter implements \Magento\Framework\Config\ConverterInterface
 {
     /**
      * Converting data to array type
@@ -37,10 +17,11 @@ class Converter implements \Magento\Config\ConverterInterface
      * @param mixed $source
      * @return array
      * @throws \InvalidArgumentException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function convert($source)
     {
-        $output = array();
+        $output = [];
         if (!$source instanceof \DOMDocument) {
             return $output;
         }
@@ -50,7 +31,7 @@ class Converter implements \Magento\Config\ConverterInterface
 
         /** @var \DOMElement $section */
         foreach ($sections as $section) {
-            $sectionArray = array();
+            $sectionArray = [];
             $sectionName = $section->getAttribute('name');
 
             if (!$sectionName) {
@@ -62,7 +43,7 @@ class Converter implements \Magento\Config\ConverterInterface
             /** @var \DOMElement $group */
 
             foreach ($groups as $group) {
-                $groupArray = array();
+                $groupArray = [];
                 $groupName = $group->getAttribute('name');
                 if (!$groupName) {
                     throw new \InvalidArgumentException('Attribute "name" of "group" does not exist');
@@ -73,7 +54,7 @@ class Converter implements \Magento\Config\ConverterInterface
                 /** @var \DOMElement $item */
 
                 foreach ($items as $item) {
-                    $rendererArray = array();
+                    $rendererArray = [];
                     $itemName = $item->getAttribute('name');
                     if (!$itemName) {
                         throw new \InvalidArgumentException('Attribute "name" of "item" does not exist');
@@ -90,11 +71,11 @@ class Converter implements \Magento\Config\ConverterInterface
                         $rendererArray[$rendererName] = $renderer->getAttribute('instance');
                     }
 
-                    $itemArray = array(
+                    $itemArray = [
                         'instance' => $item->getAttribute('instance'),
                         'sort_order' => $item->getAttribute('sort_order'),
-                        'renderers' => $rendererArray
-                    );
+                        'renderers' => $rendererArray,
+                    ];
                     $groupArray[$itemName] = $itemArray;
                 }
                 $sectionArray[$groupName] = $groupArray;
@@ -103,7 +84,7 @@ class Converter implements \Magento\Config\ConverterInterface
         }
 
         $order = $source->getElementsByTagName('order')->item(0);
-        $availableProductTypes = array();
+        $availableProductTypes = [];
         /** @var \DOMElement $order */
         if ($order) {
             /** @var \DOMNodeList $types */

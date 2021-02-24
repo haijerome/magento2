@@ -1,39 +1,21 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Widget\Grid;
+
+use Magento\Backend\Block\Widget;
+use Magento\Backend\Block\Widget\Grid\Column\Filter\AbstractFilter;
 
 /**
  * Grid column block
  *
- * @category   Magento
- * @package    Magento_Backend
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Grid;
-
-class Column extends \Magento\Backend\Block\Widget
+class Column extends Widget
 {
     /**
      * Parent grid
@@ -52,7 +34,7 @@ class Column extends \Magento\Backend\Block\Widget
     /**
      * Column filter
      *
-     * @var \Magento\Backend\Block\Widget\Grid\Column\Filter\AbstractFilter
+     * @var AbstractFilter
      */
     protected $_filter;
 
@@ -61,58 +43,58 @@ class Column extends \Magento\Backend\Block\Widget
      *
      * @var string|null
      */
-    protected $_cssClass=null;
+    protected $_cssClass = null;
 
     /**
      * Renderer types
      *
      * @var array
      */
-    protected $_rendererTypes = array(
-        'action'           => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Action',
-        'button'           => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Button',
-        'checkbox'         => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Checkbox',
-        'concat'           => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Concat',
-        'country'          => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Country',
-        'currency'         => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Currency',
-        'date'             => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Date',
-        'datetime'         => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Datetime',
-        'default'          => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Text',
-        'draggable-handle' => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\DraggableHandle',
-        'input'            => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Input',
-        'massaction'       => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Massaction',
-        'number'           => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Number',
-        'options'          => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Options',
-        'price'            => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Price',
-        'radio'            => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Radio',
-        'select'           => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Select',
-        'store'            => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Store',
-        'text'             => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Longtext',
-        'wrapline'         => 'Magento\Backend\Block\Widget\Grid\Column\Renderer\Wrapline',
-    );
+    protected $_rendererTypes = [
+        'action' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Action::class,
+        'button' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Button::class,
+        'checkbox' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Checkbox::class,
+        'concat' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Concat::class,
+        'country' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Country::class,
+        'currency' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Currency::class,
+        'date' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Date::class,
+        'datetime' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Datetime::class,
+        'default' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Text::class,
+        'draggable-handle' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\DraggableHandle::class,
+        'input' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Input::class,
+        'massaction' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Massaction::class,
+        'number' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Number::class,
+        'options' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Options::class,
+        'price' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Price::class,
+        'radio' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Radio::class,
+        'select' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Select::class,
+        'store' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Store::class,
+        'text' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Longtext::class,
+        'wrapline' => \Magento\Backend\Block\Widget\Grid\Column\Renderer\Wrapline::class,
+    ];
 
     /**
      * Filter types
      *
      * @var array
      */
-    protected $_filterTypes = array(
-        'datetime' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Datetime',
-        'date' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Date',
-        'range' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Range',
-        'number' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Range',
-        'currency' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Range',
-        'price' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Price',
-        'country' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Country',
-        'options' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Select',
-        'massaction' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Massaction',
-        'checkbox' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Checkbox',
-        'radio' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Radio',
-        'skip-list' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\SkipList',
-        'store' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Store',
-        'theme' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Theme',
-        'default' => 'Magento\Backend\Block\Widget\Grid\Column\Filter\Text',
-    );
+    protected $_filterTypes = [
+        'datetime' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Datetime::class,
+        'date' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Date::class,
+        'range' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Range::class,
+        'number' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Range::class,
+        'currency' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Range::class,
+        'price' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Price::class,
+        'country' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Country::class,
+        'options' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Select::class,
+        'massaction' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Massaction::class,
+        'checkbox' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Checkbox::class,
+        'radio' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Radio::class,
+        'skip-list' => \Magento\Backend\Block\Widget\Grid\Column\Filter\SkipList::class,
+        'store' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Store::class,
+        'theme' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Theme::class,
+        'default' => \Magento\Backend\Block\Widget\Grid\Column\Filter\Text::class,
+    ];
 
     /**
      * Column is grouped
@@ -120,10 +102,13 @@ class Column extends \Magento\Backend\Block\Widget
      */
     protected $_isGrouped = false;
 
+    /**
+     * @return void
+     */
     public function _construct()
     {
         if ($this->hasData('grouped')) {
-            $this->_isGrouped = (bool) $this->getData('grouped');
+            $this->_isGrouped = (bool)$this->getData('grouped');
         }
 
         parent::_construct();
@@ -143,7 +128,7 @@ class Column extends \Magento\Backend\Block\Widget
      * Set grid block to column
      *
      * @param \Magento\Backend\Block\Widget\Grid $grid
-     * @return \Magento\Backend\Block\Widget\Grid\Column
+     * @return $this
      */
     public function setGrid($grid)
     {
@@ -170,9 +155,7 @@ class Column extends \Magento\Backend\Block\Widget
      */
     public function getHtmlId()
     {
-        return $this->getGrid()->getId() . '_'
-            . $this->getGrid()->getVarNameFilter() . '_'
-            . $this->getId();
+        return $this->getGrid()->getId() . '_' . $this->getGrid()->getVarNameFilter() . '_' . $this->getId();
     }
 
     /**
@@ -230,7 +213,8 @@ class Column extends \Magento\Backend\Block\Widget
     /**
      * Set is column sortable
      *
-     * @param boolean $value
+     * @param bool $value
+     * @return void
      */
     public function setSortable($value)
     {
@@ -251,15 +235,18 @@ class Column extends \Magento\Backend\Block\Widget
 
     /**
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getSortable()
     {
-        return $this->hasData('sortable') ? (bool) $this->getData('sortable') : true;
+        return $this->hasData('sortable') ? (bool)$this->getData('sortable') : true;
     }
 
     /**
      * Add css class to column header
-     * @param $className
+     *
+     * @param string $className
+     * @return void
      */
     public function addHeaderCssClass($className)
     {
@@ -275,7 +262,7 @@ class Column extends \Magento\Backend\Block\Widget
     {
         $str = '';
         if ($class = $this->getHeaderCssClass()) {
-            $str.= ' class="'.$class.'"';
+            $str .= ' class="' . $class . '"';
         }
 
         return $str;
@@ -284,10 +271,10 @@ class Column extends \Magento\Backend\Block\Widget
     /**
      * Retrieve row column field value for display
      *
-     * @param   \Magento\Object $row
+     * @param   \Magento\Framework\DataObject $row
      * @return  string
      */
-    public function getRowField(\Magento\Object $row)
+    public function getRowField(\Magento\Framework\DataObject $row)
     {
         $renderedValue = $this->getRenderer()->render($row);
         if ($this->getHtmlDecorators()) {
@@ -303,6 +290,7 @@ class Column extends \Magento\Backend\Block\Widget
          */
         $frameCallback = $this->getFrameCallback();
         if (is_array($frameCallback)) {
+            $this->validateFrameCallback($frameCallback);
             $renderedValue = call_user_func($frameCallback, $renderedValue, $row, $this, false);
         }
 
@@ -310,12 +298,29 @@ class Column extends \Magento\Backend\Block\Widget
     }
 
     /**
+     * Validate frame callback
+     *
+     * @throws \InvalidArgumentException
+     *
+     * @param array $callback
+     * @return void
+     */
+    private function validateFrameCallback(array $callback)
+    {
+        if (!is_object($callback[0]) || !$callback[0] instanceof Widget) {
+            throw new \InvalidArgumentException(
+                "Frame callback host must be instance of Magento\\Backend\\Block\\Widget"
+            );
+        }
+    }
+
+    /**
      * Retrieve row column field value for export
      *
-     * @param   \Magento\Object $row
+     * @param   \Magento\Framework\DataObject $row
      * @return  string
      */
-    public function getRowFieldExport(\Magento\Object $row)
+    public function getRowFieldExport(\Magento\Framework\DataObject $row)
     {
         $renderedValue = $this->getRenderer()->renderExport($row);
 
@@ -328,6 +333,7 @@ class Column extends \Magento\Backend\Block\Widget
          */
         $frameCallback = $this->getFrameCallback();
         if (is_array($frameCallback)) {
+            $this->validateFrameCallback($frameCallback);
             $renderedValue = call_user_func($frameCallback, $renderedValue, $row, $this, true);
         }
 
@@ -361,7 +367,7 @@ class Column extends \Magento\Backend\Block\Widget
                 $decorators = explode(' ', $decorators);
             }
         }
-        if ((!is_array($decorators)) || empty($decorators)) {
+        if (!is_array($decorators) || empty($decorators)) {
             return $value;
         }
         switch (array_shift($decorators)) {
@@ -379,7 +385,7 @@ class Column extends \Magento\Backend\Block\Widget
      * Set column renderer
      *
      * @param \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer $renderer
-     * @return \Magento\Backend\Block\Widget\Grid\Column
+     * @return $this
      */
     public function setRenderer($renderer)
     {
@@ -392,6 +398,7 @@ class Column extends \Magento\Backend\Block\Widget
      *
      * @param string $type type of renderer
      * @param string $className renderer class name
+     * @return void
      */
     public function setRendererType($type, $className)
     {
@@ -406,9 +413,9 @@ class Column extends \Magento\Backend\Block\Widget
     protected function _getRendererByType()
     {
         $type = strtolower($this->getType());
-        $rendererClass = (isset($this->_rendererTypes[$type])) ?
-            $this->_rendererTypes[$type] :
-            $this->_rendererTypes['default'];
+        $rendererClass = isset(
+            $this->_rendererTypes[$type]
+        ) ? $this->_rendererTypes[$type] : $this->_rendererTypes['default'];
 
         return $rendererClass;
     }
@@ -420,13 +427,12 @@ class Column extends \Magento\Backend\Block\Widget
      */
     public function getRenderer()
     {
-        if (is_null($this->_renderer)) {
+        if ($this->_renderer === null) {
             $rendererClass = $this->getData('renderer');
             if (empty($rendererClass)) {
                 $rendererClass = $this->_getRendererByType();
             }
-            $this->_renderer = $this->getLayout()->createBlock($rendererClass)
-                ->setColumn($this);
+            $this->_renderer = $this->getLayout()->createBlock($rendererClass)->setColumn($this);
         }
         return $this->_renderer;
     }
@@ -435,6 +441,7 @@ class Column extends \Magento\Backend\Block\Widget
      * Set column filter
      *
      * @param string $filterClass filter class name
+     * @return void
      */
     public function setFilter($filterClass)
     {
@@ -445,8 +452,10 @@ class Column extends \Magento\Backend\Block\Widget
 
     /**
      * Set filter type class name
+     *
      * @param string $type type of filter
      * @param string $className filter class name
+     * @return void
      */
     public function setFilterType($type, $className)
     {
@@ -456,14 +465,12 @@ class Column extends \Magento\Backend\Block\Widget
     /**
      * Get column filter class name by filter type
      *
-     * @return mixed
+     * @return string
      */
     protected function _getFilterByType()
     {
-        $type = strtolower($this->getType());
-        $filterClass = (isset($this->_filterTypes[$type])) ?
-            $this->_filterTypes[$type] :
-            $this->_filterTypes['default'];
+        $type = $this->getFilterType() ? strtolower($this->getFilterType()) : strtolower($this->getType());
+        $filterClass = isset($this->_filterTypes[$type]) ? $this->_filterTypes[$type] : $this->_filterTypes['default'];
 
         return $filterClass;
     }
@@ -471,13 +478,13 @@ class Column extends \Magento\Backend\Block\Widget
     /**
      * Get filter block
      *
-     * @return \Magento\Backend\Block\Widget\Grid\Column\Filter\AbstractFilter|bool
+     * @return AbstractFilter|false
      */
     public function getFilter()
     {
-        if (is_null($this->_filter)) {
+        if ($this->_filter === null) {
             $filterClass = $this->getData('filter');
-            if (false === (bool) $filterClass && false === is_null($filterClass)) {
+            if (false === (bool)$filterClass && false === ($filterClass === null)) {
                 return false;
             }
             if (!$filterClass) {
@@ -486,8 +493,7 @@ class Column extends \Magento\Backend\Block\Widget
                     return false;
                 }
             }
-            $this->_filter = $this->getLayout()->createBlock($filterClass)
-                ->setColumn($this);
+            $this->_filter = $this->getLayout()->createBlock($filterClass)->setColumn($this);
         }
 
         return $this->_filter;

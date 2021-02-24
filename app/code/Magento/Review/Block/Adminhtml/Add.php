@@ -1,67 +1,45 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Adminhtml add Review main block
- *
- * @category   Magento
- * @package    Magento_Review
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Review\Block\Adminhtml;
 
-class Add extends \Magento\Adminhtml\Block\Widget\Form\Container
+/**
+ * Adminhtml add Review main block
+ *
+ * @author      Magento Core Team <core@magentocommerce.com>
+ */
+class Add extends \Magento\Backend\Block\Widget\Form\Container
 {
+    /**
+     * Initialize add review
+     *
+     * @return void
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
+     */
     protected function _construct()
     {
         parent::_construct();
-
         $this->_blockGroup = 'Magento_Review';
         $this->_controller = 'adminhtml';
         $this->_mode = 'add';
-
-        $this->_updateButton('save', 'label', __('Save Review'));
-        $this->_updateButton('save', 'id', 'save_button');
-
-        $this->_updateButton('reset', 'id', 'reset_button');
-
-        $this->_formScripts[] = '
-            toggleParentVis("add_review_form");
-            toggleVis("save_button");
-            toggleVis("reset_button");
-        ';
-
+        $this->buttonList->update('save', 'label', __('Save Review'));
+        $this->buttonList->update('save', 'id', 'save_button');
+        $this->buttonList->update('save', 'style', 'display: none;');
+        $this->buttonList->update('reset', 'id', 'reset_button');
+        $this->buttonList->update('reset', 'style', 'display: none;');
+        $this->buttonList->update('reset', 'onclick', 'window.review.formReset()');
+        // @codingStandardsIgnoreStart
         $this->_formInitScripts[] = '
-            //<![CDATA[
-            var review = function() {
+            require(["jquery","Magento_Review/js/rating","prototype"], function(jQuery, rating){
+            window.review = function() {
                 return {
+                    reviewFormEditSelector: "#edit_form",
+                    ratingSelector: "[data-widget=ratingControl]",
                     productInfoUrl : null,
                     formHidden : true,
-
                     gridRowClick : function(data, click) {
                         if(Event.findElement(click,\'TR\').title){
                             review.productInfoUrl = Event.findElement(click,\'TR\').title;
@@ -70,18 +48,28 @@ class Add extends \Magento\Adminhtml\Block\Widget\Form\Container
                             review.formHidden = false;
                         }
                     },
-
                     loadProductData : function() {
-                        var con = new Ext.lib.Ajax.request(\'POST\', review.productInfoUrl, {success:review.reqSuccess,failure:review.reqFailure}, {form_key:FORM_KEY});
+                        jQuery.ajax({
+                            type: "GET",
+                            url: review.productInfoUrl,
+                            data: {
+                                form_key: FORM_KEY
+                            },
+                            showLoader: true,
+                            success: review.reqSuccess,
+                            error: review.reqFailure
+                        });
                     },
-
                     showForm : function() {
                         toggleParentVis("add_review_form");
                         toggleVis("productGrid");
                         toggleVis("save_button");
                         toggleVis("reset_button");
                     },
-
+                    formReset: function() {
+                        jQuery(review.reviewFormEditSelector).trigger(\'reset\');
+                        jQuery(review.ratingSelector).ratingControl(\'removeRating\');
+                    },
                     updateRating: function() {
                         elements = [$("select_stores"), $("rating_detail").getElementsBySelector("input[type=\'radio\']")].flatten();
                         $(\'save_button\').disabled = true;
@@ -92,35 +80,49 @@ class Add extends \Magento\Adminhtml\Block\Widget\Form\Container
                         if (!params.form_key) {
                             params.form_key = FORM_KEY;
                         }
-                        new Ajax.Updater("rating_detail", "'.$this->getUrl('catalog/*/ratingItems').'", {parameters:params, evalScripts: true,  onComplete:function(){ $(\'save_button\').disabled = false; } });
+                        new Ajax.Updater("rating_detail", "' .
+            $this->getUrl(
+                'review/product/ratingItems'
+            ) .
+            '", {parameters:params, evalScripts: true,  onComplete:function(){ $(\'save_button\').disabled = false; } });
                     },
 
-                    reqSuccess :function(o) {
-                        var response = Ext.util.JSON.decode(o.responseText);
+                    reqSuccess :function(response) {
                         if( response.error ) {
                             alert(response.message);
                         } else if( response.id ){
+                            var productName = response.name;
                             $("product_id").value = response.id;
 
-                            $("product_name").innerHTML = \'<a href="' . $this->getUrl('catalog/product/edit') . 'id/\' + response.id + \'" target="_blank">\' + response.name + \'</a>\';
-                        } else if( response.message ) {
+                            $("product_name").innerHTML = \'<a href="' .
+            $this->getUrl(
+                'catalog/product/edit'
+            ) .
+            'id/\' + response.id + \'" target="_blank">\' + productName.escapeHTML() + \'</a>\';
+                        } else if ( response.message ) {
                             alert(response.message);
                         }
                     }
                 }
             }();
-
-             Event.observe(window, \'load\', function(){
+            Event.observe(window, \'load\', function(){
                  if ($("select_stores")) {
                      Event.observe($("select_stores"), \'change\', review.updateRating);
                  }
-           });
+            });
+            });
            //]]>
         ';
+        // @codingStandardsIgnoreEnd
     }
 
+    /**
+     * Get add new review header text
+     *
+     * @return \Magento\Framework\Phrase
+     */
     public function getHeaderText()
     {
-        return __('Add New Review');
+        return __('New Review');
     }
 }

@@ -1,47 +1,77 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Theme\Block\Html;
+
+use Magento\Backend\Model\Menu;
+use Magento\Framework\Data\Tree\Node;
+use Magento\Framework\Data\Tree\Node\Collection;
+use Magento\Framework\Data\Tree\NodeFactory;
+use Magento\Framework\Data\TreeFactory;
+use Magento\Framework\DataObject;
+use Magento\Framework\DataObject\IdentityInterface;
+use Magento\Framework\View\Element\Template;
 
 /**
  * Html page top menu block
+ *
+ * @api
+ * @since 100.0.2
  */
-class Topmenu extends \Magento\View\Element\Template
+class Topmenu extends Template implements IdentityInterface
 {
+    /**
+     * Cache identities
+     *
+     * @var array
+     */
+    protected $identities = [];
+
     /**
      * Top menu data tree
      *
-     * @var \Magento\Data\Tree\Node
+     * @var Node
      */
     protected $_menu;
 
     /**
-     * Init top menu tree structure
+     * @var NodeFactory
      */
-    public function _construct()
+    private $nodeFactory;
+
+    /**
+     * @var TreeFactory
+     */
+    private $treeFactory;
+
+    /**
+     * @param Template\Context $context
+     * @param NodeFactory $nodeFactory
+     * @param TreeFactory $treeFactory
+     * @param array $data
+     */
+    public function __construct(
+        Template\Context $context,
+        NodeFactory $nodeFactory,
+        TreeFactory $treeFactory,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->nodeFactory = $nodeFactory;
+        $this->treeFactory = $treeFactory;
+    }
+
+    /**
+     * Get block cache life time
+     *
+     * @return int
+     * @since 100.1.0
+     */
+    protected function getCacheLifetime()
     {
-        $this->_menu = new \Magento\Data\Tree\Node(array(), 'root', new \Magento\Data\Tree());
+        return parent::getCacheLifetime() ?: 3600;
     }
 
     /**
@@ -54,35 +84,43 @@ class Topmenu extends \Magento\View\Element\Template
      */
     public function getHtml($outermostClass = '', $childrenWrapClass = '', $limit = 0)
     {
-        $this->_eventManager->dispatch('page_block_html_topmenu_gethtml_before', array(
-            'menu' => $this->_menu,
-        ));
+        $this->_eventManager->dispatch(
+            'page_block_html_topmenu_gethtml_before',
+            ['menu' => $this->getMenu(), 'block' => $this, 'request' => $this->getRequest()]
+        );
 
-        $this->_menu->setOutermostClass($outermostClass);
-        $this->_menu->setChildrenWrapClass($childrenWrapClass);
+        $this->getMenu()->setOutermostClass($outermostClass);
+        $this->getMenu()->setChildrenWrapClass($childrenWrapClass);
 
-        $html = $this->_getHtml($this->_menu, $childrenWrapClass, $limit);
+        $transportObject = new DataObject(
+            [
+                'html' => $this->_getHtml(
+                    $this->getMenu(),
+                    $childrenWrapClass,
+                    $limit
+                )
+            ]
+        );
 
-        $transportObject = new \Magento\Object(array('html' => $html));
-        $this->_eventManager->dispatch('page_block_html_topmenu_gethtml_after', array(
-            'menu' => $this->_menu,
-            'transportObject' => $transportObject,
-        ));
+        $this->_eventManager->dispatch(
+            'page_block_html_topmenu_gethtml_after',
+            ['menu' => $this->getMenu(), 'transportObject' => $transportObject]
+        );
 
-        return $html;
+        return $transportObject->getHtml();
     }
 
     /**
      * Count All Subnavigation Items
      *
-     * @param \Magento\Backend\Model\Menu $items
+     * @param Menu $items
      * @return int
      */
     protected function _countItems($items)
     {
         $total = $items->count();
         foreach ($items as $item) {
-            /** @var $item \Magento\Backend\Model\Menu\Item */
+            /** @var $item Menu\Item */
             if ($item->hasChildren()) {
                 $total += $this->_countItems($item->getChildren());
             }
@@ -93,9 +131,9 @@ class Topmenu extends \Magento\View\Element\Template
     /**
      * Building Array with Column Brake Stops
      *
-     * @param \Magento\Backend\Model\Menu $items
+     * @param Menu $items
      * @param int $limit
-     * @return array
+     * @return array|void
      *
      * @todo: Add Depth Level limit, and better logic for columns
      */
@@ -106,10 +144,7 @@ class Topmenu extends \Magento\View\Element\Template
             return;
         }
 
-        $result[] = array(
-            'total' => $total,
-            'max' => (int)ceil($total / ceil($total / $limit)),
-        );
+        $result[] = ['total' => $total, 'max' => (int)ceil($total / ceil($total / $limit))];
 
         $count = 0;
         $firstCol = true;
@@ -128,10 +163,7 @@ class Topmenu extends \Magento\View\Element\Template
                 $colbrake = false;
             }
 
-            $result[] = array(
-                'place' => $place,
-                'colbrake' => $colbrake,
-            );
+            $result[] = ['place' => $place, 'colbrake' => $colbrake];
 
             $firstCol = false;
         }
@@ -142,7 +174,7 @@ class Topmenu extends \Magento\View\Element\Template
     /**
      * Add sub menu HTML code for current menu item
      *
-     * @param \Magento\Data\Tree\Node $child
+     * @param Node $child
      * @param string $childLevel
      * @param string $childrenWrapClass
      * @param int $limit
@@ -155,22 +187,14 @@ class Topmenu extends \Magento\View\Element\Template
             return $html;
         }
 
-        if (!empty($childrenWrapClass)) {
-            $html .= '<div class="' . $childrenWrapClass . '">';
-        }
-
-        $colStops = null;
+        $colStops = [];
         if ($childLevel == 0 && $limit) {
             $colStops = $this->_columnBrake($child->getChildren(), $limit);
         }
 
-        $html .= '<ul class="level' . $childLevel . '">';
+        $html .= '<ul class="level' . $childLevel . ' ' . $childrenWrapClass . '">';
         $html .= $this->_getHtml($child, $childrenWrapClass, $limit, $colStops);
         $html .= '</ul>';
-
-        if (!empty($childrenWrapClass)) {
-            $html .= '</div>';
-        }
 
         return $html;
     }
@@ -178,58 +202,62 @@ class Topmenu extends \Magento\View\Element\Template
     /**
      * Recursively generates top menu html from data that is specified in $menuTree
      *
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     * @SuppressWarnings(PHPMD.NPathComplexity)
-     *
-     * @param \Magento\Data\Tree\Node $menuTree
+     * @param Node $menuTree
      * @param string $childrenWrapClass
      * @param int $limit
      * @param array $colBrakes
      * @return string
      */
-    protected function _getHtml(\Magento\Data\Tree\Node $menuTree, $childrenWrapClass, $limit, $colBrakes = array())
-    {
+    protected function _getHtml(
+        Node $menuTree,
+        $childrenWrapClass,
+        $limit,
+        array $colBrakes = []
+    ) {
         $html = '';
 
         $children = $menuTree->getChildren();
-        $parentLevel = $menuTree->getLevel();
-        $childLevel = is_null($parentLevel) ? 0 : $parentLevel + 1;
+        $childLevel = $this->getChildLevel($menuTree->getLevel());
+        $this->removeChildrenWithoutActiveParent($children, $childLevel);
 
         $counter = 1;
-        $itemPosition = 1;
         $childrenCount = $children->count();
 
         $parentPositionClass = $menuTree->getPositionClass();
         $itemPositionClassPrefix = $parentPositionClass ? $parentPositionClass . '-' : 'nav-';
 
+        /** @var Node $child */
         foreach ($children as $child) {
             $child->setLevel($childLevel);
-            $child->setIsFirst($counter == 1);
-            $child->setIsLast($counter == $childrenCount);
+            $child->setIsFirst($counter === 1);
+            $child->setIsLast($counter === $childrenCount);
             $child->setPositionClass($itemPositionClassPrefix . $counter);
 
             $outermostClassCode = '';
             $outermostClass = $menuTree->getOutermostClass();
 
-            if ($childLevel == 0 && $outermostClass) {
+            if ($childLevel === 0 && $outermostClass) {
                 $outermostClassCode = ' class="' . $outermostClass . '" ';
-                $child->setClass($outermostClass);
+                $this->setCurrentClass($child, $outermostClass);
             }
 
-            if (count($colBrakes) && $colBrakes[$counter]['colbrake']) {
+            if ($this->shouldAddNewColumn($colBrakes, $counter)) {
                 $html .= '</ul></li><li class="column"><ul>';
             }
 
             $html .= '<li ' . $this->_getRenderedMenuItemAttributes($child) . '>';
-            $html .= '<a href="' . $child->getUrl() . '" ' . $outermostClassCode . '><span>'
-                . $this->escapeHtml($child->getName()) . '</span></a>'
-                . $this->_addSubMenu($child, $childLevel, $childrenWrapClass, $limit)
-                . '</li>';
-            $itemPosition++;
+            $html .= '<a href="' . $child->getUrl() . '" ' . $outermostClassCode . '><span>' . $this->escapeHtml(
+                $child->getName()
+            ) . '</span></a>' . $this->_addSubMenu(
+                $child,
+                $childLevel,
+                $childrenWrapClass,
+                $limit
+            ) . '</li>';
             $counter++;
         }
 
-        if (count($colBrakes) && $limit) {
+        if (is_array($colBrakes) && !empty($colBrakes) && $limit) {
             $html = '<li class="column"><ul>' . $html . '</ul></li>';
         }
 
@@ -239,14 +267,13 @@ class Topmenu extends \Magento\View\Element\Template
     /**
      * Generates string with all attributes that should be present in menu item element
      *
-     * @param \Magento\Data\Tree\Node $item
+     * @param Node $item
      * @return string
      */
-    protected function _getRenderedMenuItemAttributes(\Magento\Data\Tree\Node $item)
+    protected function _getRenderedMenuItemAttributes(Node $item)
     {
         $html = '';
-        $attributes = $this->_getMenuItemAttributes($item);
-        foreach ($attributes as $attributeName => $attributeValue) {
+        foreach ($this->_getMenuItemAttributes($item) as $attributeName => $attributeValue) {
             $html .= ' ' . $attributeName . '="' . str_replace('"', '\"', $attributeValue) . '"';
         }
         return $html;
@@ -255,27 +282,30 @@ class Topmenu extends \Magento\View\Element\Template
     /**
      * Returns array of menu item's attributes
      *
-     * @param \Magento\Data\Tree\Node $item
+     * @param Node $item
      * @return array
      */
-    protected function _getMenuItemAttributes(\Magento\Data\Tree\Node $item)
+    protected function _getMenuItemAttributes(Node $item)
     {
-        $menuItemClasses = $this->_getMenuItemClasses($item);
-        return array('class' => implode(' ', $menuItemClasses));
+        return ['class' => implode(' ', $this->_getMenuItemClasses($item))];
     }
 
     /**
      * Returns array of menu item's classes
      *
-     * @param \Magento\Data\Tree\Node $item
+     * @param Node $item
      * @return array
      */
-    protected function _getMenuItemClasses(\Magento\Data\Tree\Node $item)
+    protected function _getMenuItemClasses(Node $item)
     {
-        $classes = array();
+        $classes = [
+            'level' . $item->getLevel(),
+            $item->getPositionClass(),
+        ];
 
-        $classes[] = 'level' . $item->getLevel();
-        $classes[] = $item->getPositionClass();
+        if ($item->getIsCategory()) {
+            $classes[] = 'category-item';
+        }
 
         if ($item->getIsFirst()) {
             $classes[] = 'first';
@@ -283,6 +313,8 @@ class Topmenu extends \Magento\View\Element\Template
 
         if ($item->getIsActive()) {
             $classes[] = 'active';
+        } elseif ($item->getHasActive()) {
+            $classes[] = 'has-active';
         }
 
         if ($item->getIsLast()) {
@@ -298,5 +330,119 @@ class Topmenu extends \Magento\View\Element\Template
         }
 
         return $classes;
+    }
+
+    /**
+     * Add identity
+     *
+     * @param string|array $identity
+     * @return void
+     */
+    public function addIdentity($identity)
+    {
+        if (!in_array($identity, $this->identities)) {
+            $this->identities[] = $identity;
+        }
+    }
+
+    /**
+     * Get identities
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        return $this->identities;
+    }
+
+    /**
+     * Get tags array for saving cache
+     *
+     * @return array
+     * @since 100.1.0
+     */
+    protected function getCacheTags()
+    {
+        return array_merge(parent::getCacheTags(), $this->getIdentities());
+    }
+
+    /**
+     * Get menu object.
+     *
+     * Creates Tree root node object.
+     * The creation logic was moved from class constructor into separate method.
+     *
+     * @return Node
+     * @since 100.1.0
+     */
+    public function getMenu()
+    {
+        if (!$this->_menu) {
+            $this->_menu = $this->nodeFactory->create(
+                [
+                    'data' => [],
+                    'idField' => 'root',
+                    'tree' => $this->treeFactory->create()
+                ]
+            );
+        }
+        return $this->_menu;
+    }
+
+    /**
+     * Remove children from collection when the parent is not active
+     *
+     * @param Collection $children
+     * @param int $childLevel
+     * @return void
+     */
+    private function removeChildrenWithoutActiveParent(Collection $children, int $childLevel): void
+    {
+        /** @var Node $child */
+        foreach ($children as $child) {
+            if ($childLevel === 0 && $child->getData('is_parent_active') === false) {
+                $children->delete($child);
+            }
+        }
+    }
+
+    /**
+     * Retrieve child level based on parent level
+     *
+     * @param int $parentLevel
+     *
+     * @return int
+     */
+    private function getChildLevel($parentLevel): int
+    {
+        return $parentLevel === null ? 0 : $parentLevel + 1;
+    }
+
+    /**
+     * Check if new column should be added.
+     *
+     * @param array $colBrakes
+     * @param int $counter
+     * @return bool
+     */
+    private function shouldAddNewColumn(array $colBrakes, int $counter): bool
+    {
+        return count($colBrakes) && $colBrakes[$counter]['colbrake'];
+    }
+
+    /**
+     * Set current class.
+     *
+     * @param Node $child
+     * @param string $outermostClass
+     */
+    private function setCurrentClass(Node $child, string $outermostClass): void
+    {
+        $currentClass = $child->getClass();
+        if (empty($currentClass)) {
+            $child->setClass($outermostClass);
+        } else {
+            $child->setClass($currentClass . ' ' . $outermostClass);
+        }
     }
 }

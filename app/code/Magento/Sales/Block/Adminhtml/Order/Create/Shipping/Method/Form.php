@@ -1,41 +1,26 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Shipping\Method;
+
+use Magento\Framework\Pricing\PriceCurrencyInterface;
 
 /**
  * Adminhtml sales order create shipping method form block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Shipping\Method;
-
-class Form
-    extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
+class Form extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
 {
+    /**
+     * Shipping rates
+     *
+     * @var array
+     */
     protected $_rates;
 
     /**
@@ -46,23 +31,36 @@ class Form
     protected $_taxData = null;
 
     /**
+     * @var PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param \Magento\Sales\Model\AdminOrder\Create $orderCreate
+     * @param PriceCurrencyInterface $priceCurrency
      * @param \Magento\Tax\Helper\Data $taxData
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
         \Magento\Sales\Model\AdminOrder\Create $orderCreate,
+        PriceCurrencyInterface $priceCurrency,
         \Magento\Tax\Helper\Data $taxData,
-        array $data = array()
+        array $data = []
     ) {
         $this->_taxData = $taxData;
-        parent::__construct($context, $sessionQuote, $orderCreate, $data);
+        $data['taxHelper'] = $this->_taxData;
+        parent::__construct($context, $sessionQuote, $orderCreate, $priceCurrency, $data);
     }
 
+    /**
+     * Constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -72,7 +70,7 @@ class Form
     /**
      * Retrieve quote shipping address model
      *
-     * @return \Magento\Sales\Model\Quote\Address
+     * @return \Magento\Quote\Model\Quote\Address
      */
     public function getAddress()
     {
@@ -93,14 +91,19 @@ class Form
     }
 
     /**
-     * Rertrieve carrier name from store configuration
+     * Retrieve carrier name from store configuration
      *
-     * @param   string $carrierCode
-     * @return  string
+     * @param string $carrierCode
+     * @return string
      */
     public function getCarrierName($carrierCode)
     {
-        if ($name = $this->_storeConfig->getConfig('carriers/'.$carrierCode.'/title', $this->getStore()->getId())) {
+        if ($name = $this->_scopeConfig->getValue(
+            'carriers/' . $carrierCode . '/title',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $this->getStore()->getId()
+        )
+        ) {
             return $name;
         }
         return $carrierCode;
@@ -119,18 +122,18 @@ class Form
     /**
      * Check activity of method by code
      *
-     * @param   string $code
-     * @return  bool
+     * @param string $code
+     * @return bool
      */
     public function isMethodActive($code)
     {
-        return $code===$this->getShippingMethod();
+        return $code === $this->getShippingMethod();
     }
 
     /**
      * Retrieve rate of active shipping method
      *
-     * @return \Magento\Sales\Model\Quote\Address\Rate || false
+     * @return \Magento\Quote\Model\Quote\Address\Rate|false
      */
     public function getActiveMethodRate()
     {
@@ -147,23 +150,36 @@ class Form
         return false;
     }
 
+    /**
+     * Get rate request
+     *
+     * @return mixed
+     */
     public function getIsRateRequest()
     {
         return $this->getRequest()->getParam('collect_shipping_rates');
     }
 
+    /**
+     * Get shipping price
+     *
+     * @param float $price
+     * @param bool $flag
+     * @return float
+     */
     public function getShippingPrice($price, $flag)
     {
-        return $this->getQuote()->getStore()->convertPrice(
+        return $this->priceCurrency->convertAndFormat(
             $this->_taxData->getShippingPrice(
                 $price,
                 $flag,
                 $this->getAddress(),
                 null,
-                //We should send exact quote store to prevent fetching default config for admin store.
                 $this->getAddress()->getQuote()->getStore()
             ),
-            true
+            true,
+            PriceCurrencyInterface::DEFAULT_PRECISION,
+            $this->getQuote()->getStore()
         );
     }
 }

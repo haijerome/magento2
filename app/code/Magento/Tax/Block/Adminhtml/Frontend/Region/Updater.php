@@ -1,40 +1,55 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Tax\Block\Adminhtml\Frontend\Region;
 
-class Updater
-    extends \Magento\Backend\Block\System\Config\Form\Field
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Data\Form\Element\AbstractElement;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
+
+class Updater extends \Magento\Config\Block\System\Config\Form\Field
 {
-    protected function _getElementHtml(\Magento\Data\Form\Element\AbstractElement $element)
+    /**
+     * @var \Magento\Directory\Helper\Data
+     */
+    protected $_directoryHelper;
+
+    /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
+     * @param \Magento\Backend\Block\Template\Context $context
+     * @param \Magento\Directory\Helper\Data $directoryHelper
+     * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        \Magento\Directory\Helper\Data $directoryHelper,
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null
+    ) {
+        $this->_directoryHelper = $directoryHelper;
+        parent::__construct($context, $data);
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+    }
+
+    /**
+     * Return element html.
+     *
+     * @param AbstractElement $element
+     * @return string
+     */
+    protected function _getElementHtml(AbstractElement $element)
     {
         $html = parent::_getElementHtml($element);
 
-        $js = '<script type="text/javascript">
-               var updater = new RegionUpdater("tax_defaults_country", "none", "tax_defaults_region", %s, "nullify");
+        $js = 'require(["prototype", "mage/adminhtml/form"], function(){
+               updater = new RegionUpdater("tax_defaults_country", "none", "tax_defaults_region", %s, "nullify");
                if(updater.lastCountryId) {
                    var tmpRegionId = $("tax_defaults_region").value;
                    var tmpCountryId = updater.lastCountryId;
@@ -45,12 +60,12 @@ class Updater
                } else {
                    updater.update();
                }
-               </script>';
+                });';
 
-        $html .= sprintf($js, $this->helper('Magento\Directory\Helper\Data')->getRegionJson());
+        $scriptString = sprintf($js, $this->_directoryHelper->getRegionJson());
+
+        $html .= /* @noEscape */ $this->secureRenderer->renderTag('script', [], $scriptString, false);
+
         return $html;
     }
 }
-
-
-

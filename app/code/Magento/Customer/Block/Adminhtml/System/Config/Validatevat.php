@@ -1,39 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Adminhtml VAT ID validation block
  *
- * @category   Magento
- * @package    Magento_Customer
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Customer\Block\Adminhtml\System\Config;
 
-class Validatevat extends \Magento\Backend\Block\System\Config\Form\Field
+class Validatevat extends \Magento\Config\Block\System\Config\Form\Field
 {
     /**
      * Merchant Country Field Name
@@ -121,7 +99,7 @@ class Validatevat extends \Magento\Backend\Block\System\Config\Form\Field
     {
         parent::_prepareLayout();
         if (!$this->getTemplate()) {
-            $this->setTemplate('system/config/validatevat.phtml');
+            $this->setTemplate('Magento_Customer::system/config/validatevat.phtml');
         }
         return $this;
     }
@@ -129,10 +107,10 @@ class Validatevat extends \Magento\Backend\Block\System\Config\Form\Field
     /**
      * Unset some non-related element parameters
      *
-     * @param \Magento\Data\Form\Element\AbstractElement $element
+     * @param \Magento\Framework\Data\Form\Element\AbstractElement $element
      * @return string
      */
-    public function render(\Magento\Data\Form\Element\AbstractElement $element)
+    public function render(\Magento\Framework\Data\Form\Element\AbstractElement $element)
     {
         $element->unsScope()->unsCanUseWebsiteValue()->unsCanUseDefaultValue();
         return parent::render($element);
@@ -141,18 +119,20 @@ class Validatevat extends \Magento\Backend\Block\System\Config\Form\Field
     /**
      * Get the button and scripts contents
      *
-     * @param \Magento\Data\Form\Element\AbstractElement $element
+     * @param \Magento\Framework\Data\Form\Element\AbstractElement $element
      * @return string
      */
-    protected function _getElementHtml(\Magento\Data\Form\Element\AbstractElement $element)
+    protected function _getElementHtml(\Magento\Framework\Data\Form\Element\AbstractElement $element)
     {
         $originalData = $element->getOriginalData();
         $buttonLabel = !empty($originalData['button_label']) ? $originalData['button_label'] : $this->_vatButtonLabel;
-        $this->addData(array(
-            'button_label' => __($buttonLabel),
-            'html_id' => $element->getHtmlId(),
-            'ajax_url' => $this->_urlBuilder->getUrl('customer/system_config_validatevat/validate')
-        ));
+        $this->addData(
+            [
+                'button_label' => __($buttonLabel),
+                'html_id' => $element->getHtmlId(),
+                'ajax_url' => $this->_urlBuilder->getUrl('customer/system_config_validatevat/validate'),
+            ]
+        );
 
         return $this->_toHtml();
     }

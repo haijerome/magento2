@@ -1,92 +1,81 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-
 /**
- * Wishlist block customer items
- *
- * @category   Magento
- * @package    Magento_Wishlist
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Wishlist\Block\Customer;
 
+/**
+ * Wishlist block customer items.
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
 {
+    /**
+     * List of product options rendering configurations by product type
+     *
+     * @var array
+     */
+    protected $_optionsCfg = [];
+
     /**
      * @var \Magento\Catalog\Helper\Product\ConfigurationPool
      */
     protected $_helperPool;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Wishlist\Helper\Data $wishlistData
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Catalog\Model\ProductFactory $productFactory
+     * @var  \Magento\Wishlist\Model\ResourceModel\Item\Collection
+     * @since 101.1.1
+     */
+    protected $_collection;
+
+    /**
+     * @var \Magento\Customer\Helper\Session\CurrentCustomer
+     */
+    protected $currentCustomer;
+
+    /**
+     * @var \Magento\Framework\Data\Helper\PostHelper
+     */
+    protected $postDataHelper;
+
+    /**
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Framework\App\Http\Context $httpContext
      * @param \Magento\Catalog\Helper\Product\ConfigurationPool $helperPool
+     * @param \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer
+     * @param \Magento\Framework\Data\Helper\PostHelper $postDataHelper
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Wishlist\Helper\Data $wishlistData,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Catalog\Model\ProductFactory $productFactory,
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Framework\App\Http\Context $httpContext,
         \Magento\Catalog\Helper\Product\ConfigurationPool $helperPool,
-        array $data = array()
+        \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer,
+        \Magento\Framework\Data\Helper\PostHelper $postDataHelper,
+        array $data = []
     ) {
-        $this->_helperPool = $helperPool;
         parent::__construct(
             $context,
-            $catalogConfig,
-            $registry,
-            $taxData,
-            $catalogData,
-            $mathRandom,
-            $wishlistData,
-            $customerSession,
-            $productFactory,
+            $httpContext,
             $data
         );
+        $this->_helperPool = $helperPool;
+        $this->currentCustomer = $currentCustomer;
+        $this->postDataHelper = $postDataHelper;
     }
 
     /**
      * Add wishlist conditions to collection
      *
-     * @param  \Magento\Wishlist\Model\Resource\Item\Collection $collection
-     * @return \Magento\Wishlist\Block\Customer\Wishlist
+     * @param  \Magento\Wishlist\Model\ResourceModel\Item\Collection $collection
+     * @return $this
      */
     protected function _prepareCollection($collection)
     {
@@ -95,17 +84,65 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     }
 
     /**
+     * Paginate Wishlist Product Items collection
+     *
+     * @return void
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
+     */
+    private function paginateCollection()
+    {
+        $page = $this->getRequest()->getParam("p", 1);
+        $limit = $this->getRequest()->getParam("limit", 10);
+        $this->_collection
+            ->setPageSize($limit)
+            ->setCurPage($page);
+    }
+
+    /**
+     * Retrieve Wishlist Product Items collection
+     *
+     * @return \Magento\Wishlist\Model\ResourceModel\Item\Collection
+     * @since 101.1.1
+     */
+    public function getWishlistItems()
+    {
+        if ($this->_collection === null) {
+            $this->_collection = $this->_createWishlistItemCollection();
+            $this->_prepareCollection($this->_collection);
+            $this->paginateCollection();
+        }
+        return $this->_collection;
+    }
+
+    /**
      * Preparing global layout
      *
-     * @return \Magento\Wishlist\Block\Customer\Wishlist
+     * @return $this
      */
     protected function _prepareLayout()
     {
         parent::_prepareLayout();
-        $headBlock = $this->getLayout()->getBlock('head');
-        if ($headBlock) {
-            $headBlock->setTitle(__('My Wish List'));
-        }
+        $this->pageConfig->getTitle()->set(__('My Wish List'));
+        $this->getChildBlock('wishlist_item_pager')
+            ->setUseContainer(
+                true
+            )->setShowAmounts(
+                true
+            )->setFrameLength(
+                $this->_scopeConfig->getValue(
+                    'design/pagination/pagination_frame',
+                    \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+                )
+            )->setJump(
+                $this->_scopeConfig->getValue(
+                    'design/pagination/pagination_frame_skip',
+                    \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+                )
+            )->setLimit(
+                $this->getLimit()
+            )
+            ->setCollection($this->getWishlistItems());
+        return $this;
     }
 
     /**
@@ -121,9 +158,8 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     /**
      * Sets all options render configurations
      *
-     * @deprecated after 1.6.2.0
      * @param null|array $optionCfg
-     * @return \Magento\Wishlist\Block\Customer\Wishlist
+     * @return $this
      */
     public function setOptionsRenderCfgs($optionCfg)
     {
@@ -134,7 +170,6 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     /**
      * Returns all options render configurations
      *
-     * @deprecated after 1.6.2.0
      * @return array
      */
     public function getOptionsRenderCfgs()
@@ -142,25 +177,23 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
         return $this->_optionsCfg;
     }
 
-    /*
+    /**
      * Adds config for rendering product type options
      *
-     * @deprecated after 1.6.2.0
      * @param string $productType
      * @param string $helperName
      * @param null|string $template
-     * @return \Magento\Wishlist\Block\Customer\Wishlist
+     * @return $this
      */
     public function addOptionsRenderCfg($productType, $helperName, $template = null)
     {
-        $this->_optionsCfg[$productType] = array('helper' => $helperName, 'template' => $template);
+        $this->_optionsCfg[$productType] = ['helper' => $helperName, 'template' => $template];
         return $this;
     }
 
     /**
      * Returns html for showing item options
      *
-     * @deprecated after 1.6.2.0
      * @param string $productType
      * @return array|null
      */
@@ -178,7 +211,6 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     /**
      * Returns html for showing item options
      *
-     * @deprecated after 1.6.2.0
      * @param \Magento\Wishlist\Model\Item $item
      * @return string
      */
@@ -189,7 +221,7 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
             return '';
         }
 
-        $block  = $this->getChildBlock('item_options');
+        $block = $this->getChildBlock('item_options');
         if (!$block) {
             return '';
         }
@@ -204,15 +236,14 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
             $template = $cfgDefault['template'];
         }
 
-        return $block->setTemplate($template)
-            ->setOptionList($this->_helperPool($cfg['helper'])->getOptions($item))
-            ->toHtml();
+        $block->setTemplate($template);
+        $block->setOptionList($this->_helperPool->get($cfg['helper'])->getOptions($item));
+        return $block->toHtml();
     }
 
     /**
      * Returns qty to show visually to user
      *
-     * @deprecated after 1.6.2.0
      * @param \Magento\Wishlist\Model\Item $item
      * @return float
      */
@@ -220,5 +251,30 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     {
         $qty = $this->getQty($item);
         return $qty ? $qty : 1;
+    }
+
+    /**
+     * Get add all to cart params for POST request
+     *
+     * @return string
+     */
+    public function getAddAllToCartParams()
+    {
+        return $this->postDataHelper->getPostData(
+            $this->getUrl('wishlist/index/allcart'),
+            ['wishlist_id' => $this->getWishlistInstance()->getId()]
+        );
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function _toHtml()
+    {
+        if ($this->currentCustomer->getCustomerId()) {
+            return parent::_toHtml();
+        } else {
+            return '';
+        }
     }
 }

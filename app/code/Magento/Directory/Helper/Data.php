@@ -1,35 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Directory
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Directory\Helper;
+
+use Magento\Directory\Model\AllowedCountries;
+use Magento\Directory\Model\Currency;
+use Magento\Directory\Model\CurrencyFactory;
+use Magento\Directory\Model\ResourceModel\Country\Collection;
+use Magento\Directory\Model\ResourceModel\Region\CollectionFactory;
+use Magento\Framework\App\Cache\Type\Config;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\Helper\Context;
+use Magento\Framework\Json\Helper\Data as JsonData;
+use Magento\Store\Model\ScopeInterface;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Directory data helper
+ *
+ * @api
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-namespace Magento\Directory\Helper;
-
-class Data extends \Magento\App\Helper\AbstractHelper
+class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
     /**
      * Config value that lists ISO2 country codes which have optional Zip/Postal pre-configured
@@ -46,17 +42,36 @@ class Data extends \Magento\App\Helper\AbstractHelper
      */
     const XML_PATH_DISPLAY_ALL_STATES = 'general/region/display_all';
 
+    /**#@+
+     * Path to config value, which is default country
+     */
+    const XML_PATH_DEFAULT_COUNTRY = 'general/country/default';
+    const XML_PATH_DEFAULT_LOCALE = 'general/locale/code';
+    const XML_PATH_DEFAULT_TIMEZONE = 'general/locale/timezone';
+    /**#@-*/
+
+    /**
+     * Path to config value that contains codes of the most used countries.
+     * Such countries can be shown on the top of the country list.
+     */
+    const XML_PATH_TOP_COUNTRIES = 'general/country/destinations';
+
+    /**
+     * Path to config value that contains weight unit
+     */
+    const XML_PATH_WEIGHT_UNIT = 'general/locale/weight_unit';
+
     /**
      * Country collection
      *
-     * @var \Magento\Directory\Model\Resource\Country\Collection
+     * @var Collection
      */
     protected $_countryCollection;
 
     /**
      * Region collection
      *
-     * @var \Magento\Directory\Model\Resource\Region\Collection
+     * @var \Magento\Directory\Model\ResourceModel\Region\Collection
      */
     protected $_regionCollection;
 
@@ -72,7 +87,7 @@ class Data extends \Magento\App\Helper\AbstractHelper
      *
      * @var array
      */
-    protected $_currencyCache = array();
+    protected $_currencyCache = [];
 
     /**
      * ISO2 country codes which have optional Zip/Postal pre-configured
@@ -82,76 +97,70 @@ class Data extends \Magento\App\Helper\AbstractHelper
     protected $_optZipCountries = null;
 
     /**
-     * @var \Magento\App\Cache\Type\Config
+     * @var Config
      */
     protected $_configCacheType;
 
     /**
-     * @var \Magento\Directory\Model\Resource\Region\CollectionFactory
+     * @var CollectionFactory
      */
-    protected $_regCollFactory;
+    protected $_regCollectionFactory;
 
     /**
-     * @var \Magento\Core\Helper\Data
+     * @var JsonData
      */
-    protected $_coreHelper;
+    protected $jsonHelper;
 
     /**
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @var \Magento\Directory\Model\CurrencyFactory
+     * @var CurrencyFactory
      */
     protected $_currencyFactory;
 
     /**
-     * @var \Magento\Core\Model\Config
-     */
-    protected $_config;
-
-    /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\App\Cache\Type\Config $configCacheType
-     * @param \Magento\Directory\Model\Resource\Country\Collection $countryCollection
-     * @param \Magento\Directory\Model\Resource\Region\CollectionFactory $regCollFactory,
-     * @param \Magento\Core\Helper\Data $coreHelper
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Directory\Model\CurrencyFactory $currencyFactory
-     * @param \Magento\Core\Model\Config $config
+     * Data constructor.
+     *
+     * @param Context $context
+     * @param Config $configCacheType
+     * @param Collection $countryCollection
+     * @param CollectionFactory $regCollectionFactory
+     * @param JsonData $jsonHelper
+     * @param StoreManagerInterface $storeManager
+     * @param CurrencyFactory $currencyFactory
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\App\Cache\Type\Config $configCacheType,
-        \Magento\Directory\Model\Resource\Country\Collection $countryCollection,
-        \Magento\Directory\Model\Resource\Region\CollectionFactory $regCollFactory,
-        \Magento\Core\Helper\Data $coreHelper,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Directory\Model\CurrencyFactory $currencyFactory,
-        \Magento\Core\Model\Config $config
+        Context $context,
+        Config $configCacheType,
+        Collection $countryCollection,
+        CollectionFactory $regCollectionFactory,
+        JsonData $jsonHelper,
+        StoreManagerInterface $storeManager,
+        CurrencyFactory $currencyFactory
     ) {
         parent::__construct($context);
         $this->_configCacheType = $configCacheType;
         $this->_countryCollection = $countryCollection;
-        $this->_regCollFactory = $regCollFactory;
-        $this->_coreHelper = $coreHelper;
+        $this->_regCollectionFactory = $regCollectionFactory;
+        $this->jsonHelper = $jsonHelper;
         $this->_storeManager = $storeManager;
         $this->_currencyFactory = $currencyFactory;
-        $this->_config = $config;
     }
 
     /**
      * Retrieve region collection
      *
-     * @return \Magento\Directory\Model\Resource\Region\Collection
+     * @return \Magento\Directory\Model\ResourceModel\Region\Collection
      */
     public function getRegionCollection()
     {
         if (!$this->_regionCollection) {
-            $this->_regionCollection = $this->_regCollFactory->create();
-            $this->_regionCollection->addCountryFilter($this->getAddress()->getCountryId())
-                ->load();
+            $this->_regionCollection = $this->_regCollectionFactory->create();
+            // phpstan:ignore
+            $this->_regionCollection->addCountryFilter($this->getAddress()->getCountryId())->load();
         }
         return $this->_regionCollection;
     }
@@ -159,12 +168,13 @@ class Data extends \Magento\App\Helper\AbstractHelper
     /**
      * Retrieve country collection
      *
-     * @return \Magento\Directory\Model\Resource\Country\Collection
+     * @param null|int|string|\Magento\Store\Model\Store $store
+     * @return Collection
      */
-    public function getCountryCollection()
+    public function getCountryCollection($store = null)
     {
         if (!$this->_countryCollection->isLoaded()) {
-            $this->_countryCollection->loadByStore();
+            $this->_countryCollection->loadByStore($store);
         }
         return $this->_countryCollection;
     }
@@ -173,45 +183,28 @@ class Data extends \Magento\App\Helper\AbstractHelper
      * Retrieve regions data json
      *
      * @return string
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     public function getRegionJson()
     {
-        \Magento\Profiler::start('TEST: ' . __METHOD__, array('group' => 'TEST', 'method' => __METHOD__));
+        \Magento\Framework\Profiler::start('TEST: ' . __METHOD__, ['group' => 'TEST', 'method' => __METHOD__]);
         if (!$this->_regionJson) {
-            $cacheKey = 'DIRECTORY_REGIONS_JSON_STORE' . $this->_storeManager->getStore()->getId();
+            $scope = $this->getCurrentScope();
+            $scopeKey = $scope['value'] ? '_' . implode('_', $scope) : null;
+            $cacheKey = 'DIRECTORY_REGIONS_JSON_STORE' . $scopeKey;
             $json = $this->_configCacheType->load($cacheKey);
             if (empty($json)) {
-                $countryIds = array();
-                foreach ($this->getCountryCollection() as $country) {
-                    $countryIds[] = $country->getCountryId();
+                $regions = $this->getRegionData();
+                $json = $this->jsonHelper->jsonEncode($regions);
+                if ($json === false) {
+                    $json = 'false';
                 }
-                $collection = $this->_regCollFactory->create();
-                $collection->addCountryFilter($countryIds)
-                    ->load();
-                $regions = array(
-                    'config' => array(
-                        'show_all_regions' => $this->isShowNonRequiredState(),
-                        'regions_required' => $this->getCountriesWithStatesRequired()
-                    )
-                );
-                foreach ($collection as $region) {
-                    /** @var $region \Magento\Directory\Model\Region */
-                    if (!$region->getRegionId()) {
-                        continue;
-                    }
-                    $regions[$region->getCountryId()][$region->getRegionId()] = array(
-                        'code' => $region->getCode(),
-                        'name' => (string)__($region->getName())
-                    );
-                }
-                $json = $this->_coreHelper->jsonEncode($regions);
-
                 $this->_configCacheType->save($json, $cacheKey);
             }
             $this->_regionJson = $json;
         }
 
-        \Magento\Profiler::stop('TEST: ' . __METHOD__);
+        \Magento\Framework\Profiler::stop('TEST: ' . __METHOD__);
         return $this->_regionJson;
     }
 
@@ -221,15 +214,17 @@ class Data extends \Magento\App\Helper\AbstractHelper
      * @param float $amount
      * @param string $from
      * @param string $to
+     *
      * @return float
      * @SuppressWarnings(PHPMD.ShortVariable)
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     public function currencyConvert($amount, $from, $to = null)
     {
         if (empty($this->_currencyCache[$from])) {
             $this->_currencyCache[$from] = $this->_currencyFactory->create()->load($from);
         }
-        if (is_null($to)) {
+        if ($to === null) {
             $to = $this->_storeManager->getStore()->getCurrentCurrencyCode();
         }
         $converted = $this->_currencyCache[$from]->convert($amount, $to);
@@ -245,11 +240,16 @@ class Data extends \Magento\App\Helper\AbstractHelper
     public function getCountriesWithOptionalZip($asJson = false)
     {
         if (null === $this->_optZipCountries) {
-            $value = trim($this->_storeManager->getStore()->getConfig(self::OPTIONAL_ZIP_COUNTRIES_CONFIG_PATH));
+            $value = trim(
+                $this->scopeConfig->getValue(
+                    self::OPTIONAL_ZIP_COUNTRIES_CONFIG_PATH,
+                    ScopeInterface::SCOPE_STORE
+                )
+            );
             $this->_optZipCountries = preg_split('/\,/', $value, 0, PREG_SPLIT_NO_EMPTY);
         }
         if ($asJson) {
-            return $this->_coreHelper->jsonEncode($this->_optZipCountries);
+            return $this->jsonHelper->jsonEncode($this->_optZipCountries);
         }
         return $this->_optZipCountries;
     }
@@ -270,14 +270,19 @@ class Data extends \Magento\App\Helper\AbstractHelper
      * Returns the list of countries, for which region is required
      *
      * @param boolean $asJson
-     * @return array
+     * @return array|string
      */
     public function getCountriesWithStatesRequired($asJson = false)
     {
-        $value = trim($this->_storeManager->getStore()->getConfig(self::XML_PATH_STATES_REQUIRED));
-        $countryList =  preg_split('/\,/', $value, 0, PREG_SPLIT_NO_EMPTY);
+        $value = trim(
+            $this->scopeConfig->getValue(
+                self::XML_PATH_STATES_REQUIRED,
+                ScopeInterface::SCOPE_STORE
+            )
+        );
+        $countryList = preg_split('/\,/', $value, 0, PREG_SPLIT_NO_EMPTY);
         if ($asJson) {
-            return $this->_coreHelper->jsonEncode($countryList);
+            return $this->jsonHelper->jsonEncode($countryList);
         }
         return $countryList;
     }
@@ -289,7 +294,10 @@ class Data extends \Magento\App\Helper\AbstractHelper
      */
     public function isShowNonRequiredState()
     {
-        return (boolean)$this->_storeManager->getStore()->getConfig(self::XML_PATH_DISPLAY_ALL_STATES);
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_DISPLAY_ALL_STATES,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     /**
@@ -314,6 +322,110 @@ class Data extends \Magento\App\Helper\AbstractHelper
      */
     public function getBaseCurrencyCode()
     {
-        return $this->_config->getValue(\Magento\Directory\Model\Currency::XML_PATH_CURRENCY_BASE, 'default');
+        return $this->scopeConfig->getValue(
+            Currency::XML_PATH_CURRENCY_BASE,
+            'default'
+        );
+    }
+
+    /**
+     * Return default country code
+     *
+     * @param \Magento\Store\Model\Store|string|int $store
+     * @return string
+     */
+    public function getDefaultCountry($store = null)
+    {
+        return $this->scopeConfig->getValue(
+            self::XML_PATH_DEFAULT_COUNTRY,
+            ScopeInterface::SCOPE_STORE,
+            $store
+        );
+    }
+
+    /**
+     * Retrieve regions data
+     *
+     * @return array
+     */
+    public function getRegionData()
+    {
+        $scope = $this->getCurrentScope();
+        $allowedCountries = $this->scopeConfig->getValue(
+            AllowedCountries::ALLOWED_COUNTRIES_PATH,
+            $scope['type'],
+            $scope['value']
+        );
+        $countryIds = explode(',', $allowedCountries);
+        $collection = $this->_regCollectionFactory->create();
+        $collection->addCountryFilter($countryIds)->load();
+        $regions = [
+            'config' => [
+                'show_all_regions' => $this->isShowNonRequiredState(),
+                'regions_required' => $this->getCountriesWithStatesRequired(),
+            ],
+        ];
+        foreach ($collection as $region) {
+            /** @var $region \Magento\Directory\Model\Region */
+            if (!$region->getRegionId()) {
+                continue;
+            }
+            $regions[$region->getCountryId()][$region->getRegionId()] = [
+                'code' => $region->getCode(),
+                'name' => (string)__($region->getName()),
+            ];
+        }
+        return $regions;
+    }
+
+    /**
+     * Retrieve list of codes of the most used countries
+     *
+     * @return array
+     */
+    public function getTopCountryCodes()
+    {
+        $configValue = (string)$this->scopeConfig->getValue(
+            self::XML_PATH_TOP_COUNTRIES,
+            ScopeInterface::SCOPE_STORE
+        );
+        return !empty($configValue) ? explode(',', $configValue) : [];
+    }
+
+    /**
+     * Retrieve weight unit
+     *
+     * @return string
+     */
+    public function getWeightUnit()
+    {
+        return $this->scopeConfig->getValue(self::XML_PATH_WEIGHT_UNIT, ScopeInterface::SCOPE_STORE);
+    }
+
+    /**
+     * Get current scope from request
+     *
+     * @return array
+     */
+    private function getCurrentScope(): array
+    {
+        $scope = [
+            'type' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT,
+            'value' => null,
+        ];
+        $request = $this->_getRequest();
+        if ($request->getParam(ScopeInterface::SCOPE_WEBSITE)) {
+            $scope = [
+                'type' => ScopeInterface::SCOPE_WEBSITE,
+                'value' => $request->getParam(ScopeInterface::SCOPE_WEBSITE),
+            ];
+        } elseif ($request->getParam(ScopeInterface::SCOPE_STORE)) {
+            $scope = [
+                'type' => ScopeInterface::SCOPE_STORE,
+                'value' => $request->getParam(ScopeInterface::SCOPE_STORE),
+            ];
+        }
+
+        return $scope;
     }
 }

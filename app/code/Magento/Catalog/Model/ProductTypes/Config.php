@@ -1,43 +1,32 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ProductTypes;
 
-class Config
-    extends \Magento\Config\Data
-    implements \Magento\Catalog\Model\ProductTypes\ConfigInterface
+use Magento\Framework\Serialize\SerializerInterface;
+
+/**
+ * Provides product types configuration
+ */
+class Config extends \Magento\Framework\Config\Data implements \Magento\Catalog\Model\ProductTypes\ConfigInterface
 {
     /**
-     * @param \Magento\Catalog\Model\ProductTypes\Config\Reader $reader
-     * @param \Magento\Config\CacheInterface $cache
-     * @param string $cacheId
+     * Constructor
+     *
+     * @param Config\Reader $reader
+     * @param \Magento\Framework\Config\CacheInterface $cache
+     * @param string|null $cacheId
+     * @param SerializerInterface|null $serializer
      */
     public function __construct(
         \Magento\Catalog\Model\ProductTypes\Config\Reader $reader,
-        \Magento\Config\CacheInterface $cache,
-        $cacheId = 'product_types_config'
+        \Magento\Framework\Config\CacheInterface $cache,
+        $cacheId = 'product_types_config',
+        SerializerInterface $serializer = null
     ) {
-        parent::__construct($reader, $cache, $cacheId);
+        parent::__construct($reader, $cache, $cacheId, $serializer);
     }
 
     /**
@@ -48,7 +37,7 @@ class Config
      */
     public function getType($name)
     {
-        return $this->get($name, array());
+        return $this->get('types/' . $name, []);
     }
 
     /**
@@ -58,6 +47,48 @@ class Config
      */
     public function getAll()
     {
-        return $this->get();
+        return $this->get('types');
+    }
+
+    /**
+     * Check whether product type is set of products
+     *
+     * @param string $typeId
+     * @return bool
+     */
+    public function isProductSet($typeId)
+    {
+        return 'true' == $this->get('types/' . $typeId . '/custom_attributes/is_product_set', false);
+    }
+
+    /**
+     * Get composable types
+     *
+     * @return array
+     */
+    public function getComposableTypes()
+    {
+        return $this->get('composableTypes', []);
+    }
+
+    /**
+     * Get list of product types that comply with condition
+     *
+     * @param string $attributeName
+     * @param string $value
+     * @return array
+     */
+    public function filter($attributeName, $value = 'true')
+    {
+        $availableProductTypes = [];
+        foreach ($this->getAll() as $type) {
+            if (!isset(
+                $type['custom_attributes'][$attributeName]
+            ) || $type['custom_attributes'][$attributeName] == $value
+            ) {
+                $availableProductTypes[$type['name']] = $type['name'];
+            }
+        }
+        return $availableProductTypes;
     }
 }

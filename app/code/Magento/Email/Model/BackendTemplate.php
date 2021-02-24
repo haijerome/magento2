@@ -1,143 +1,83 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Email\Model;
+
+use Magento\Framework\App\Config\ScopeConfigInterface;
 
 /**
  * Adminhtml email template model
  *
+ * @api
+ *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
-class BackendTemplate extends \Magento\Email\Model\Template
+class BackendTemplate extends Template
 {
     /**
-     * @var \Magento\Core\Model\Config
+     * @var \Magento\Config\Model\Config\Structure
      */
-    protected $_coreConfig;
+    private $structure;
 
     /**
-     * @var \Magento\Backend\Model\Config\Structure
-     */
-    private $_structure;
-
-    /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\View\DesignInterface $design
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\App\Emulation $appEmulation
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Filesystem $filesystem
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\View\FileSystem $viewFileSystem
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\Config $coreConfig
-     * @param \Magento\Email\Model\Template\FilterFactory $emailFilterFactory
-     * @param \Magento\App\Dir $dir
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\View\DesignInterface $design
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Store\Model\App\Emulation $appEmulation
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Email\Model\Template\Config $emailConfig
-     * @param \Magento\Backend\Model\Config\Structure $structure
+     * @param \Magento\Email\Model\TemplateFactory $templateFactory
+     * @param \Magento\Framework\Filter\FilterManager $filterManager
+     * @param \Magento\Framework\UrlInterface $urlModel
+     * @param \Magento\Email\Model\Template\FilterFactory $filterFactory
+     * @param \Magento\Config\Model\Config\Structure $structure
      * @param array $data
+     * @param \Magento\Framework\Serialize\Serializer\Json|null $serializer
      *
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\View\DesignInterface $design,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\App\Emulation $appEmulation,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Filesystem $filesystem,
-        \Magento\View\Url $viewUrl,
-        \Magento\View\FileSystem $viewFileSystem,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\Config $coreConfig,
-        \Magento\Email\Model\Template\FilterFactory $emailFilterFactory,
-        \Magento\App\Dir $dir,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\View\DesignInterface $design,
+        \Magento\Framework\Registry $registry,
+        \Magento\Store\Model\App\Emulation $appEmulation,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Email\Model\Template\Config $emailConfig,
-        \Magento\Backend\Model\Config\Structure $structure,
-        array $data = array()
+        \Magento\Email\Model\TemplateFactory $templateFactory,
+        \Magento\Framework\Filter\FilterManager $filterManager,
+        \Magento\Framework\UrlInterface $urlModel,
+        \Magento\Email\Model\Template\FilterFactory $filterFactory,
+        \Magento\Config\Model\Config\Structure $structure,
+        array $data = [],
+        \Magento\Framework\Serialize\Serializer\Json $serializer = null
     ) {
+        $this->structure = $structure;
         parent::__construct(
             $context,
             $design,
             $registry,
             $appEmulation,
             $storeManager,
+            $assetRepo,
             $filesystem,
-            $viewUrl,
-            $viewFileSystem,
-            $coreStoreConfig,
-            $coreConfig,
-            $emailFilterFactory,
-            $dir,
+            $scopeConfig,
             $emailConfig,
-            $data
+            $templateFactory,
+            $filterManager,
+            $urlModel,
+            $filterFactory,
+            $data,
+            $serializer
         );
-        $this->_structure = $structure;
-    }
-
-    /**
-     * Collect all system config paths where current template is used as default
-     *
-     * @return array
-     */
-    public function getSystemConfigPathsWhereUsedAsDefault()
-    {
-        $templateCode = $this->getOrigTemplateCode();
-        if (!$templateCode) {
-            return array();
-        }
-
-        $configData = $this->_coreConfig->getValue(null, 'default');
-        $paths = $this->_findEmailTemplateUsages($templateCode, $configData, '');
-        return $paths;
-    }
-
-    /**
-     * Find nodes which are using $templateCode value
-     *
-     * @param string $code
-     * @param array $data
-     * @param string $path
-     * @return array
-     */
-    protected function _findEmailTemplateUsages($code, array $data, $path)
-    {
-        $output = array();
-        foreach ($data as $key => $value) {
-            $configPath = $path ? $path . '/' . $key : $key;
-            if (is_array($value)) {
-                $output = array_merge(
-                    $output,
-                    $this->_findEmailTemplateUsages($code, $value, $configPath)
-                );
-            } else {
-                if ($value == $code) {
-                    $output[] = array('path' => $configPath);
-                }
-            }
-        }
-        return $output;
     }
 
     /**
@@ -145,23 +85,36 @@ class BackendTemplate extends \Magento\Email\Model\Template
      *
      * @return array
      */
-    public function getSystemConfigPathsWhereUsedCurrently()
+    public function getSystemConfigPathsWhereCurrentlyUsed()
     {
         $templateId = $this->getId();
         if (!$templateId) {
-            return array();
+            return [];
         }
 
-        $templatePaths = $this->_structure
-            ->getFieldPathsByAttribute('source_model', 'Magento\Backend\Model\Config\Source\Email\Template');
+        $templatePaths = $this->structure->getFieldPathsByAttribute(
+            'source_model',
+            \Magento\Config\Model\Config\Source\Email\Template::class
+        );
 
         if (!count($templatePaths)) {
-            return array();
+            return [];
         }
 
         $configData = $this->_getResource()->getSystemConfigByPathsAndTemplateId($templatePaths, $templateId);
-        if (!$configData) {
-            return array();
+        foreach ($templatePaths as $path) {
+            if ($this->scopeConfig->getValue($path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT) == $templateId) {
+                foreach ($configData as $data) {
+                    if ($data['path'] == $path) {
+                        continue 2;   // don't add final fallback value if it was found in stored config
+                    }
+                }
+
+                $configData[] = [
+                    'scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT,
+                    'path' => $path
+                ];
+            }
         }
 
         return $configData;

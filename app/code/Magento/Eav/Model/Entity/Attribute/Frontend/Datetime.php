@@ -1,74 +1,58 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Eav
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 namespace Magento\Eav\Model\Entity\Attribute\Frontend;
 
+/**
+ * Entity datetime frontend attribute
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Datetime extends \Magento\Eav\Model\Entity\Attribute\Frontend\AbstractFrontend
 {
     /**
-     * @var \Magento\Core\Model\LocaleInterface
+     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
      */
-    protected $_locale;
+    protected $_localeDate;
 
     /**
      * @param \Magento\Eav\Model\Entity\Attribute\Source\BooleanFactory $attrBooleanFactory
-     * @param \Magento\Core\Model\LocaleInterface $locale
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @codeCoverageIgnore
      */
-    function __construct(
+    public function __construct(
         \Magento\Eav\Model\Entity\Attribute\Source\BooleanFactory $attrBooleanFactory,
-        \Magento\Core\Model\LocaleInterface $locale
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
     ) {
         parent::__construct($attrBooleanFactory);
-        $this->_locale = $locale;
+        $this->_localeDate = $localeDate;
     }
 
     /**
      * Retrieve attribute value
      *
-     * @param $object
+     * @param \Magento\Framework\DataObject $object
      * @return mixed
      */
-    public function getValue(\Magento\Object $object)
+    public function getValue(\Magento\Framework\DataObject $object)
     {
         $data = '';
         $value = parent::getValue($object);
-        $format = $this->_locale->getDateFormat(
-            \Magento\Core\Model\LocaleInterface::FORMAT_TYPE_MEDIUM
-        );
 
         if ($value) {
-            try {
-                $data = $this->_locale->date($value, \Zend_Date::ISO_8601, null, false)->toString($format);
-            } catch (\Exception $e) {
-                $data = $this->_locale->date($value, null, null, false)->toString($format);
-            }
+            $showTime = $this->getAttribute()->getFrontendInput() === 'datetime'
+                ? \IntlDateFormatter::MEDIUM : \IntlDateFormatter::NONE;
+            $data = $this->_localeDate->formatDateTime(
+                new \DateTime($value),
+                \IntlDateFormatter::MEDIUM,
+                $showTime
+            );
         }
 
         return $data;
     }
 }
-

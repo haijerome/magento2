@@ -2,46 +2,47 @@
 /**
  * Renders HTML anchor or nothing depending on isVisible().
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Integration\Block\Adminhtml\Widget\Grid\Column\Renderer;
 
 use Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer;
-use Magento\Customer\Block\Account\AuthorizationLink;
-use Magento\Object;
+use Magento\Framework\DataObject;
 
 class Link extends AbstractRenderer
 {
-    /** @var \Magento\Object */
+    /**
+     * @var \Magento\Framework\DataObject
+     */
     protected $_row;
+
+    /**
+     * @var \Magento\Framework\Json\Helper\Data
+     */
+    protected $jsonHelper;
+
+    /**
+     * @param \Magento\Backend\Block\Context $context
+     * @param \Magento\Framework\Json\Helper\Data $jsonHelper
+     * @param array $data
+     */
+    public function __construct(
+        \Magento\Backend\Block\Context $context,
+        \Magento\Framework\Json\Helper\Data $jsonHelper,
+        array $data = []
+    ) {
+        $this->jsonHelper = $jsonHelper;
+        parent::__construct($context, $data);
+    }
 
     /**
      * Render grid row
      *
-     * @param \Magento\Object $row
+     * @param \Magento\Framework\DataObject $row
      * @return string
      */
-    public function render(Object $row)
+    public function render(DataObject $row)
     {
         $this->_row = $row;
 
@@ -80,8 +81,9 @@ class Link extends AbstractRenderer
     }
 
     /**
-     * Return URL pattern for action associated with the link e.g. "(star)(slash)(star)(slash)activate" ->
-     * will be translated to http://.../admin/integration/activate/id/X
+     * Return URL pattern for action associated with the link e.g. "(star)(slash)(star)(slash)activate"
+     *
+     * Will be translated to http://.../admin/integration/activate/id/X
      *
      * @return string
      */
@@ -97,9 +99,13 @@ class Link extends AbstractRenderer
      */
     public function getCaption()
     {
-        return $this->isDisabled()
-            ? $this->getColumn()->getDisabledCaption() ?: $this->getColumn()->getCaption()
-            : $this->getColumn()->getCaption();
+        return $this->isDisabled() ? $this
+            ->getColumn()
+            ->getDisabledCaption() ?: $this
+            ->getColumn()
+            ->getCaption() : $this
+            ->getColumn()
+            ->getCaption();
     }
 
     /**
@@ -115,7 +121,7 @@ class Link extends AbstractRenderer
             if ($value === null || $value == '') {
                 continue;
             }
-            $html[] = sprintf('%s="%s"', $key, $this->escapeHtml($value));
+            $html[] = sprintf('%s="%s"', $key, $this->escapeHtmlAttr($value, false));
         }
 
         return join(' ', $html);
@@ -128,8 +134,8 @@ class Link extends AbstractRenderer
      */
     protected function _getAttributes()
     {
-        /** @var \Magento\Core\Helper\Data $helper */
-        $helper = $this->helper('Magento\Core\Helper\Data');
+        /** @var \Magento\Framework\Json\Helper\Data $helper */
+        $helper = $this->jsonHelper;
         $attributes = ['title' => $this->getCaption()];
 
         foreach ($this->_getDataAttributes() as $key => $attr) {
@@ -154,11 +160,11 @@ class Link extends AbstractRenderer
     /**
      * Render URL for current item.
      *
-     * @param \Magento\Object $row
+     * @param \Magento\Framework\DataObject $row
      * @return string
      */
-    protected function _getUrl(Object $row)
+    protected function _getUrl(DataObject $row)
     {
-        return $this->isDisabled($row) ? '#' : $this->getUrl($this->getUrlPattern(), ['id' => $row->getId()]);
+        return $this->isDisabled() ? '#' : $this->getUrl($this->getUrlPattern(), ['id' => $row->getId()]);
     }
 }

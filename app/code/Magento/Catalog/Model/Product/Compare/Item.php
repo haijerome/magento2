@@ -1,49 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Model\Product\Compare;
 
+use Magento\Catalog\Model\Product;
 
 /**
  * Catalog Compare Item Model
  *
- * @method \Magento\Catalog\Model\Resource\Product\Compare\Item getResource()
+ * @api
  * @method \Magento\Catalog\Model\Product\Compare\Item setVisitorId(int $value)
  * @method \Magento\Catalog\Model\Product\Compare\Item setCustomerId(int $value)
  * @method int getProductId()
  * @method \Magento\Catalog\Model\Product\Compare\Item setProductId(int $value)
  * @method int getStoreId()
  * @method \Magento\Catalog\Model\Product\Compare\Item setStoreId(int $value)
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Model\Product\Compare;
-
-class Item extends \Magento\Core\Model\AbstractModel
+class Item extends \Magento\Framework\Model\AbstractModel implements \Magento\Framework\DataObject\IdentityInterface
 {
+    /**
+     * Model cache tag
+     */
+    const CACHE_TAG = 'compare_item';
 
     /**
      * Prefix of model events names
@@ -76,43 +57,43 @@ class Item extends \Magento\Core\Model\AbstractModel
     protected $_customerSession;
 
     /**
-     * Log visitor
+     * Customer visitor
      *
-     * @var \Magento\Log\Model\Visitor
+     * @var \Magento\Customer\Model\Visitor
      */
-    protected $_logVisitor;
+    protected $_customerVisitor;
 
     /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Log\Model\Visitor $logVisitor
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Customer\Model\Visitor $customerVisitor
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Catalog\Helper\Product\Compare $catalogProductCompare
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Log\Model\Visitor $logVisitor,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Customer\Model\Visitor $customerVisitor,
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Catalog\Helper\Product\Compare $catalogProductCompare,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         $this->_storeManager = $storeManager;
-        $this->_logVisitor = $logVisitor;
+        $this->_customerVisitor = $customerVisitor;
         $this->_customerSession = $customerSession;
         $this->_catalogProductCompare = $catalogProductCompare;
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
@@ -121,30 +102,21 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Initialize resourse model
      *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Catalog\Model\Resource\Product\Compare\Item');
-    }
-
-    /**
-     * Retrieve Resource instance
-     *
-     * @return \Magento\Catalog\Model\Resource\Product\Compare\Item
-     */
-    protected function _getResource()
-    {
-        return parent::_getResource();
+        $this->_init(\Magento\Catalog\Model\ResourceModel\Product\Compare\Item::class);
     }
 
     /**
      * Set current store before save
      *
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @return $this
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
-        parent::_beforeSave();
+        parent::beforeSave();
         if (!$this->hasStoreId()) {
             $this->setStoreId($this->_storeManager->getStore()->getId());
         }
@@ -153,22 +125,10 @@ class Item extends \Magento\Core\Model\AbstractModel
     }
 
     /**
-     * Add customer data from customer object
-     *
-     * @param \Magento\Customer\Model\Customer $customer
-     * @return \Magento\Catalog\Model\Product\Compare\Item
-     */
-    public function addCustomerData(\Magento\Customer\Model\Customer $customer)
-    {
-        $this->setCustomerId($customer->getId());
-        return $this;
-    }
-
-    /**
      * Set visitor
      *
      * @param int $visitorId
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @return $this
      */
     public function addVisitorId($visitorId)
     {
@@ -179,8 +139,8 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Load compare item by product
      *
-     * @param mixed $product
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @param Product|int $product
+     * @return $this
      */
     public function loadByProduct($product)
     {
@@ -191,16 +151,15 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Set product data
      *
-     * @param mixed $product
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @param Product|int $product
+     * @return $this
      */
     public function addProductData($product)
     {
-        if ($product instanceof \Magento\Catalog\Model\Product) {
+        if ($product instanceof Product) {
             $this->setProductId($product->getId());
-        }
-        else if(intval($product)) {
-            $this->setProductId(intval($product));
+        } elseif ((int) $product) {
+            $this->setProductId((int) $product);
         }
 
         return $this;
@@ -213,10 +172,10 @@ class Item extends \Magento\Core\Model\AbstractModel
      */
     public function getDataForSave()
     {
-        $data = array();
+        $data = [];
         $data['customer_id'] = $this->getCustomerId();
-        $data['visitor_id']  = $this->getVisitorId();
-        $data['product_id']  = $this->getProductId();
+        $data['visitor_id'] = $this->getVisitorId();
+        $data['product_id'] = $this->getProductId();
 
         return $data;
     }
@@ -224,7 +183,7 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Customer login bind process
      *
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @return $this
      */
     public function bindCustomerLogin()
     {
@@ -237,10 +196,11 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Customer logout bind process
      *
-     * @param \Magento\Event\Observer $observer
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @param \Magento\Framework\Event\Observer $observer
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function bindCustomerLogout(\Magento\Event\Observer $observer = null)
+    public function bindCustomerLogout(\Magento\Framework\Event\Observer $observer = null)
     {
         $this->_getResource()->purgeVisitorByCustomer($this);
 
@@ -251,16 +211,16 @@ class Item extends \Magento\Core\Model\AbstractModel
     /**
      * Clean compare items
      *
-     * @return \Magento\Catalog\Model\Product\Compare\Item
+     * @return $this
      */
     public function clean()
     {
-        $this->_getResource()->clean($this);
+        $this->_getResource()->clean();
         return $this;
     }
 
     /**
-     * Retrieve Customer Id if loggined
+     * Retrieve Customer Id if logged in
      *
      * @return int
      */
@@ -281,9 +241,19 @@ class Item extends \Magento\Core\Model\AbstractModel
     public function getVisitorId()
     {
         if (!$this->hasData('visitor_id')) {
-            $visitorId = $this->_logVisitor->getId();
+            $visitorId = $this->_customerVisitor->getId();
             $this->setData('visitor_id', $visitorId);
         }
         return $this->getData('visitor_id');
+    }
+
+    /**
+     * Get identities
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        return [self::CACHE_TAG . '_' . $this->getId()];
     }
 }

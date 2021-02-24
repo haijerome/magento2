@@ -2,87 +2,72 @@
 /**
  * Default application path for backend area
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
 namespace Magento\Backend\App;
 
+use Magento\Config\App\Config\Type\System;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+
 /**
- * Backend config accessor
+ * Backend config accessor.
  */
 class Config implements ConfigInterface
 {
     /**
-     * @var \Magento\Core\Model\Config\SectionPool
+     * @var \Magento\Framework\App\Config
      */
-    protected $_sectionPool;
+    protected $appConfig;
 
     /**
-     * @param \Magento\Core\Model\Config\SectionPool $sectionPool
+     * @var array
      */
-    public function __construct(\Magento\Core\Model\Config\SectionPool $sectionPool)
+    private $data;
+
+    /**
+     * @param \Magento\Framework\App\Config $appConfig
+     * @return void
+     */
+    public function __construct(\Magento\Framework\App\Config $appConfig)
     {
-        $this->_sectionPool = $sectionPool;
+        $this->appConfig = $appConfig;
     }
 
     /**
-     * Retrieve config value by path and scope
-     *
-     * @param string $path
-     * @return mixed
+     * @inheritdoc
      */
     public function getValue($path)
     {
-        return $this->_sectionPool->getSection('default', null)->getValue($path);
+        if (isset($this->data[$path])) {
+            return $this->data[$path];
+        }
+
+        $configPath = ScopeConfigInterface::SCOPE_TYPE_DEFAULT;
+        if ($path) {
+            $configPath .= '/' . $path;
+        }
+        return $this->appConfig->get(System::CONFIG_TYPE, $configPath);
     }
 
     /**
-     * Set config value in the corresponding config scope
-     *
-     * @param string $path
-     * @param mixed $value
+     * @inheritdoc
      */
     public function setValue($path, $value)
     {
-        $this->_sectionPool->getSection('default', null)->setValue($path, $value);
+        $this->data[$path] = $value;
     }
 
     /**
-     * Reinitialize configuration
-     *
-     * @return \Magento\Core\Model\Config
+     * @inheritdoc
      */
-    public function reinit()
+    public function isSetFlag($path)
     {
-        $this->_sectionPool->clean();
-    }
-
-    /**
-     * Retrieve config flag
-     *
-     * @param string $path
-     * @return bool
-     */
-    public function getFlag($path)
-    {
-        return !!$this->_sectionPool->getSection('default', null)->getValue($path);
+        $configPath = ScopeConfigInterface::SCOPE_TYPE_DEFAULT;
+        if ($path) {
+            $configPath .= '/' . $path;
+        }
+        return (bool) $this->appConfig->get(System::CONFIG_TYPE, $configPath);
     }
 }

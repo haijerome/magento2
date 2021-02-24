@@ -1,71 +1,74 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Sales\Block\Order\Item\Renderer;
 
+use Magento\Catalog\Model\Product\OptionFactory;
+use Magento\Framework\DataObject;
+use Magento\Framework\Stdlib\StringUtils;
+use Magento\Framework\View\Element\AbstractBlock;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Sales\Model\Order\Creditmemo\Item as CreditMemoItem;
+use Magento\Sales\Model\Order\Invoice\Item as InvoiceItem;
+use Magento\Sales\Model\Order\Item as OrderItem;
+
 /**
  * Order item render block
+ *
+ * @api
+ * @since 100.0.2
  */
-class DefaultRenderer extends \Magento\View\Element\Template
+class DefaultRenderer extends \Magento\Framework\View\Element\Template
 {
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var StringUtils
      */
     protected $string;
 
     /**
-     * @var \Magento\Catalog\Model\Product\OptionFactory
+     * @var OptionFactory
      */
     protected $_productOptionFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory
+     * @param Context $context
+     * @param StringUtils $string
+     * @param OptionFactory $productOptionFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Stdlib\String $string,
-        \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory,
-        array $data = array()
+        Context $context,
+        StringUtils $string,
+        OptionFactory $productOptionFactory,
+        array $data = []
     ) {
         $this->string = $string;
         $this->_productOptionFactory = $productOptionFactory;
         parent::__construct($context, $data);
     }
 
-    public function setItem(\Magento\Object $item)
+    /**
+     * Set item.
+     *
+     * @param DataObject $item
+     * @return $this
+     */
+    public function setItem(DataObject $item)
     {
         $this->setData('item', $item);
         return $this;
     }
 
+    /**
+     * Get item.
+     *
+     * @return array|null
+     */
     public function getItem()
     {
         return $this->_getData('item');
@@ -81,32 +84,41 @@ class DefaultRenderer extends \Magento\View\Element\Template
         return $this->getOrderItem()->getOrder();
     }
 
-
+    /**
+     * Get order item.
+     *
+     * @return array|null
+     */
     public function getOrderItem()
     {
-        if ($this->getItem() instanceof \Magento\Sales\Model\Order\Item) {
+        if ($this->getItem() instanceof OrderItem) {
             return $this->getItem();
         } else {
             return $this->getItem()->getOrderItem();
         }
     }
 
+    /**
+     * Get item options.
+     *
+     * @return array
+     */
     public function getItemOptions()
     {
-        $result = array();
+        $result = [];
         $options = $this->getOrderItem()->getProductOptions();
         if ($options) {
             if (isset($options['options'])) {
-                $result = array_merge($result, $options['options']);
+                $result[] = $options['options'];
             }
             if (isset($options['additional_options'])) {
-                $result = array_merge($result, $options['additional_options']);
+                $result[] = $options['additional_options'];
             }
             if (isset($options['attributes_info'])) {
-                $result = array_merge($result, $options['attributes_info']);
+                $result[] = $options['attributes_info'];
             }
         }
-        return $result;
+        return array_merge([], ...$result);
     }
 
     /**
@@ -128,10 +140,11 @@ class DefaultRenderer extends \Magento\View\Element\Template
      *          )
      *
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function getFormatedOptionValue($optionValue)
     {
-        $optionInfo = array();
+        $optionInfo = [];
 
         // define input data format
         if (is_array($optionValue)) {
@@ -147,11 +160,11 @@ class DefaultRenderer extends \Magento\View\Element\Template
 
         // render customized option view
         if (isset($optionInfo['custom_view']) && $optionInfo['custom_view']) {
-            $_default = array('value' => $optionValue);
+            $_default = ['value' => $optionValue];
             if (isset($optionInfo['option_type'])) {
                 try {
                     $group = $this->_productOptionFactory->create()->groupFactory($optionInfo['option_type']);
-                    return array('value' => $group->getCustomizedView($optionInfo));
+                    return ['value' => $group->getCustomizedView($optionInfo)];
                 } catch (\Exception $e) {
                     return $_default;
                 }
@@ -160,22 +173,23 @@ class DefaultRenderer extends \Magento\View\Element\Template
         }
 
         // truncate standard view
-        $result = array();
+        $result = [];
         if (is_array($optionValue)) {
             $truncatedValue = implode("\n", $optionValue);
             $truncatedValue = nl2br($truncatedValue);
-            return array('value' => $truncatedValue);
+            return ['value' => $truncatedValue];
         } else {
-            $truncatedValue = $this->filterManager->truncate($optionValue, array('length' => 55, 'etc' => ''));
+            $truncatedValue = $this->filterManager->truncate($optionValue, ['length' => 55, 'etc' => '']);
             $truncatedValue = nl2br($truncatedValue);
         }
 
-        $result = array('value' => $truncatedValue);
+        $result = ['value' => $truncatedValue];
 
         if ($this->string->strlen($optionValue) > 55) {
-            $result['value'] = $result['value'] . ' <a href="#" class="dots" onclick="return false">...</a>';
+            $result['value'] = $result['value']
+                . ' ...';
             $optionValue = nl2br($optionValue);
-            $result = array_merge($result, array('full_view' => $optionValue));
+            $result = array_merge($result, ['full_view' => $optionValue]);
         }
 
         return $result;
@@ -194,7 +208,7 @@ class DefaultRenderer extends \Magento\View\Element\Template
     /**
      * Return product additional information block
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return \Magento\Framework\View\Element\AbstractBlock
      */
     public function getProductAdditionalInformationBlock()
     {
@@ -210,5 +224,70 @@ class DefaultRenderer extends \Magento\View\Element\Template
     public function prepareSku($sku)
     {
         return $this->escapeHtml($this->string->splitInjection($sku));
+    }
+
+    /**
+     * Return item unit price html
+     *
+     * @param OrderItem|InvoiceItem|CreditmemoItem $item child item in case of bundle product
+     * @return string
+     */
+    public function getItemPriceHtml($item = null)
+    {
+        $block = $this->getLayout()->getBlock('item_unit_price');
+        if (!$item) {
+            $item = $this->getItem();
+        }
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Return item row total html
+     *
+     * @param OrderItem|InvoiceItem|CreditmemoItem $item child item in case of bundle product
+     * @return string
+     */
+    public function getItemRowTotalHtml($item = null)
+    {
+        $block = $this->getLayout()->getBlock('item_row_total');
+        if (!$item) {
+            $item = $this->getItem();
+        }
+        $block->setItem($item);
+        return $block->toHtml();
+    }
+
+    /**
+     * Return the total amount minus discount
+     *
+     * @param OrderItem|InvoiceItem|CreditmemoItem $item
+     * @return mixed
+     */
+    public function getTotalAmount($item)
+    {
+        $totalAmount = $item->getRowTotal()
+            + $item->getTaxAmount()
+            + $item->getDiscountTaxCompensationAmount()
+            + $item->getWeeeTaxAppliedRowAmount()
+            - $item->getDiscountAmount();
+
+        return $totalAmount;
+    }
+
+    /**
+     * Return HTML for item total after discount
+     *
+     * @param OrderItem|InvoiceItem|CreditmemoItem $item child item in case of bundle product
+     * @return string
+     */
+    public function getItemRowTotalAfterDiscountHtml($item = null)
+    {
+        $block = $this->getLayout()->getBlock('item_row_total_after_discount');
+        if (!$item) {
+            $item = $this->getItem();
+        }
+        $block->setItem($item);
+        return $block->toHtml();
     }
 }

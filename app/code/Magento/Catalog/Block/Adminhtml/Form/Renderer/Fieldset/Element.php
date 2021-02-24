@@ -1,51 +1,27 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Catalog\Block\Adminhtml\Form\Renderer\Fieldset;
 
 /**
  * Catalog fieldset element renderer
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Catalog\Block\Adminhtml\Form\Renderer\Fieldset;
-
-class Element
-    extends \Magento\Adminhtml\Block\Widget\Form\Renderer\Fieldset\Element
+class Element extends \Magento\Backend\Block\Widget\Form\Renderer\Fieldset\Element
 {
     /**
      * Initialize block template
      */
-
     protected $_template = 'Magento_Catalog::catalog/form/renderer/fieldset/element.phtml';
 
     /**
      * Retrieve data object related with form
      *
-     * @return \Magento\Catalog\Model\Product || \Magento\Catalog\Model\Category
+     * @return \Magento\Catalog\Model\Product|\Magento\Catalog\Model\Category
      */
     public function getDataObject()
     {
@@ -53,9 +29,9 @@ class Element
     }
 
     /**
-     * Retireve associated with element attribute object
+     * Retrieve associated with element attribute object
      *
-     * @return \Magento\Catalog\Model\Resource\Eav\Attribute
+     * @return \Magento\Catalog\Model\ResourceModel\Eav\Attribute
      */
     public function getAttribute()
     {
@@ -80,10 +56,11 @@ class Element
     public function canDisplayUseDefault()
     {
         if ($attribute = $this->getAttribute()) {
-            if (!$attribute->isScopeGlobal()
-                && $this->getDataObject()
-                && $this->getDataObject()->getId()
-                && $this->getDataObject()->getStoreId()) {
+            if (!$attribute->isScopeGlobal() &&
+                $this->getDataObject() &&
+                $this->getDataObject()->getId() &&
+                $this->getDataObject()->getStoreId()
+            ) {
                 return true;
             }
         }
@@ -102,7 +79,7 @@ class Element
 
         if (!$this->getDataObject()->getExistsStoreValueFlag($attributeCode)) {
             return true;
-        } else if ($this->getElement()->getValue() == $defaultValue &&
+        } elseif ($this->getElement()->getValue() == $defaultValue &&
             $this->getDataObject()->getStoreId() != $this->_getDefaultStoreId()
         ) {
             return false;
@@ -183,6 +160,6 @@ class Element
      */
     protected function _getDefaultStoreId()
     {
-        return \Magento\Core\Model\Store::DEFAULT_STORE_ID;
+        return \Magento\Store\Model\Store::DEFAULT_STORE_ID;
     }
 }

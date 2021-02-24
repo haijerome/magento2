@@ -1,91 +1,91 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Adminhtml catalog product action attribute update
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Adminhtml\Product\Edit\Action;
 
-class Attribute extends \Magento\Adminhtml\Block\Widget
-{
+use Magento\Catalog\Helper\Product\Edit\Action\Attribute as ActionAttribute;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
 
+/**
+ * @api
+ * @since 100.0.2
+ */
+class Attribute extends \Magento\Backend\Block\Widget
+{
     /**
      * Adminhtml catalog product edit action attribute
      *
-     * @var \Magento\Catalog\Helper\Product\Edit\Action\Attribute
+     * @var ActionAttribute
      */
     protected $_helperActionAttribute = null;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Catalog\Helper\Product\Edit\Action\Attribute $helperActionAttribute
+     * @param ActionAttribute $helperActionAttribute
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Catalog\Helper\Product\Edit\Action\Attribute $helperActionAttribute,
-        array $data = array()
+        ActionAttribute $helperActionAttribute,
+        array $data = []
     ) {
         $this->_helperActionAttribute = $helperActionAttribute;
         parent::__construct($context, $data);
     }
 
+    /**
+     * @return void
+     */
     protected function _prepareLayout()
     {
-        $this->addChild('back_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Back'),
-            'onclick'   => 'setLocation(\''.$this->getUrl('catalog/product/', array('store'=>$this->getRequest()->getParam('store', 0))).'\')',
-            'class' => 'back'
-        ));
+        $this->getToolbar()->addChild(
+            'back_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Back'),
+                'onclick' => 'setLocation(\'' . $this->getUrl(
+                    'catalog/product/',
+                    ['store' => $this->getRequest()->getParam('store', 0)]
+                ) . '\')',
+                'class' => 'back'
+            ]
+        );
 
-        $this->addChild('reset_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Reset'),
-            'onclick'   => 'setLocation(\''.$this->getUrl('catalog/*/*', array('_current'=>true)).'\')'
-        ));
+        $this->getToolbar()->addChild(
+            'reset_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Reset'),
+                'onclick' => 'setLocation(\'' . $this->getUrl('catalog/*/*', ['_current' => true]) . '\')',
+                'class' => 'reset'
+            ]
+        );
 
-        $this->addChild('save_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'label'     => __('Save'),
-            'class'     => 'save',
-            'data_attribute'  => array(
-                'mage-init' => array(
-                    'button' => array('event' => 'save', 'target' => '#attributes-edit-form'),
-                ),
-            ),
-        ));
+        $this->getToolbar()->addChild(
+            'save_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Save'),
+                'class' => 'save primary',
+                'data_attribute' => [
+                    'mage-init' => ['button' => ['event' => 'save', 'target' => '#attributes-edit-form']],
+                ]
+            ]
+        );
     }
 
     /**
      * Retrieve selected products for update
      *
-     * @return unknown
+     * @return Collection
      */
     public function getProducts()
     {
@@ -95,11 +95,11 @@ class Attribute extends \Magento\Adminhtml\Block\Widget
     /**
      * Retrieve block attributes update helper
      *
-     * @return \Magento\Catalog\Helper\Product\Edit\Action\Attribute
+     * @return ActionAttribute|null
      */
     protected function _getHelper()
     {
-        return $this->helper('Magento\Catalog\Helper\Product\Edit\Action\Attribute');
+        return $this->_helperActionAttribute;
     }
 
     /**
@@ -117,7 +117,7 @@ class Attribute extends \Magento\Adminhtml\Block\Widget
      *
      * @return string
      */
-     public function getCancelButtonHtml()
+    public function getCancelButtonHtml()
     {
         return $this->getChildHtml('reset_button');
     }
@@ -140,12 +140,7 @@ class Attribute extends \Magento\Adminhtml\Block\Widget
     public function getSaveUrl()
     {
         $helper = $this->_helperActionAttribute;
-        return $this->getUrl(
-            '*/*/save',
-            array(
-                'store' => $helper->getSelectedStoreId()
-            )
-        );
+        return $this->getUrl('*/*/save', ['store' => $helper->getSelectedStoreId()]);
     }
 
     /**
@@ -155,6 +150,6 @@ class Attribute extends \Magento\Adminhtml\Block\Widget
      */
     public function getValidationUrl()
     {
-        return $this->getUrl('catalog/*/validate', array('_current'=>true));
+        return $this->getUrl('catalog/*/validate', ['_current' => true]);
     }
 }

@@ -1,46 +1,37 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-require __DIR__ . '/../../../Magento/Catalog/_files/multiple_products.php';
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
 
-$review = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Review\Model\Review',
-    array('data' => array('nickname' => 'Nickname', 'title' => 'Review Summary', 'detail' => 'Review text'))
+Resolver::getInstance()->requireDataFixture('Magento/Catalog/_files/multiple_products.php');
+
+$objectManager = Bootstrap::getObjectManager();
+/** @var ProductRepositoryInterface $productRepository */
+$productRepository = $objectManager->create(ProductRepositoryInterface::class);
+$product = $productRepository->get('simple1');
+$review = $objectManager->create(
+    \Magento\Review\Model\Review::class,
+    ['data' => ['nickname' => 'Nickname', 'title' => 'Review Summary', 'detail' => 'Review text']]
 );
-$review->setEntityId($review->getEntityIdByCode(\Magento\Review\Model\Review::ENTITY_PRODUCT_CODE))
-    ->setEntityPkValue($product->getId()) // the last product from the fixture file included above
-    ->setStatusId(\Magento\Review\Model\Review::STATUS_PENDING)
-    ->setStoreId(
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\StoreManagerInterface')
-            ->getStore()->getId()
-    )
-    ->setStores(array(
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\StoreManagerInterface')
-            ->getStore()->getId()
-    ))
-    ->save()
-;
+$review->setEntityId(
+    $review->getEntityIdByCode(\Magento\Review\Model\Review::ENTITY_PRODUCT_CODE)
+)->setEntityPkValue(
+    $product->getId()
+)->setStatusId(
+    \Magento\Review\Model\Review::STATUS_PENDING
+)->setStoreId(
+    $objectManager->get(
+        \Magento\Store\Model\StoreManagerInterface::class
+    )->getStore()->getId()
+)->setStores(
+    [
+        $objectManager->get(
+            \Magento\Store\Model\StoreManagerInterface::class
+        )->getStore()->getId()
+    ]
+)->save();

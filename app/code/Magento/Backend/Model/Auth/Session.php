@@ -1,44 +1,43 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
 namespace Magento\Backend\Model\Auth;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Stdlib\Cookie\CookieMetadataFactory;
+use Magento\Framework\Stdlib\CookieManagerInterface;
+use Magento\Framework\Message\ManagerInterface;
 
 /**
  * Backend Auth session model
  *
+ * @api
+ * @method \Magento\User\Model\User|null getUser()
+ * @method \Magento\Backend\Model\Auth\Session setUser(\Magento\User\Model\User $value)
+ * @method \Magento\Framework\Acl|null getAcl()
+ * @method \Magento\Backend\Model\Auth\Session setAcl(\Magento\Framework\Acl $value)
+ * @method int getUpdatedAt()
+ * @method \Magento\Backend\Model\Auth\Session setUpdatedAt(int $value)
+ *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ * @todo implement solution that keeps is_first_visit flag in session during redirects
+ * @api
+ * @since 100.0.2
  */
-class Session
-    extends \Magento\Core\Model\Session\AbstractSession
-    implements \Magento\Backend\Model\Auth\StorageInterface
+class Session extends \Magento\Framework\Session\SessionManager implements \Magento\Backend\Model\Auth\StorageInterface
 {
+    /**
+     * Admin session lifetime config path
+     */
     const XML_PATH_SESSION_LIFETIME = 'admin/security/session_lifetime';
 
     /**
-     * Whether it is the first page after successfull login
+     * Whether it is the first page after successful login
      *
      * @var boolean
      */
@@ -47,12 +46,12 @@ class Session
     /**
      * Access Control List builder
      *
-     * @var \Magento\Acl\Builder
+     * @var \Magento\Framework\Acl\Builder
      */
     protected $_aclBuilder;
 
     /**
-     * @var \Magento\Backend\Model\Url
+     * @var \Magento\Backend\Model\UrlInterface
      */
     protected $_backendUrl;
 
@@ -62,48 +61,57 @@ class Session
     protected $_config;
 
     /**
-     * @param \Magento\Core\Model\Session\Context $context
-     * @param \Magento\Session\SidResolverInterface $sidResolver
-     * @param \Magento\Session\Config\ConfigInterface $sessionConfig
-     * @param \Magento\Acl\Builder $aclBuilder
-     * @param \Magento\Backend\Model\Url $backendUrl
+     * @var ManagerInterface
+     */
+    private $messageManager;
+
+    /**
+     * @param \Magento\Framework\App\Request\Http $request
+     * @param \Magento\Framework\Session\SidResolverInterface $sidResolver
+     * @param \Magento\Framework\Session\Config\ConfigInterface $sessionConfig
+     * @param \Magento\Framework\Session\SaveHandlerInterface $saveHandler
+     * @param \Magento\Framework\Session\ValidatorInterface $validator
+     * @param \Magento\Framework\Session\StorageInterface $storage
+     * @param CookieManagerInterface $cookieManager
+     * @param CookieMetadataFactory $cookieMetadataFactory
+     * @param \Magento\Framework\App\State $appState
+     * @param \Magento\Framework\Acl\Builder $aclBuilder
+     * @param \Magento\Backend\Model\UrlInterface $backendUrl
      * @param \Magento\Backend\App\ConfigInterface $config
-     * @param array $data
+     * @param ManagerInterface $messageManager
+     * @throws \Magento\Framework\Exception\SessionException
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Session\Context $context,
-        \Magento\Session\SidResolverInterface $sidResolver,
-        \Magento\Session\Config\ConfigInterface $sessionConfig,
-        \Magento\Acl\Builder $aclBuilder,
-        \Magento\Backend\Model\Url $backendUrl,
+        \Magento\Framework\App\Request\Http $request,
+        \Magento\Framework\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\Session\Config\ConfigInterface $sessionConfig,
+        \Magento\Framework\Session\SaveHandlerInterface $saveHandler,
+        \Magento\Framework\Session\ValidatorInterface $validator,
+        \Magento\Framework\Session\StorageInterface $storage,
+        CookieManagerInterface $cookieManager,
+        CookieMetadataFactory $cookieMetadataFactory,
+        \Magento\Framework\App\State $appState,
+        \Magento\Framework\Acl\Builder $aclBuilder,
+        \Magento\Backend\Model\UrlInterface $backendUrl,
         \Magento\Backend\App\ConfigInterface $config,
-        array $data = array()
+        ManagerInterface $messageManager = null
     ) {
         $this->_config = $config;
         $this->_aclBuilder = $aclBuilder;
         $this->_backendUrl = $backendUrl;
-        parent::__construct($context, $sidResolver, $sessionConfig, $data);
-        $this->start('admin');
-    }
-
-    /**
-     * Pull out information from session whether there is currently the first page after log in
-     *
-     * The idea is to set this value on login(), then redirect happens,
-     * after that on next request the value is grabbed once the session is initialized
-     * Since the session is used as a singleton, the value will be in $_isFirstPageAfterLogin until the end of request,
-     * unless it is reset intentionally from somewhere
-     *
-     * @param string $namespace
-     * @param string $sessionName
-     * @return \Magento\Backend\Model\Auth\Session
-     * @see self::login()
-     */
-    public function start($namespace = 'default', $sessionName = null)
-    {
-        parent::start($namespace, $sessionName);
-        // @todo implement solution that keeps is_first_visit flag in session during redirects
-        return $this;
+        $this->messageManager = $messageManager ?? ObjectManager::getInstance()->get(ManagerInterface::class);
+        parent::__construct(
+            $request,
+            $sidResolver,
+            $sessionConfig,
+            $saveHandler,
+            $validator,
+            $storage,
+            $cookieManager,
+            $cookieMetadataFactory,
+            $appState
+        );
     }
 
     /**
@@ -114,7 +122,7 @@ class Session
      */
     public function refreshAcl($user = null)
     {
-        if (is_null($user)) {
+        if ($user === null) {
             $user = $this->getUser();
         }
         if (!$user) {
@@ -151,7 +159,7 @@ class Session
                         return $acl->isAllowed($user->getAclRole(), null, $privilege);
                     }
                 } catch (\Exception $e) {
-
+                    return false;
                 }
             }
         }
@@ -165,29 +173,59 @@ class Session
      */
     public function isLoggedIn()
     {
-        $lifetime = $this->_config->getValue(self::XML_PATH_SESSION_LIFETIME);
-        $currentTime = time();
-
-        /* Validate admin session lifetime that should be more than 60 seconds */
-        if ($lifetime >= 60 && ($this->getUpdatedAt() < $currentTime - $lifetime)) {
-            return false;
-        }
-
-        if ($this->getUser() && $this->getUser()->getId()) {
-            $this->setUpdatedAt($currentTime);
-            return true;
-        }
-        return false;
+        return $this->getUser() && $this->getUser()->getId();
     }
 
     /**
-     * Check if it is the first page after successfull login
+     * Set session UpdatedAt to current time
+     *
+     * @return void
+     */
+    public function prolong()
+    {
+        $sessionUser = $this->getUser();
+        $errorMessage = '';
+        if ($sessionUser !== null) {
+            if ((int)$sessionUser->getIsActive() !== 1) {
+                $errorMessage = 'The account sign-in was incorrect or your account is disabled temporarily. '
+                    . 'Please wait and try again later.';
+            }
+            if (!$sessionUser->hasAssigned2Role($sessionUser->getId())) {
+                $errorMessage = 'More permissions are needed to access this.';
+            }
+
+            if (!empty($errorMessage)) {
+                $this->destroy();
+                $this->messageManager->addErrorMessage(__($errorMessage));
+
+                return;
+            }
+        }
+
+        $lifetime = $this->_config->getValue(self::XML_PATH_SESSION_LIFETIME);
+        $cookieValue = $this->cookieManager->getCookie($this->getName());
+
+        if ($cookieValue) {
+            $this->setUpdatedAt(time());
+            $cookieMetadata = $this->cookieMetadataFactory->createPublicCookieMetadata()
+                ->setDuration($lifetime)
+                ->setPath($this->sessionConfig->getCookiePath())
+                ->setDomain($this->sessionConfig->getCookieDomain())
+                ->setSecure($this->sessionConfig->getCookieSecure())
+                ->setHttpOnly($this->sessionConfig->getCookieHttpOnly())
+                ->setSameSite($this->sessionConfig->getCookieSameSite());
+            $this->cookieManager->setPublicCookie($this->getName(), $cookieValue, $cookieMetadata);
+        }
+    }
+
+    /**
+     * Check if it is the first page after successful login
      *
      * @return bool
      */
     public function isFirstPageAfterLogin()
     {
-        if (is_null($this->_isFirstAfterLogin)) {
+        if ($this->_isFirstAfterLogin === null) {
             $this->_isFirstAfterLogin = $this->getData('is_first_visit', true);
         }
         return $this->_isFirstAfterLogin;
@@ -242,6 +280,8 @@ class Session
      *
      * @param string $path
      * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @codeCoverageIgnore
      */
     public function isValidForPath($path)
     {

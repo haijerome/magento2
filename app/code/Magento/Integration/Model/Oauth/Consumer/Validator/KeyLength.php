@@ -1,56 +1,50 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Oauth
- * @copyright  Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Validate OAuth keys
- *
- * @category   Magento
- * @package    Magento_Oauth
- * @author     Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Integration\Model\Oauth\Consumer\Validator;
 
+/**
+ * Validate OAuth keys
+ */
 class KeyLength extends \Zend_Validate_StringLength
 {
     /**
-     * Key name
+     * Default key name
      *
      * @var string
      */
     protected $_name = 'Key';
 
     /**
-     * Sets validator options
-     *
-     * @param  integer|array|\Zend_Config $options
+     * @var array
      */
-    public function __construct($options = array())
+    protected $_messageTemplates = [
+        self::INVALID   => "Invalid type given for %name%. String expected",
+        self::TOO_SHORT => "%name% '%value%' is less than %min% characters long",
+        self::TOO_LONG  => "%name% '%value%' is more than %max% characters long",
+    ];
+
+    /**
+     * Additional variables available for validation failure messages
+     *
+     * @var array
+     */
+    protected $_messageVariables = ['min' => '_min', 'max' => '_max', 'name' => '_name'];
+
+    /**
+     * Sets KeyLength validator options
+     *
+     * Default encoding is set to utf-8 if none provided
+     * New option name added to allow adding key name in validation error messages
+     *
+     * @inheritdoc
+     */
+    public function __construct($options = [])
     {
         if (!is_array($options)) {
-            $options     = func_get_args();
+            $options = func_get_args();
             if (!isset($options[1])) {
                 $options[1] = 'utf-8';
             }
@@ -58,8 +52,7 @@ class KeyLength extends \Zend_Validate_StringLength
             return;
         } else {
             if (isset($options['length'])) {
-                $options['max'] =
-                $options['min'] = $options['length'];
+                $options['max'] = $options['min'] = $options['length'];
             }
             if (isset($options['name'])) {
                 $this->_name = $options['name'];
@@ -69,36 +62,10 @@ class KeyLength extends \Zend_Validate_StringLength
     }
 
     /**
-     * Init validation failure message template definitions
-     *
-     * @return \Magento\Integration\Model\Oauth\Consumer\Validator\KeyLength
-     */
-    protected function _initMessageTemplates()
-    {
-        $_messageTemplates[self::TOO_LONG] =
-            __("%name% '%value%' is too long. It must has length %min% symbols.");
-        $_messageTemplates[self::TOO_SHORT] =
-            __("%name% '%value%' is too short. It must has length %min% symbols.");
-
-        return $this;
-    }
-
-    /**
-     * Additional variables available for validation failure messages
-     *
-     * @var array
-     */
-    protected $_messageVariables = array(
-        'min'  => '_min',
-        'max'  => '_max',
-        'name' => '_name'
-    );
-
-    /**
      * Set length
      *
-     * @param $length
-     * @return \Magento\Integration\Model\Oauth\Consumer\Validator\KeyLength
+     * @param int|null $length
+     * @return $this
      */
     public function setLength($length)
     {
@@ -140,7 +107,7 @@ class KeyLength extends \Zend_Validate_StringLength
      * Set key name
      *
      * @param string $name
-     * @return \Magento\Integration\Model\Oauth\Consumer\Validator\KeyLength
+     * @return $this
      */
     public function setName($name)
     {

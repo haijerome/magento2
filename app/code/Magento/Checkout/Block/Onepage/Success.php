@@ -1,39 +1,20 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Checkout\Block\Onepage;
+
+use Magento\Customer\Model\Context;
+use Magento\Sales\Model\Order;
 
 /**
  * One page checkout success page
  *
- * @category   Magento
- * @package    Magento_Checkout
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Checkout\Block\Onepage;
-
-class Success extends \Magento\View\Element\Template
+class Success extends \Magento\Framework\View\Element\Template
 {
     /**
      * @var \Magento\Checkout\Model\Session
@@ -41,152 +22,116 @@ class Success extends \Magento\View\Element\Template
     protected $_checkoutSession;
 
     /**
-     * @var \Magento\Customer\Model\Session
-     */
-    protected $_customerSession;
-
-    /**
-     * @var \Magento\Sales\Model\OrderFactory
-     */
-    protected $_orderFactory;
-
-    /**
-     * @var \Magento\Sales\Model\Billing\AgreementFactory
-     */
-    protected $_agreementFactory;
-
-    /**
-     * @var \Magento\Sales\Model\Resource\Recurring\Profile\Collection
-     */
-    protected $_recurringProfileCollectionFactory;
-
-    /**
      * @var \Magento\Sales\Model\Order\Config
      */
     protected $_orderConfig;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @var \Magento\Framework\App\Http\Context
+     */
+    protected $httpContext;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Checkout\Model\Session $checkoutSession
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Sales\Model\OrderFactory $orderFactory
-     * @param \Magento\Sales\Model\Billing\AgreementFactory $agreementFactory
-     * @param \Magento\Sales\Model\Resource\Recurring\Profile\CollectionFactory $recurringProfileCollectionFactory
      * @param \Magento\Sales\Model\Order\Config $orderConfig
+     * @param \Magento\Framework\App\Http\Context $httpContext
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Checkout\Model\Session $checkoutSession,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Sales\Model\OrderFactory $orderFactory,
-        \Magento\Sales\Model\Billing\AgreementFactory $agreementFactory,
-        \Magento\Sales\Model\Resource\Recurring\Profile\CollectionFactory $recurringProfileCollectionFactory,
         \Magento\Sales\Model\Order\Config $orderConfig,
-        array $data = array()
+        \Magento\Framework\App\Http\Context $httpContext,
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_checkoutSession = $checkoutSession;
-        $this->_customerSession = $customerSession;
-        $this->_orderFactory = $orderFactory;
-        $this->_agreementFactory = $agreementFactory;
-        $this->_recurringProfileCollectionFactory = $recurringProfileCollectionFactory;
         $this->_orderConfig = $orderConfig;
+        $this->_isScopePrivate = true;
+        $this->httpContext = $httpContext;
     }
 
     /**
-     * See if the order has state, visible on frontend
+     * Render additional order information lines and return result html
      *
-     * @return bool
-     */
-    public function isOrderVisible()
-    {
-        return (bool)$this->_getData('is_order_visible');
-    }
-
-    /**
-     * Getter for recurring profile view page
-     *
-     * @param $profile
      * @return string
      */
-    public function getProfileUrl(\Magento\Object $profile)
+    public function getAdditionalInfoHtml()
     {
-        return $this->getUrl('sales/recurring_profile/view', array('profile' => $profile->getId()));
+        return $this->_layout->renderElement('order.success.additional.info');
     }
 
     /**
      * Initialize data and prepare it for output
+     *
+     * @return string
      */
     protected function _beforeToHtml()
     {
-        $this->_prepareLastOrder();
-        $this->_prepareLastBillingAgreement();
-        $this->_prepareLastRecurringProfiles();
+        $this->prepareBlockData();
         return parent::_beforeToHtml();
     }
 
     /**
-     * Get last order ID from session, fetch it and check whether it can be viewed, printed etc
+     * Prepares block data
+     *
+     * @return void
      */
-    protected function _prepareLastOrder()
+    protected function prepareBlockData()
     {
-        $orderId = $this->_checkoutSession->getLastOrderId();
-        if ($orderId) {
-            $order = $this->_orderFactory->create()->load($orderId);
-            if ($order->getId()) {
-                $isVisible = !in_array($order->getState(), $this->_orderConfig->getInvisibleOnFrontStates());
-                $this->addData(array(
-                    'is_order_visible' => $isVisible,
-                    'view_order_url' => $this->getUrl('sales/order/view/', array('order_id' => $orderId)),
-                    'print_url' => $this->getUrl('sales/order/print', array('order_id'=> $orderId)),
-                    'can_print_order' => $isVisible,
-                    'can_view_order'  => $this->_customerSession->isLoggedIn() && $isVisible,
-                    'order_id'  => $order->getIncrementId(),
-                ));
-            }
-        }
+        $order = $this->_checkoutSession->getLastRealOrder();
+
+        $this->addData(
+            [
+                'is_order_visible' => $this->isVisible($order),
+                'view_order_url' => $this->getUrl(
+                    'sales/order/view/',
+                    ['order_id' => $order->getEntityId()]
+                ),
+                'print_url' => $this->getUrl(
+                    'sales/order/print',
+                    ['order_id' => $order->getEntityId()]
+                ),
+                'can_print_order' => $this->isVisible($order),
+                'can_view_order'  => $this->canViewOrder($order),
+                'order_id'  => $order->getIncrementId()
+            ]
+        );
     }
 
     /**
-     * Prepare billing agreement data from an identifier in the session
+     * Is order visible
+     *
+     * @param Order $order
+     * @return bool
      */
-    protected function _prepareLastBillingAgreement()
+    protected function isVisible(Order $order)
     {
-        $agreementId = $this->_checkoutSession->getLastBillingAgreementId();
-        $customerId = $this->_customerSession->getCustomerId();
-        if ($agreementId && $customerId) {
-            $agreement = $this->_agreementFactory->create()->load($agreementId);
-            if ($agreement->getId() && $customerId == $agreement->getCustomerId()) {
-                $this->addData(array(
-                    'agreement_ref_id' => $agreement->getReferenceId(),
-                    'agreement_url' => $this->getUrl('sales/billing_agreement/view',
-                        array('agreement' => $agreementId)
-                    ),
-                ));
-            }
-        }
+        return !in_array(
+            $order->getStatus(),
+            $this->_orderConfig->getInvisibleOnFrontStatuses()
+        );
     }
 
     /**
-     * Prepare recurring payment profiles from the session
+     * Can view order
+     *
+     * @param Order $order
+     * @return bool
      */
-    protected function _prepareLastRecurringProfiles()
+    protected function canViewOrder(Order $order)
     {
-        $profileIds = $this->_checkoutSession->getLastRecurringProfileIds();
-        if ($profileIds && is_array($profileIds)) {
-            $collection = $this->_recurringProfileCollectionFactory->create()
-                ->addFieldToFilter('profile_id', array('in' => $profileIds));
-            $profiles = array();
-            foreach ($collection as $profile) {
-                $profiles[] = $profile;
-            }
-            if ($profiles) {
-                $this->setRecurringProfiles($profiles);
-                if ($this->_customerSession->isLoggedIn()) {
-                    $this->setCanViewProfiles(true);
-                }
-            }
-        }
+        return $this->httpContext->getValue(Context::CONTEXT_AUTH)
+            && $this->isVisible($order);
+    }
+
+    /**
+     * @return string
+     * @since 100.2.0
+     */
+    public function getContinueUrl()
+    {
+        return $this->_storeManager->getStore()->getBaseUrl();
     }
 }

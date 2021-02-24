@@ -1,54 +1,49 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Totals;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Math\Random;
 
 /**
  * Adminhtml order tax totals block
  *
- * @category    Magento
- * @package     Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Totals;
-
 class Tax extends \Magento\Tax\Block\Sales\Order\Tax
 {
     /**
+     * Tax helper
+     *
      * @var \Magento\Tax\Helper\Data
      */
     protected $_taxHelper;
 
     /**
+     * Tax calculation
+     *
      * @var \Magento\Tax\Model\Calculation
      */
     protected $_taxCalculation;
 
     /**
+     * Tax factory
+     *
      * @var \Magento\Tax\Model\Sales\Order\TaxFactory
      */
     protected $_taxOrderFactory;
+
+    /**
+     * Sales admin helper
+     *
+     * @var \Magento\Sales\Helper\Admin
+     */
+    protected $_salesAdminHelper;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
@@ -56,7 +51,9 @@ class Tax extends \Magento\Tax\Block\Sales\Order\Tax
      * @param \Magento\Tax\Helper\Data $taxHelper
      * @param \Magento\Tax\Model\Calculation $taxCalculation
      * @param \Magento\Tax\Model\Sales\Order\TaxFactory $taxOrderFactory
+     * @param \Magento\Sales\Helper\Admin $salesAdminHelper
      * @param array $data
+     * @param Random $randomHelper
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
@@ -64,11 +61,16 @@ class Tax extends \Magento\Tax\Block\Sales\Order\Tax
         \Magento\Tax\Helper\Data $taxHelper,
         \Magento\Tax\Model\Calculation $taxCalculation,
         \Magento\Tax\Model\Sales\Order\TaxFactory $taxOrderFactory,
-        array $data = array()
+        \Magento\Sales\Helper\Admin $salesAdminHelper,
+        array $data = [],
+        ?Random $randomHelper = null
     ) {
         $this->_taxHelper = $taxHelper;
         $this->_taxCalculation = $taxCalculation;
         $this->_taxOrderFactory = $taxOrderFactory;
+        $this->_salesAdminHelper = $salesAdminHelper;
+        $data['taxHelper'] = $this->_taxHelper;
+        $data['randomHelper'] = $randomHelper ?? ObjectManager::getInstance()->get(Random::class);
         parent::__construct($context, $taxConfig, $data);
     }
 
@@ -79,18 +81,24 @@ class Tax extends \Magento\Tax\Block\Sales\Order\Tax
      */
     public function getFullTaxInfo()
     {
-        /** @var $source \Magento\Sales\Model\Order */
-        $source = $this->getOrder();
-        $taxClassAmount = array();
-        if ($source instanceof \Magento\Sales\Model\Order) {
-            $taxClassAmount = $this->_taxHelper->getCalculatedTaxes($source);
-            $shippingTax    = $this->_taxHelper->getShippingTax($source);
-            $taxClassAmount = array_merge($taxClassAmount, $shippingTax);
-            if (empty($taxClassAmount)) {
-                $rates = $this->_taxOrderFactory->create()->getCollection()->loadByOrder($source)->toArray();
-                $taxClassAmount =  $this->_taxCalculation->reproduceProcess($rates['items']);
-            }
+        $source = $this->getSource();
+        if (!$source instanceof \Magento\Sales\Model\Order\Invoice
+            && !$source instanceof \Magento\Sales\Model\Order\Creditmemo
+        ) {
+            $source = $this->getOrder();
         }
+
+        $taxClassAmount = [];
+        if (empty($source)) {
+            return $taxClassAmount;
+        }
+
+        $taxClassAmount = $this->_taxHelper->getCalculatedTaxes($source);
+        if (empty($taxClassAmount)) {
+            $rates = $this->_taxOrderFactory->create()->getCollection()->loadByOrder($this->getOrder())->toArray();
+            $taxClassAmount = $this->_taxCalculation->reproduceProcess($rates['items']);
+        }
+
         return $taxClassAmount;
     }
 
@@ -103,15 +111,13 @@ class Tax extends \Magento\Tax\Block\Sales\Order\Tax
      */
     public function displayAmount($amount, $baseAmount)
     {
-        return $this->_helperFactory->get('Magento\Sales\Helper\Admin')->displayPrices(
-            $this->getSource(), $baseAmount, $amount, false, '<br />'
-        );
+        return $this->_salesAdminHelper->displayPrices($this->getSource(), $baseAmount, $amount, false, '<br />');
     }
 
     /**
      * Get store object for process configuration settings
      *
-     * @return \Magento\Core\Model\Store
+     * @return \Magento\Store\Model\Store
      */
     public function getStore()
     {

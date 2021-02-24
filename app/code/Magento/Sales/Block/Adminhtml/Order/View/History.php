@@ -1,47 +1,25 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\View;
 
 /**
  * Order history block
  *
- * @category   Magento
- * @package    Magento_Sales
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\View;
-
 class History extends \Magento\Backend\Block\Template
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
-    
+
     /**
      * Sales data
      *
@@ -50,35 +28,52 @@ class History extends \Magento\Backend\Block\Template
     protected $_salesData = null;
 
     /**
+     * @var \Magento\Sales\Helper\Admin
+     */
+    private $adminHelper;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\Sales\Helper\Data $salesData
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Sales\Helper\Admin $adminHelper
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Sales\Helper\Data $salesData,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        \Magento\Sales\Helper\Admin $adminHelper,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
         $this->_salesData = $salesData;
         parent::__construct($context, $data);
+        $this->adminHelper = $adminHelper;
     }
 
+    /**
+     * Preparing global layout
+     *
+     * @return $this
+     */
     protected function _prepareLayout()
     {
-        $onclick = "submitAndReloadArea($('order_history_block').parentNode, '".$this->getSubmitUrl()."')";
-        $button = $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button')
-            ->setData(array(
-                'label'   => __('Submit Comment'),
-                'class'   => 'save',
-                'onclick' => $onclick
-            ));
+        $onclick = "submitAndReloadArea($('order_history_block').parentNode, '" . $this->getSubmitUrl() . "')";
+        $button = $this->getLayout()->createBlock(
+            \Magento\Backend\Block\Widget\Button::class
+        )->setData(
+            ['label' => __('Submit Comment'), 'class' => 'action-save action-secondary', 'onclick' => $onclick]
+        );
         $this->setChild('submit_button', $button);
         return parent::_prepareLayout();
     }
 
+    /**
+     * Get stat uses
+     *
+     * @return array
+     */
     public function getStatuses()
     {
         $state = $this->getOrder()->getState();
@@ -86,9 +81,15 @@ class History extends \Magento\Backend\Block\Template
         return $statuses;
     }
 
+    /**
+     * Check allow to send order comment email
+     *
+     * @return bool
+     */
     public function canSendCommentEmail()
     {
-        return $this->_salesData->canSendOrderCommentEmail($this->getOrder()->getStore()->getId());
+        return $this->_salesData->canSendOrderCommentEmail($this->getOrder()->getStore()->getId())
+            && $this->_authorization->isAllowed('Magento_Sales::email');
     }
 
     /**
@@ -101,25 +102,46 @@ class History extends \Magento\Backend\Block\Template
         return $this->_coreRegistry->registry('sales_order');
     }
 
+    /**
+     * Check allow to add comment
+     *
+     * @return bool
+     */
     public function canAddComment()
     {
-        return $this->_authorization->isAllowed('Magento_Sales::comment') &&
-               $this->getOrder()->canComment();
+        return $this->_authorization->isAllowed('Magento_Sales::comment') && $this->getOrder()->canComment();
     }
 
+    /**
+     * Submit URL getter
+     *
+     * @return string
+     */
     public function getSubmitUrl()
     {
-        return $this->getUrl('sales/*/addComment', array('order_id'=>$this->getOrder()->getId()));
+        return $this->getUrl('sales/*/addComment', ['order_id' => $this->getOrder()->getId()]);
     }
 
     /**
      * Customer Notification Applicable check method
      *
      * @param  \Magento\Sales\Model\Order\Status\History $history
-     * @return boolean
+     * @return bool
      */
     public function isCustomerNotificationNotApplicable(\Magento\Sales\Model\Order\Status\History $history)
     {
         return $history->isCustomerNotificationNotApplicable();
+    }
+
+    /**
+     * Replace links in string
+     *
+     * @param array|string $data
+     * @param null|array $allowedTags
+     * @return string
+     */
+    public function escapeHtml($data, $allowedTags = null)
+    {
+        return $this->adminHelper->escapeHtmlWithLinks($data, $allowedTags);
     }
 }

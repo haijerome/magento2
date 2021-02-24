@@ -1,257 +1,219 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Bundle
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
-/**
- * Sales Order Creditmemo Pdf default items renderer
- *
- * @category   Magento
- * @package    Magento_Sales
- * @author     Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Bundle\Model\Sales\Order\Pdf\Items;
 
-class Creditmemo extends \Magento\Bundle\Model\Sales\Order\Pdf\Items\AbstractItems
+use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Framework\Filesystem;
+use Magento\Framework\Filter\FilterManager;
+use Magento\Framework\Model\Context;
+use Magento\Framework\Model\ResourceModel\AbstractResource;
+use Magento\Framework\Registry;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\Stdlib\StringUtils;
+use Magento\Tax\Helper\Data;
+
+/**
+ * Order creditmemo pdf default items renderer
+ */
+class Creditmemo extends AbstractItems
 {
     /**
      * Core string
      *
-     * @var \Magento\Stdlib\String
+     * @var StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\App\Dir $coreDir
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param Context $context
+     * @param Registry $registry
+     * @param Data $taxData
+     * @param Filesystem $filesystem
+     * @param FilterManager $filterManager
+     * @param Json $serializer
+     * @param StringUtils $string
+     * @param AbstractResource $resource
+     * @param AbstractDb $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\App\Dir $coreDir,
-        \Magento\Stdlib\String $string,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        Context $context,
+        Registry $registry,
+        Data $taxData,
+        Filesystem $filesystem,
+        FilterManager $filterManager,
+        Json $serializer,
+        StringUtils $string,
+        AbstractResource $resource = null,
+        AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         $this->string = $string;
-        parent::__construct($context, $registry, $taxData, $coreDir, $resource, $resourceCollection, $data);
+        parent::__construct(
+            $context,
+            $registry,
+            $taxData,
+            $filesystem,
+            $filterManager,
+            $serializer,
+            $resource,
+            $resourceCollection,
+            $data
+        );
     }
 
     /**
      * Draw item line
      *
+     * @return void
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     public function draw()
     {
-        $order  = $this->getOrder();
-        $item   = $this->getItem();
-        $pdf    = $this->getPdf();
-        $page   = $this->getPage();
+        $order = $this->getOrder();
+        $item = $this->getItem();
+        $pdf = $this->getPdf();
+        $page = $this->getPage();
 
-        $items = $this->getChilds($item);
-        $_prevOptionId = '';
-        $drawItems  = array();
-        $leftBound  = 35;
+        $items = $this->getChildren($item);
+        $prevOptionId = '';
+        $drawItems = [];
+        $leftBound = 35;
         $rightBound = 565;
 
-        foreach ($items as $_item) {
-            $x      = $leftBound;
-            $line   = array();
+        foreach ($items as $childItem) {
+            $x = $leftBound;
+            $line = [];
 
-            $attributes = $this->getSelectionAttributes($_item);
+            $attributes = $this->getSelectionAttributes($childItem);
             if (is_array($attributes)) {
-                $optionId   = $attributes['option_id'];
-            }
-            else {
+                $optionId = $attributes['option_id'];
+            } else {
                 $optionId = 0;
             }
 
             if (!isset($drawItems[$optionId])) {
-                $drawItems[$optionId] = array(
-                    'lines'  => array(),
-                    'height' => 15
-                );
+                $drawItems[$optionId] = ['lines' => [], 'height' => 15];
             }
 
             // draw selection attributes
-            if ($_item->getOrderItem()->getParentItem()) {
-                if ($_prevOptionId != $attributes['option_id']) {
-                    $line[0] = array(
-                        'font'  => 'italic',
-                        'text'  => $this->string->split($attributes['option_label'], 38, true, true),
-                        'feed'  => $x
-                    );
+            if ($childItem->getOrderItem()->getParentItem() && $prevOptionId != $attributes['option_id']) {
+                $line[0] = [
+                    'font' => 'italic',
+                    'text' => $this->string->split($attributes['option_label'], 38, true, true),
+                    'feed' => $x,
+                ];
 
-                    $drawItems[$optionId] = array(
-                        'lines'  => array($line),
-                        'height' => 15
-                    );
+                $drawItems[$optionId] = ['lines' => [$line], 'height' => 15];
 
-                    $line = array();
-                    $_prevOptionId = $attributes['option_id'];
-                }
+                $line = [];
+                $prevOptionId = $attributes['option_id'];
             }
 
             // draw product titles
-            if ($_item->getOrderItem()->getParentItem()) {
+            if ($childItem->getOrderItem()->getParentItem()) {
                 $feed = $x + 5;
-                $name = $this->getValueHtml($_item);
+                $name = $this->getValueHtml($childItem);
             } else {
                 $feed = $x;
-                $name = $_item->getName();
+                $name = $childItem->getName();
             }
 
-            $line[] = array(
-                'text'  => $this->string->split($name, 35, true, true),
-                'feed'  => $feed
-            );
+            $line[] = ['text' => $this->string->split($name, 35, true, true), 'feed' => $feed];
 
             $x += 220;
 
             // draw SKUs
-            if (!$_item->getOrderItem()->getParentItem()) {
-                $text = array();
+            if (!$childItem->getOrderItem()->getParentItem()) {
+                $text = [];
                 foreach ($this->string->split($item->getSku(), 17) as $part) {
                     $text[] = $part;
                 }
-                $line[] = array(
-                    'text'  => $text,
-                    'feed'  => $x
-                );
+                $line[] = ['text' => $text, 'feed' => $x];
             }
 
             $x += 100;
 
             // draw prices
-            if ($this->canShowPriceInfo($_item)) {
+            if ($this->canShowPriceInfo($childItem)) {
                 // draw Total(ex)
-                $text = $order->formatPriceTxt($_item->getRowTotal());
-                $line[] = array(
-                    'text'  => $text,
-                    'feed'  => $x,
-                    'font'  => 'bold',
-                    'align' => 'right',
-                    'width' => 50
-                );
+                $text = $order->formatPriceTxt($childItem->getRowTotal());
+                $line[] = ['text' => $text, 'feed' => $x, 'font' => 'bold', 'align' => 'right', 'width' => 50];
                 $x += 50;
 
                 // draw Discount
-                $text = $order->formatPriceTxt(-$_item->getDiscountAmount());
-                $line[] = array(
-                    'text'  => $text,
-                    'feed'  => $x,
-                    'font'  => 'bold',
-                    'align' => 'right',
-                    'width' => 50
-                );
+                $text = $order->formatPriceTxt(-$childItem->getDiscountAmount());
+                $line[] = ['text' => $text, 'feed' => $x, 'font' => 'bold', 'align' => 'right', 'width' => 50];
                 $x += 50;
 
                 // draw QTY
-                $text = $_item->getQty() * 1;
-                $line[] = array(
-                    'text'  => $_item->getQty()*1,
-                    'feed'  => $x,
-                    'font'  => 'bold',
+                $text = $childItem->getQty() * 1;
+                $line[] = [
+                    'text' => $text,
+                    'feed' => $x,
+                    'font' => 'bold',
                     'align' => 'center',
-                    'width' => 30
-                );
+                    'width' => 30,
+                ];
                 $x += 30;
 
                 // draw Tax
-                $text = $order->formatPriceTxt($_item->getTaxAmount());
-                $line[] = array(
-                    'text'  => $text,
-                    'feed'  => $x,
-                    'font'  => 'bold',
-                    'align' => 'right',
-                    'width' => 45
-                );
+                $text = $order->formatPriceTxt($childItem->getTaxAmount());
+                $line[] = ['text' => $text, 'feed' => $x, 'font' => 'bold', 'align' => 'right', 'width' => 45];
                 $x += 45;
 
                 // draw Total(inc)
                 $text = $order->formatPriceTxt(
-                    $_item->getRowTotal() + $_item->getTaxAmount() - $_item->getDiscountAmount()
+                    $childItem->getRowTotal() + $childItem->getTaxAmount() - $childItem->getDiscountAmount()
                 );
-                $line[] = array(
-                    'text'  => $text,
-                    'feed'  => $rightBound,
-                    'font'  => 'bold',
-                    'align' => 'right',
-                );
+                $line[] = ['text' => $text, 'feed' => $rightBound, 'font' => 'bold', 'align' => 'right'];
             }
 
             $drawItems[$optionId]['lines'][] = $line;
-
         }
 
         // custom options
         $options = $item->getOrderItem()->getProductOptions();
-        if ($options) {
-            if (isset($options['options'])) {
-                foreach ($options['options'] as $option) {
-                    $lines = array();
-                    $lines[][] = array(
-                        'text'  => $this->string->split(strip_tags($option['label']), 40, true, true),
-                        'font'  => 'italic',
-                        'feed'  => $leftBound
-                    );
+        if ($options && isset($options['options'])) {
+            foreach ($options['options'] as $option) {
+                $lines = [];
+                $lines[][] = [
+                    'text' => $this->string->split(
+                        $this->filterManager->stripTags($option['label']),
+                        40,
+                        true,
+                        true
+                    ),
+                    'font' => 'italic',
+                    'feed' => $leftBound,
+                ];
 
-                    if ($option['value']) {
-                        $text = array();
-                        $_printValue = isset($option['print_value'])
-                            ? $option['print_value']
-                            : strip_tags($option['value']);
-                        $values = explode(', ', $_printValue);
-                        foreach ($values as $value) {
-                            foreach ($this->string->split($value, 30, true, true) as $_value) {
-                                $text[] = $_value;
-                            }
+                if ($option['value']) {
+                    $text = [];
+                    $printValue = $option['print_value'] ?? $this->filterManager->stripTags($option['value']);
+                    $values = explode(', ', $printValue);
+                    foreach ($values as $value) {
+                        foreach ($this->string->split($value, 30, true, true) as $subValue) {
+                            $text[] = $subValue;
                         }
-
-                        $lines[][] = array(
-                            'text'  => $text,
-                            'feed'  => $leftBound + 5
-                        );
                     }
 
-                    $drawItems[] = array(
-                        'lines'  => $lines,
-                        'height' => 15
-                    );
+                    $lines[][] = ['text' => $text, 'feed' => $leftBound + 5];
                 }
+
+                $drawItems[] = ['lines' => $lines, 'height' => 15];
             }
         }
 
-        $page = $pdf->drawLineBlocks($page, $drawItems, array('table_header' => true));
+        $page = $pdf->drawLineBlocks($page, $drawItems, ['table_header' => true]);
         $this->setPage($page);
     }
 }

@@ -1,99 +1,177 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
-/**
- * Customer dashboard addresses section
- *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
- */
-
 namespace Magento\Customer\Block\Account\Dashboard;
 
-class Address extends \Magento\View\Element\Template
+use Magento\Customer\Api\Data\AddressInterface;
+use Magento\Customer\Model\Address\Mapper;
+use Magento\Framework\Exception\NoSuchEntityException;
+
+/**
+ * Class to manage customer dashboard addresses section
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Address extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var \Magento\Customer\Model\Address\Config
      */
-    protected $_customerSession;
+    protected $_addressConfig;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Customer\Model\Session $customerSession
+     * @var \Magento\Customer\Helper\Session\CurrentCustomer
+     */
+    protected $currentCustomer;
+
+    /**
+     * @var \Magento\Customer\Helper\Session\CurrentCustomerAddress
+     */
+    protected $currentCustomerAddress;
+
+    /**
+     * @var Mapper
+     */
+    protected $addressMapper;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer
+     * @param \Magento\Customer\Helper\Session\CurrentCustomerAddress $currentCustomerAddress
+     * @param \Magento\Customer\Model\Address\Config $addressConfig
+     * @param Mapper $addressMapper
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Customer\Model\Session $customerSession,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer,
+        \Magento\Customer\Helper\Session\CurrentCustomerAddress $currentCustomerAddress,
+        \Magento\Customer\Model\Address\Config $addressConfig,
+        Mapper $addressMapper,
+        array $data = []
     ) {
-        $this->_customerSession = $customerSession;
+        $this->currentCustomer = $currentCustomer;
+        $this->currentCustomerAddress = $currentCustomerAddress;
+        $this->_addressConfig = $addressConfig;
         parent::__construct($context, $data);
+        $this->addressMapper = $addressMapper;
     }
 
+    /**
+     * Get the logged in customer
+     *
+     * @return \Magento\Customer\Api\Data\CustomerInterface|null
+     */
     public function getCustomer()
     {
-        return $this->_customerSession->getCustomer();
+        try {
+            return $this->currentCustomer->getCustomer();
+        } catch (NoSuchEntityException $e) {
+            return null;
+        }
     }
 
+    /**
+     * HTML for Shipping Address
+     *
+     * @return \Magento\Framework\Phrase|string
+     */
     public function getPrimaryShippingAddressHtml()
     {
-        $address = $this->getCustomer()->getPrimaryShippingAddress();
+        try {
+            $address = $this->currentCustomerAddress->getDefaultShippingAddress();
+        } catch (NoSuchEntityException $e) {
+            return __('You have not set a default shipping address.');
+        }
 
-        if( $address instanceof \Magento\Object ) {
-            return $address->format('html');
+        if ($address) {
+            return $this->_getAddressHtml($address);
         } else {
             return __('You have not set a default shipping address.');
         }
     }
 
+    /**
+     * HTML for Billing Address
+     *
+     * @return \Magento\Framework\Phrase|string
+     */
     public function getPrimaryBillingAddressHtml()
     {
-        $address = $this->getCustomer()->getPrimaryBillingAddress();
+        try {
+            $address = $this->currentCustomerAddress->getDefaultBillingAddress();
+        } catch (NoSuchEntityException $e) {
+            return $this->escapeHtml(__('You have not set a default billing address.'));
+        }
 
-        if( $address instanceof \Magento\Object ) {
-            return $address->format('html');
+        if ($address) {
+            return $this->_getAddressHtml($address);
         } else {
-            return __('You have not set a default billing address.');
+            return $this->escapeHtml(__('You have not set a default billing address.'));
         }
     }
 
+    /**
+     * Get Primary Shipping Address Edit Url
+     *
+     * @return string
+     */
     public function getPrimaryShippingAddressEditUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/address/edit', array('id'=>$this->getCustomer()->getDefaultShipping()));
+        if (!$this->getCustomer()) {
+            return '';
+        } else {
+            $address = $this->currentCustomerAddress->getDefaultShippingAddress();
+            $addressId = $address ? $address->getId() : null;
+            return $this->_urlBuilder->getUrl(
+                'customer/address/edit',
+                ['id' => $addressId]
+            );
+        }
     }
 
+    /**
+     * Get Primary Billing Address Edit Url
+     *
+     * @return string
+     */
     public function getPrimaryBillingAddressEditUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/address/edit', array('id'=>$this->getCustomer()->getDefaultBilling()));
+        if (!$this->getCustomer()) {
+            return '';
+        } else {
+            $address = $this->currentCustomerAddress->getDefaultBillingAddress();
+            $addressId = $address ? $address->getId() : null;
+            return $this->_urlBuilder->getUrl(
+                'customer/address/edit',
+                ['id' => $addressId]
+            );
+        }
     }
 
+    /**
+     * Get Address Book Url
+     *
+     * @return string
+     */
     public function getAddressBookUrl()
     {
         return $this->getUrl('customer/address/');
+    }
+
+    /**
+     * Render an address as HTML and return the result
+     *
+     * @param AddressInterface $address
+     * @return string
+     */
+    protected function _getAddressHtml($address)
+    {
+        /** @var \Magento\Customer\Block\Address\Renderer\RendererInterface $renderer */
+        $renderer = $this->_addressConfig->getFormatByCode('html')->getRenderer();
+        return $renderer->renderArray($this->addressMapper->toFlatArray($address));
     }
 }

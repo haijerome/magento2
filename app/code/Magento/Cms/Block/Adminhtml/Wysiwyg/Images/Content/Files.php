@@ -1,44 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Cms\Block\Adminhtml\Wysiwyg\Images\Content;
 
 /**
  * Directory contents block for Wysiwyg Images
  *
- * @category   Magento
- * @package    Magento_Cms
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Cms\Block\Adminhtml\Wysiwyg\Images\Content;
-
 class Files extends \Magento\Backend\Block\Template
 {
     /**
      * Files collection object
      *
-     * @var \Magento\Data\Collection\Filesystem
+     * @var \Magento\Framework\Data\Collection\Filesystem
      */
     protected $_filesCollection;
 
@@ -62,7 +40,7 @@ class Files extends \Magento\Backend\Block\Template
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Cms\Model\Wysiwyg\Images\Storage $imageStorage,
         \Magento\Cms\Helper\Wysiwyg\Images $imageHelper,
-        array $data = array()
+        array $data = []
     ) {
         $this->_imageHelper = $imageHelper;
         $this->_imageStorage = $imageStorage;
@@ -72,14 +50,15 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * Prepared Files collection for current directory
      *
-     * @return \Magento\Data\Collection\Filesystem
+     * @return \Magento\Framework\Data\Collection\Filesystem
      */
     public function getFiles()
     {
-        if (! $this->_filesCollection) {
+        if (!$this->_filesCollection) {
             $this->_filesCollection = $this->_imageStorage->getFilesCollection(
-                    $this->_imageHelper->getCurrentPath(), $this->_getMediaType()
-                );
+                $this->_imageHelper->getCurrentPath(),
+                $this->_getMediaType()
+            );
         }
 
         return $this->_filesCollection;
@@ -96,12 +75,12 @@ class Files extends \Magento\Backend\Block\Template
     }
 
     /**
-     * File idetifier getter
+     * File identifier getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileId(\Magento\Object $file)
+    public function getFileId(\Magento\Framework\DataObject $file)
     {
         return $file->getId();
     }
@@ -109,10 +88,10 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * File thumb URL getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileThumbUrl(\Magento\Object $file)
+    public function getFileThumbUrl(\Magento\Framework\DataObject $file)
     {
         return $file->getThumbUrl();
     }
@@ -120,10 +99,10 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * File name URL getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileName(\Magento\Object $file)
+    public function getFileName(\Magento\Framework\DataObject $file)
     {
         return $file->getName();
     }
@@ -131,10 +110,10 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * Image file width getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileWidth(\Magento\Object $file)
+    public function getFileWidth(\Magento\Framework\DataObject $file)
     {
         return $file->getWidth();
     }
@@ -142,10 +121,10 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * Image file height getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileHeight(\Magento\Object $file)
+    public function getFileHeight(\Magento\Framework\DataObject $file)
     {
         return $file->getHeight();
     }
@@ -153,10 +132,10 @@ class Files extends \Magento\Backend\Block\Template
     /**
      * File short name getter
      *
-     * @param  \Magento\Object $file
+     * @param  \Magento\Framework\DataObject $file
      * @return string
      */
-    public function getFileShortName(\Magento\Object $file)
+    public function getFileShortName(\Magento\Framework\DataObject $file)
     {
         return $file->getShortName();
     }

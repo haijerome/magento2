@@ -1,142 +1,37 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Sales order view block
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Reorder;
 
-class Sidebar extends \Magento\View\Element\Template
+use Magento\Customer\Model\Context;
+
+/**
+ * Last ordered items sidebar
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Sidebar extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var string
+     * @var \Magento\Framework\App\Http\Context
      */
-    protected $_template = 'order/history.phtml';
+    protected $httpContext;
 
     /**
-     * @var \Magento\Sales\Model\Resource\Order\CollectionFactory
-     */
-    protected $_orderCollectionFactory;
-
-    /**
-     * @var \Magento\Sales\Model\Order\Config
-     */
-    protected $_orderConfig;
-
-    /**
-     * @var \Magento\Customer\Model\Session
-     */
-    protected $_customerSession;
-
-    /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Sales\Model\Resource\Order\CollectionFactory $orderCollectionFactory
-     * @param \Magento\Sales\Model\Order\Config $orderConfig
-     * @param \Magento\Customer\Model\Session $customerSession
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\App\Http\Context $httpContext
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Sales\Model\Resource\Order\CollectionFactory $orderCollectionFactory,
-        \Magento\Sales\Model\Order\Config $orderConfig,
-        \Magento\Customer\Model\Session $customerSession,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\App\Http\Context $httpContext,
+        array $data = []
     ) {
-        $this->_orderCollectionFactory = $orderCollectionFactory;
-        $this->_orderConfig = $orderConfig;
-        $this->_customerSession = $customerSession;
         parent::__construct($context, $data);
-    }
-
-    /**
-     * Init orders
-     */
-    protected function _construct()
-    {
-        parent::_construct();
-        if ($this->_customerSession->isLoggedIn()) {
-            $this->initOrders();
-        }
-    }
-
-    /**
-     * Init customer order for display on front
-     */
-    public function initOrders()
-    {
-        $customerId = $this->getCustomerId() ? $this->getCustomerId()
-            : $this->_customerSession->getCustomer()->getId();
-
-        $orders = $this->_orderCollectionFactory->create()
-            ->addAttributeToFilter('customer_id', $customerId)
-            ->addAttributeToFilter('state',
-                array('in' => $this->_orderConfig->getVisibleOnFrontStates())
-            )
-            ->addAttributeToSort('created_at', 'desc')
-            ->setPage(1, 1);
-        //TODO: add filter by current website
-
-        $this->setOrders($orders);
-    }
-
-    /**
-     * Get list of last ordered products
-     *
-     * @return array
-     */
-    public function getItems()
-    {
-        $items = array();
-        $order = $this->getLastOrder();
-        $limit = 5;
-
-        if ($order) {
-            $website = $this->_storeManager->getStore()->getWebsiteId();
-            foreach ($order->getParentItemsRandomCollection($limit) as $item) {
-                if ($item->getProduct() && in_array($website, $item->getProduct()->getWebsiteIds())) {
-                    $items[] = $item;
-                }
-            }
-        }
-
-        return $items;
-    }
-
-    /**
-     * Check item product availability for reorder
-     *
-     * @param  \Magento\Sales\Model\Order\Item $orderItem
-     * @return boolean
-     */
-    public function isItemAvailableForReorder(\Magento\Sales\Model\Order\Item $orderItem)
-    {
-        if ($orderItem->getProduct()) {
-            return $orderItem->getProduct()->getStockItem()->getIsInStock();
-        }
-        return false;
+        $this->httpContext = $httpContext;
     }
 
     /**
@@ -147,20 +42,7 @@ class Sidebar extends \Magento\View\Element\Template
      */
     public function getFormActionUrl()
     {
-        return $this->getUrl('checkout/cart/addgroup', array('_secure' => true));
-    }
-
-    /**
-     * Last order getter
-     *
-     * @return \Magento\Sales\Model\Order|false
-     */
-    public function getLastOrder()
-    {
-        foreach ($this->getOrders() as $order) {
-            return $order;
-        }
-        return false;
+        return $this->getUrl('checkout/cart/addgroup', ['_secure' => true]);
     }
 
     /**
@@ -170,6 +52,7 @@ class Sidebar extends \Magento\View\Element\Template
      */
     protected function _toHtml()
     {
-        return $this->_customerSession->isLoggedIn() || $this->getCustomerId() ? parent::_toHtml() : '';
+        $isValid = $this->httpContext->getValue(Context::CONTEXT_AUTH) || $this->getCustomerId();
+        return $isValid ? parent::_toHtml() : '';
     }
 }

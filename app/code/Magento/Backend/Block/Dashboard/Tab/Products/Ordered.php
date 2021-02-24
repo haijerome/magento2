@@ -1,76 +1,61 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Dashboard\Tab\Products;
 
 /**
  * Adminhtml dashboard most ordered products grid
  *
- * @category   Magento
- * @package    Magento_Backend
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.DepthOfInheritance)
  */
-
-namespace Magento\Backend\Block\Dashboard\Tab\Products;
-
 class Ordered extends \Magento\Backend\Block\Dashboard\Grid
 {
     /**
-     * @var \Magento\Sales\Model\Resource\Report\Bestsellers\CollectionFactory
+     * @var \Magento\Sales\Model\ResourceModel\Report\Bestsellers\CollectionFactory
      */
     protected $_collectionFactory;
 
     /**
-     * @var \Magento\Module\Manager
+     * @var \Magento\Framework\Module\Manager
      */
     protected $_moduleManager;
 
     /**
-     * @param \Magento\Module\Manager $moduleManager
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Sales\Model\Resource\Report\Bestsellers\CollectionFactory $collectionFactory
+     * @param \Magento\Backend\Helper\Data $backendHelper
+     * @param \Magento\Framework\Module\Manager $moduleManager
+     * @param \Magento\Sales\Model\ResourceModel\Report\Bestsellers\CollectionFactory $collectionFactory
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Module\Manager $moduleManager,
-        \Magento\Sales\Model\Resource\Report\Bestsellers\CollectionFactory $collectionFactory,
-        array $data = array()
+        \Magento\Backend\Helper\Data $backendHelper,
+        \Magento\Framework\Module\Manager $moduleManager,
+        \Magento\Sales\Model\ResourceModel\Report\Bestsellers\CollectionFactory $collectionFactory,
+        array $data = []
     ) {
         $this->_collectionFactory = $collectionFactory;
         $this->_moduleManager = $moduleManager;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Construct.
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
         $this->setId('productsOrderedGrid');
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _prepareCollection()
     {
         if (!$this->_moduleManager->isEnabled('Magento_Sales')) {
@@ -79,50 +64,64 @@ class Ordered extends \Magento\Backend\Block\Dashboard\Grid
         if ($this->getParam('website')) {
             $storeIds = $this->_storeManager->getWebsite($this->getParam('website'))->getStoreIds();
             $storeId = array_pop($storeIds);
-        } else if ($this->getParam('group')) {
+        } elseif ($this->getParam('group')) {
             $storeIds = $this->_storeManager->getGroup($this->getParam('group'))->getStoreIds();
             $storeId = array_pop($storeIds);
         } else {
             $storeId = (int)$this->getParam('store');
         }
 
-        $collection = $this->_collectionFactory->create()
-            ->setModel('Magento\Catalog\Model\Product')
-            ->addStoreFilter($storeId)
-        ;
+        $collection = $this->_collectionFactory->create()->setModel(
+            \Magento\Catalog\Model\Product::class
+        )->addStoreFilter(
+            $storeId
+        );
 
         $this->setCollection($collection);
 
         return parent::_prepareCollection();
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _prepareColumns()
     {
+        $this->addColumn(
+            'name',
+            [
+                'header' => __('Product'),
+                'sortable' => false,
+                'index' => 'product_name',
+                'header_css_class' => 'col-product',
+                'column_css_class' => 'col-product'
+            ]
+        );
 
-        $this->addColumn('name', array(
-            'header'    => __('Product'),
-            'sortable'  => false,
-            'index'     => 'product_name'
-        ));
+        $this->addColumn(
+            'price',
+            [
+                'header' => __('Price'),
+                'type' => 'currency',
+                'currency_code' => (string)$this->_storeManager->getStore(
+                    (int)$this->getParam('store')
+                )->getBaseCurrencyCode(),
+                'sortable' => false,
+                'index' => 'product_price'
+            ]
+        );
 
-        $this->addColumn('price', array(
-            'header'    => __('Price'),
-            'width'     => '120px',
-            'type'      => 'currency',
-            'currency_code' => (string) $this->_storeManager->getStore((int)$this->getParam('store'))
-                ->getBaseCurrencyCode(),
-            'sortable'  => false,
-            'index'     => 'product_price'
-        ));
-
-        $this->addColumn('ordered_qty', array(
-            'header'    => __('Order Quantity'),
-            'width'     => '120px',
-            'align'     => 'right',
-            'sortable'  => false,
-            'index'     => 'qty_ordered',
-            'type'      => 'number'
-        ));
+        $this->addColumn(
+            'ordered_qty',
+            [
+                'header' => __('Quantity'),
+                'sortable' => false,
+                'index' => 'qty_ordered',
+                'type' => 'number',
+                'header_css_class' => 'col-qty',
+                'column_css_class' => 'col-qty'
+            ]
+        );
 
         $this->setFilterVisibility(false);
         $this->setPagerVisibility(false);
@@ -130,12 +129,11 @@ class Ordered extends \Magento\Backend\Block\Dashboard\Grid
         return parent::_prepareColumns();
     }
 
-    /*
+    /**
      * Returns row url to show in admin dashboard
      * $row is bestseller row wrapped in Product model
      *
      * @param \Magento\Catalog\Model\Product $row
-     *
      * @return string
      */
     public function getRowUrl($row)
@@ -148,7 +146,7 @@ class Ordered extends \Magento\Backend\Block\Dashboard\Grid
             return '';
         }
 
-        $params = array('id' => $productId);
+        $params = ['id' => $productId];
         if ($this->getRequest()->getParam('store')) {
             $params['store'] = $this->getRequest()->getParam('store');
         }

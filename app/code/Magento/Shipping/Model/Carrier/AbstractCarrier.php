@@ -1,34 +1,24 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Shipping
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 namespace Magento\Shipping\Model\Carrier;
 
-abstract class AbstractCarrier extends \Magento\Object
+use Magento\Quote\Model\Quote\Address\RateResult\Error;
+use Magento\Shipping\Model\Shipment\Request;
+
+/**
+ * Class AbstractCarrier
+ *
+ * @api
+ * @since 100.0.2
+ */
+abstract class AbstractCarrier extends \Magento\Framework\DataObject implements AbstractCarrierInterface
 {
+    const DEBUG_KEYS_MASK = '****';
+
     /**
      * Carrier's code
      *
@@ -67,18 +57,22 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Container types that could be customized
      *
-     * @var array
+     * @var string[]
      */
-    protected $_customizableContainerTypes = array();
+    protected $_customizableContainerTypes = [];
 
     const USA_COUNTRY_ID = 'US';
+
     const CANADA_COUNTRY_ID = 'CA';
+
     const MEXICO_COUNTRY_ID = 'MX';
 
     const HANDLING_TYPE_PERCENT = 'P';
+
     const HANDLING_TYPE_FIXED = 'F';
 
     const HANDLING_ACTION_PERPACKAGE = 'P';
+
     const HANDLING_ACTION_PERORDER = 'O';
 
     /**
@@ -86,56 +80,61 @@ abstract class AbstractCarrier extends \Magento\Object
      *
      * @var array
      */
-    protected $_debugReplacePrivateDataKeys = array();
+    protected $_debugReplacePrivateDataKeys = [];
 
     /**
      * Core store config
      *
-     * @var \Magento\Core\Model\Store\Config
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
      */
-    protected $_coreStoreConfig;
+    protected $_scopeConfig;
 
     /**
-     * @var \Magento\Shipping\Model\Rate\Result\ErrorFactory
+     * @var \Magento\Quote\Model\Quote\Address\RateResult\ErrorFactory
      */
     protected $_rateErrorFactory;
 
     /**
-     * @var \Magento\Shipping\Model\Rate\Result\ErrorFactory
+     * @var \Psr\Log\LoggerInterface
      */
-    protected $_logAdapterFactory;
+    protected $_logger;
 
     /**
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Shipping\Model\Rate\Result\ErrorFactory $rateErrorFactory
-     * @param \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Quote\Model\Quote\Address\RateResult\ErrorFactory $rateErrorFactory
+     * @param \Psr\Log\LoggerInterface $logger
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Shipping\Model\Rate\Result\ErrorFactory $rateErrorFactory,
-        \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory,
-        array $data = array()
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Quote\Model\Quote\Address\RateResult\ErrorFactory $rateErrorFactory,
+        \Psr\Log\LoggerInterface $logger,
+        array $data = []
     ) {
         parent::__construct($data);
-        $this->_coreStoreConfig = $coreStoreConfig;
+        $this->_scopeConfig = $scopeConfig;
         $this->_rateErrorFactory = $rateErrorFactory;
-        $this->_logAdapterFactory = $logAdapterFactory;
+        $this->_logger = $logger;
     }
 
     /**
      * Retrieve information from carrier configuration
      *
      * @param   string $field
-     * @return  mixed
+     * @return  false|string
      */
     public function getConfigData($field)
     {
         if (empty($this->_code)) {
             return false;
         }
-        $path = 'carriers/'.$this->_code.'/'.$field;
-        return $this->_coreStoreConfig->getConfig($path, $this->getStore());
+        $path = 'carriers/' . $this->_code . '/' . $field;
+
+        return $this->_scopeConfig->getValue(
+            $path,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $this->getStore()
+        );
     }
 
     /**
@@ -143,80 +142,85 @@ abstract class AbstractCarrier extends \Magento\Object
      *
      * @param string $field
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
+     * @api
      */
     public function getConfigFlag($field)
     {
         if (empty($this->_code)) {
             return false;
         }
-        $path = 'carriers/'.$this->_code.'/'.$field;
-        return $this->_coreStoreConfig->getConfigFlag($path, $this->getStore());
+        $path = 'carriers/' . $this->_code . '/' . $field;
+
+        return $this->_scopeConfig->isSetFlag(
+            $path,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $this->getStore()
+        );
     }
 
     /**
-     * Collect and get rates
+     * Do request to shipment.
      *
-     * @abstract
-     * @param \Magento\Shipping\Model\Rate\Request $request
-     * @return \Magento\Shipping\Model\Rate\Result|bool|null
-     */
-    abstract public function collectRates(\Magento\Shipping\Model\Rate\Request $request);
-
-    /**
-     * Do request to shipment
      * Implementation must be in overridden method
      *
-     * @param \Magento\Shipping\Model\Shipment\Request $request
-     * @return \Magento\Object
+     * @param Request $request
+     * @return \Magento\Framework\DataObject
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function requestToShipment(\Magento\Shipping\Model\Shipment\Request $request)
+    public function requestToShipment($request)
     {
-        return new \Magento\Object();
+        return new \Magento\Framework\DataObject();
     }
 
     /**
-     * Do return of shipment
+     * Do return of shipment.
+     *
      * Implementation must be in overridden method
      *
-     * @param $request
-     * @return \Magento\Object
+     * @param Request $request
+     * @return \Magento\Framework\DataObject
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function returnOfShipment($request)
     {
-        return new \Magento\Object();
+        return new \Magento\Framework\DataObject();
     }
 
     /**
      * Return container types of carrier
      *
-     * @param \Magento\Object|null $params
+     * @param \Magento\Framework\DataObject|null $params
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getContainerTypes(\Magento\Object $params = null)
+    public function getContainerTypes(\Magento\Framework\DataObject $params = null)
     {
-        return array();
+        return [];
     }
 
     /**
      * Get allowed containers of carrier
      *
-     * @param \Magento\Object|null $params
+     * @param \Magento\Framework\DataObject|null $params
      * @return array|bool
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    protected function _getAllowedContainers(\Magento\Object $params = null)
+    protected function _getAllowedContainers(\Magento\Framework\DataObject $params = null)
     {
         $containersAll = $this->getContainerTypesAll();
         if (empty($containersAll)) {
-            return array();
+            return [];
         }
         if (empty($params)) {
             return $containersAll;
         }
-        $containersFilter   = $this->getContainerTypesFilter();
-        $containersFiltered = array();
-        $method             = $params->getMethod();
-        $countryShipper     = $params->getCountryShipper();
-        $countryRecipient   = $params->getCountryRecipient();
+        $containersFilter = $this->getContainerTypesFilter();
+        $containersFiltered = [];
+        $method = $params->getMethod();
+        $countryShipper = $params->getCountryShipper();
+        $countryRecipient = $params->getCountryRecipient();
 
         if (empty($containersFilter)) {
             return $containersAll;
@@ -227,18 +231,18 @@ abstract class AbstractCarrier extends \Magento\Object
 
         if ($countryShipper == self::USA_COUNTRY_ID && $countryRecipient == self::USA_COUNTRY_ID) {
             $direction = 'within_us';
-        } else if ($countryShipper == self::USA_COUNTRY_ID && $countryRecipient != self::USA_COUNTRY_ID) {
-            $direction = 'from_us';
         } else {
-            return $containersAll;
+            if ($countryShipper == self::USA_COUNTRY_ID && $countryRecipient != self::USA_COUNTRY_ID) {
+                $direction = 'from_us';
+            } else {
+                return $containersAll;
+            }
         }
 
         foreach ($containersFilter as $dataItem) {
             $containers = $dataItem['containers'];
             $filters = $dataItem['filters'];
-            if (!empty($filters[$direction]['method'])
-                && in_array($method, $filters[$direction]['method'])
-            ) {
+            if (!empty($filters[$direction]['method']) && in_array($method, $filters[$direction]['method'])) {
                 foreach ($containers as $container) {
                     if (!empty($containersAll[$container])) {
                         $containersFiltered[$container] = $containersAll[$container];
@@ -253,7 +257,7 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Get Container Types, that could be customized
      *
-     * @return array
+     * @return string[]
      */
     public function getCustomizableContainerTypes()
     {
@@ -263,62 +267,89 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Return delivery confirmation types of carrier
      *
-     * @param \Magento\Object|null $params
+     * @param \Magento\Framework\DataObject|null $params
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getDeliveryConfirmationTypes(\Magento\Object $params = null)
+    public function getDeliveryConfirmationTypes(\Magento\Framework\DataObject $params = null)
     {
-        return array();
+        return [];
     }
 
     /**
-     * @param \Magento\Shipping\Model\Rate\Request $request
-     * @return $this|bool|false|\Magento\Core\Model\AbstractModel
+     * Validate request for available ship countries.
+     *
+     * @param \Magento\Framework\DataObject $request
+     * @return $this|bool|false|\Magento\Framework\Model\AbstractModel
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    public function checkAvailableShipCountries(\Magento\Shipping\Model\Rate\Request $request)
+    public function checkAvailableShipCountries(\Magento\Framework\DataObject $request)
     {
         $speCountriesAllow = $this->getConfigData('sallowspecific');
         /*
-        * for specific countries, the flag will be 1
-        */
-        if ($speCountriesAllow && $speCountriesAllow == 1){
-             $showMethod = $this->getConfigData('showmethod');
-             $availableCountries = array();
-             if($this->getConfigData('specificcountry')) {
-                $availableCountries = explode(',',$this->getConfigData('specificcountry'));
-             }
-             if ($availableCountries && in_array($request->getDestCountryId(), $availableCountries)) {
-                 return $this;
-             } elseif ($showMethod && (!$availableCountries || ($availableCountries
-                 && !in_array($request->getDestCountryId(), $availableCountries)))
-             ){
-                   /** @var \Magento\Shipping\Model\Rate\Result\Error $error */
-                   $error = $this->_rateErrorFactory->create();
-                   $error->setCarrier($this->_code);
-                   $error->setCarrierTitle($this->getConfigData('title'));
-                   $errorMsg = $this->getConfigData('specificerrmsg');
-                   $error->setErrorMessage($errorMsg ? $errorMsg : __('Sorry, but we can\'t deliver to the destination country with this shipping module.'));
-                   return $error;
-             } else {
-                 /*
-                * The admin set not to show the shipping module if the devliery country is not within specific countries
-                */
+         * for specific countries, the flag will be 1
+         */
+        if ($speCountriesAllow && $speCountriesAllow == 1) {
+            $showMethod = $this->getConfigData('showmethod');
+            $availableCountries = [];
+            if ($this->getConfigData('specificcountry')) {
+                $availableCountries = explode(',', $this->getConfigData('specificcountry'));
+            }
+            if ($availableCountries && in_array($request->getDestCountryId(), $availableCountries)) {
+                return $this;
+            } elseif ($showMethod && (!$availableCountries || $availableCountries && !in_array(
+                $request->getDestCountryId(),
+                $availableCountries
+            ))
+            ) {
+                /** @var Error $error */
+                $error = $this->_rateErrorFactory->create();
+                $error->setCarrier($this->_code);
+                $error->setCarrierTitle($this->getConfigData('title'));
+                $errorMsg = $this->getConfigData('specificerrmsg');
+                $error->setErrorMessage(
+                    $errorMsg ? $errorMsg : __(
+                        'Sorry, but we can\'t deliver to the destination country with this shipping module.'
+                    )
+                );
+
+                return $error;
+            } else {
+                /*
+                 * The admin set not to show the shipping module if the delivery country
+                 * is not within specific countries
+                 */
                 return false;
-             }
+            }
         }
+
         return $this;
     }
-
 
     /**
      * Processing additional validation to check is carrier applicable.
      *
-     * @param \Magento\Shipping\Model\Rate\Request $request
-     * @return \Magento\Shipping\Model\Carrier\AbstractCarrier|\Magento\Shipping\Model\Rate\Result\Error|boolean
+     * @param \Magento\Framework\DataObject $request
+     * @return $this|bool|\Magento\Framework\DataObject
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @since 100.2.6
      */
-    public function proccessAdditionalValidation(\Magento\Shipping\Model\Rate\Request $request)
+    public function processAdditionalValidation(\Magento\Framework\DataObject $request)
     {
         return $this;
+    }
+
+    /**
+     * Processing additional validation to check is carrier applicable.
+     *
+     * @param \Magento\Framework\DataObject $request
+     * @return $this|bool|\Magento\Framework\DataObject
+     * @deprecated 100.2.6
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function proccessAdditionalValidation(\Magento\Framework\DataObject $request)
+    {
+        return $this->processAdditionalValidation($request);
     }
 
     /**
@@ -329,7 +360,8 @@ abstract class AbstractCarrier extends \Magento\Object
     public function isActive()
     {
         $active = $this->getConfigData('active');
-        return $active==1 || $active=='true';
+
+        return $active == 1 || $active == 'true';
     }
 
     /**
@@ -345,7 +377,7 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Check if carrier has shipping tracking option available
      *
-     * @return boolean
+     * @return bool
      */
     public function isTrackingAvailable()
     {
@@ -355,7 +387,7 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Check if carrier has shipping label option available
      *
-     * @return boolean
+     * @return bool
      */
     public function isShippingLabelsAvailable()
     {
@@ -365,7 +397,7 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      *  Retrieve sort order of current carrier
      *
-     * @return mixed
+     * @return string|null
      */
     public function getSortOrder()
     {
@@ -373,11 +405,18 @@ abstract class AbstractCarrier extends \Magento\Object
     }
 
     /**
-     * @param \Magento\Shipping\Model\Rate\Request $request
-     * @return null
+     * Allows free shipping when all product items have free shipping.
+     *
+     * @param \Magento\Quote\Model\Quote\Address\RateRequest $request
+     * @return void
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     protected function _updateFreeMethodQuote($request)
     {
+        if (!$request->getFreeShipping()) {
+            return;
+        }
         if ($request->getFreeMethodWeight() == $request->getPackageWeight() || !$request->hasFreeMethodWeight()) {
             return;
         }
@@ -389,7 +428,7 @@ abstract class AbstractCarrier extends \Magento\Object
         $freeRateId = false;
 
         if (is_object($this->_result)) {
-            foreach ($this->_result->getAllRates() as $i=>$item) {
+            foreach ($this->_result->getAllRates() as $i => $item) {
                 if ($item->getMethod() == $freeMethod) {
                     $freeRateId = $i;
                     break;
@@ -405,14 +444,14 @@ abstract class AbstractCarrier extends \Magento\Object
             $this->_setFreeMethodRequest($freeMethod);
 
             $result = $this->_getQuotes();
-            if ($result && ($rates = $result->getAllRates()) && count($rates)>0) {
-                if ((count($rates) == 1) && ($rates[0] instanceof \Magento\Shipping\Model\Rate\Result\Method)) {
+            if ($result && ($rates = $result->getAllRates()) && count($rates) > 0) {
+                if (count($rates) == 1 && $rates[0] instanceof \Magento\Quote\Model\Quote\Address\RateResult\Method) {
                     $price = $rates[0]->getPrice();
                 }
                 if (count($rates) > 1) {
                     foreach ($rates as $rate) {
-                        if ($rate instanceof \Magento\Shipping\Model\Rate\Result\Method
-                            && $rate->getMethod() == $freeMethod
+                        if ($rate instanceof \Magento\Quote\Model\Quote\Address\RateResult\Method &&
+                            $rate->getMethod() == $freeMethod
                         ) {
                             $price = $rate->getPrice();
                         }
@@ -430,25 +469,9 @@ abstract class AbstractCarrier extends \Magento\Object
         /**
          * if we did not get our free shipping method in response we must use its old price
          */
-        if (!is_null($price)) {
+        if ($price !== null) {
             $this->_result->getRateById($freeRateId)->setPrice($price);
         }
-    }
-
-    /**
-     * Calculate price considering free shipping and handling fee
-     *
-     * @param string $cost
-     * @param string $method
-     * @return float|string
-     */
-    public function getMethodPrice($cost, $method = '')
-    {
-        return $method == $this->getConfigData($this->_freeMethod)
-            && (!$this->getConfigFlag('free_shipping_enable')
-                || $this->getConfigData('free_shipping_subtotal') <= $this->_rawRequest->getBaseSubtotalInclTax())
-            ? '0.00'
-            : $this->getFinalPriceWithHandlingFee($cost);
     }
 
     /**
@@ -459,7 +482,7 @@ abstract class AbstractCarrier extends \Magento\Object
      */
     public function getFinalPriceWithHandlingFee($cost)
     {
-        $handlingFee = $this->getConfigData('handling_fee');
+        $handlingFee = (float)$this->getConfigData('handling_fee');
         $handlingType = $this->getConfigData('handling_type');
         if (!$handlingType) {
             $handlingType = self::HANDLING_TYPE_FIXED;
@@ -469,9 +492,15 @@ abstract class AbstractCarrier extends \Magento\Object
             $handlingAction = self::HANDLING_ACTION_PERORDER;
         }
 
-        return $handlingAction == self::HANDLING_ACTION_PERPACKAGE
-            ? $this->_getPerpackagePrice($cost, $handlingType, $handlingFee)
-            : $this->_getPerorderPrice($cost, $handlingType, $handlingFee);
+        return $handlingAction == self::HANDLING_ACTION_PERPACKAGE ? $this->_getPerpackagePrice(
+            $cost,
+            $handlingType,
+            $handlingFee
+        ) : $this->_getPerorderPrice(
+            $cost,
+            $handlingType,
+            $handlingFee
+        );
     }
 
     /**
@@ -485,7 +514,7 @@ abstract class AbstractCarrier extends \Magento\Object
     protected function _getPerpackagePrice($cost, $handlingType, $handlingFee)
     {
         if ($handlingType == self::HANDLING_TYPE_PERCENT) {
-            return ($cost + ($cost * $handlingFee/100)) * $this->_numBoxes;
+            return ($cost + $cost * $handlingFee / 100) * $this->_numBoxes;
         }
 
         return ($cost + $handlingFee) * $this->_numBoxes;
@@ -502,27 +531,17 @@ abstract class AbstractCarrier extends \Magento\Object
     protected function _getPerorderPrice($cost, $handlingType, $handlingFee)
     {
         if ($handlingType == self::HANDLING_TYPE_PERCENT) {
-            return ($cost * $this->_numBoxes) + ($cost * $this->_numBoxes * $handlingFee / 100);
+            return $cost * $this->_numBoxes + $cost * $this->_numBoxes * $handlingFee / 100;
         }
 
-        return ($cost * $this->_numBoxes) + $handlingFee;
+        return $cost * $this->_numBoxes + $handlingFee;
     }
 
     /**
-     *  Return weight in pounds
+     * Gets the average weight of each box available for shipping
      *
-     *  @param integer Weight in someone measure
-     *  @return float Weight in pounds
-     */
-    public function convertWeightToLbs($weight)
-    {
-        return $weight;
-    }
-
-    /**
-     * set the number of boxes for shipping
-     *
-     * @return weight
+     * @param float $weight in some measure
+     * @return float
      */
     public function getTotalNumOfBoxes($weight)
     {
@@ -530,12 +549,12 @@ abstract class AbstractCarrier extends \Magento\Object
         reset num box first before retrieve again
         */
         $this->_numBoxes = 1;
-        $weight = $this->convertWeightToLbs($weight);
         $maxPackageWeight = $this->getConfigData('max_package_weight');
         if ($weight > $maxPackageWeight && $maxPackageWeight != 0) {
-            $this->_numBoxes = ceil($weight/$maxPackageWeight);
-            $weight = $weight/$this->_numBoxes;
+            $this->_numBoxes = ceil($weight / $maxPackageWeight);
+            $weight = (float)$weight / $this->_numBoxes;
         }
+
         return $weight;
     }
 
@@ -552,7 +571,7 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Check if city option required
      *
-     * @return boolean
+     * @return bool
      */
     public function isCityRequired()
     {
@@ -564,6 +583,7 @@ abstract class AbstractCarrier extends \Magento\Object
      *
      * @param string|null $countryId
      * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function isZipCodeRequired($countryId = null)
     {
@@ -574,13 +594,12 @@ abstract class AbstractCarrier extends \Magento\Object
      * Log debug data to file
      *
      * @param mixed $debugData
+     * @return void
      */
     protected function _debug($debugData)
     {
         if ($this->getDebugFlag()) {
-            $this->_logAdapterFactory->create(array('fileName' => 'shipping_' . $this->getCarrierCode() . '.log'))
-               ->setFilterDataKeys($this->_debugReplacePrivateDataKeys)
-               ->log($debugData);
+            $this->_logger->debug(var_export($debugData, true));
         }
     }
 
@@ -588,6 +607,8 @@ abstract class AbstractCarrier extends \Magento\Object
      * Define if debugging is enabled
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
+     * @api
      */
     public function getDebugFlag()
     {
@@ -598,6 +619,7 @@ abstract class AbstractCarrier extends \Magento\Object
      * Used to call debug method from not Payment Method context
      *
      * @param mixed $debugData
+     * @return void
      */
     public function debugData($debugData)
     {
@@ -617,11 +639,59 @@ abstract class AbstractCarrier extends \Magento\Object
     /**
      * Return content types of package
      *
-     * @param \Magento\Object $params
+     * @param \Magento\Framework\DataObject $params
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getContentTypes(\Magento\Object $params)
+    public function getContentTypes(\Magento\Framework\DataObject $params)
     {
-        return array();
+        return [];
+    }
+
+    /**
+     * Recursive replace sensitive fields of XML document.
+     *
+     * For example if xml document has the following structure:
+     * ```xml
+     * <Request>
+     *     <LicenseNumber>E437FJFD</LicenseNumber>
+     *     <UserId>testUser1</UserId>
+     *     <Password>userPassword</Password>
+     * </Request>
+     * ```
+     * and sensitive fields are specified as `['UserId', 'Password']`, then sensitive fields
+     * will be replaced by the mask(by default it is '****')
+     *
+     * @param string $data
+     * @return string
+     * @since 100.1.0
+     */
+    protected function filterDebugData($data)
+    {
+        try {
+            $xml = new \SimpleXMLElement($data);
+            $this->filterXmlData($xml);
+            $data = $xml->asXML();
+        } catch (\Exception $e) {
+        }
+        return $data;
+    }
+
+    /**
+     * Recursive replace sensitive xml nodes values by specified mask.
+     *
+     * @param \SimpleXMLElement $xml
+     * @return void
+     */
+    private function filterXmlData(\SimpleXMLElement $xml)
+    {
+        /** @var \SimpleXMLElement $child */
+        foreach ($xml->children() as $child) {
+            if ($child->count()) {
+                $this->filterXmlData($child);
+            } elseif (in_array((string) $child->getName(), $this->_debugReplacePrivateDataKeys)) {
+                $child[0] = self::DEBUG_KEYS_MASK;
+            }
+        }
     }
 }

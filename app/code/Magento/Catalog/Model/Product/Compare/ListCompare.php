@@ -1,44 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Model\Product\Compare;
+
+use Magento\Catalog\Model\ProductRepository;
+use Magento\Catalog\Model\ResourceModel\Product\Compare\Item\Collection;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\NoSuchEntityException;
 
 /**
  * Product Compare List Model
  *
+ * @api
  * @SuppressWarnings(PHPMD.LongVariable)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ * @since 100.0.2
  */
-class ListCompare extends \Magento\Object
+class ListCompare extends \Magento\Framework\DataObject
 {
     /**
-     * Log visitor
+     * Customer visitor
      *
-     * @var \Magento\Log\Model\Visitor
+     * @var \Magento\Customer\Model\Visitor
      */
-    protected $_logVisitor;
+    protected $_customerVisitor;
 
     /**
      * Customer session
@@ -50,14 +37,14 @@ class ListCompare extends \Magento\Object
     /**
      * Catalog product compare item
      *
-     * @var \Magento\Catalog\Model\Resource\Product\Compare\Item
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Compare\Item
      */
     protected $_catalogProductCompareItem;
 
     /**
      * Item collection factory
      *
-     * @var \Magento\Catalog\Model\Resource\Product\Compare\Item\CollectionFactory
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Compare\Item\CollectionFactory
      */
     protected $_itemCollectionFactory;
 
@@ -69,28 +56,36 @@ class ListCompare extends \Magento\Object
     protected $_compareItemFactory;
 
     /**
+     * @var ProductRepository
+     */
+    private $productRepository;
+
+    /**
      * Constructor
      *
      * @param \Magento\Catalog\Model\Product\Compare\ItemFactory $compareItemFactory
-     * @param \Magento\Catalog\Model\Resource\Product\Compare\Item\CollectionFactory $itemCollectionFactory
-     * @param \Magento\Catalog\Model\Resource\Product\Compare\Item $catalogProductCompareItem
+     * @param \Magento\Catalog\Model\ResourceModel\Product\Compare\Item\CollectionFactory $itemCollectionFactory
+     * @param \Magento\Catalog\Model\ResourceModel\Product\Compare\Item $catalogProductCompareItem
      * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Log\Model\Visitor $logVisitor
+     * @param \Magento\Customer\Model\Visitor $customerVisitor
      * @param array $data
+     * @param ProductRepository|null $productRepository
      */
     public function __construct(
         \Magento\Catalog\Model\Product\Compare\ItemFactory $compareItemFactory,
-        \Magento\Catalog\Model\Resource\Product\Compare\Item\CollectionFactory $itemCollectionFactory,
-        \Magento\Catalog\Model\Resource\Product\Compare\Item $catalogProductCompareItem,
+        \Magento\Catalog\Model\ResourceModel\Product\Compare\Item\CollectionFactory $itemCollectionFactory,
+        \Magento\Catalog\Model\ResourceModel\Product\Compare\Item $catalogProductCompareItem,
         \Magento\Customer\Model\Session $customerSession,
-        \Magento\Log\Model\Visitor $logVisitor,
-        array $data = array()
+        \Magento\Customer\Model\Visitor $customerVisitor,
+        array $data = [],
+        ProductRepository $productRepository = null
     ) {
         $this->_compareItemFactory = $compareItemFactory;
         $this->_itemCollectionFactory = $itemCollectionFactory;
         $this->_catalogProductCompareItem = $catalogProductCompareItem;
         $this->_customerSession = $customerSession;
-        $this->_logVisitor = $logVisitor;
+        $this->_customerVisitor = $customerVisitor;
+        $this->productRepository = $productRepository ?: ObjectManager::getInstance()->create(ProductRepository::class);
         parent::__construct($data);
     }
 
@@ -98,7 +93,8 @@ class ListCompare extends \Magento\Object
      * Add product to Compare List
      *
      * @param int|\Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Compare\ListCompare
+     * @return $this
+     * @throws \Exception
      */
     public function addProduct($product)
     {
@@ -107,7 +103,7 @@ class ListCompare extends \Magento\Object
         $this->_addVisitorToItem($item);
         $item->loadByProduct($product);
 
-        if (!$item->getId()) {
+        if (!$item->getId() && $this->productExists($product)) {
             $item->addProductData($product);
             $item->save();
         }
@@ -116,10 +112,29 @@ class ListCompare extends \Magento\Object
     }
 
     /**
+     * Check product exists.
+     *
+     * @param int|\Magento\Catalog\Model\Product $product
+     * @return bool
+     */
+    private function productExists($product)
+    {
+        if ($product instanceof \Magento\Catalog\Model\Product && $product->getId()) {
+            return true;
+        }
+        try {
+            $product = $this->productRepository->getById((int)$product);
+            return !empty($product->getId());
+        } catch (NoSuchEntityException $e) {
+            return false;
+        }
+    }
+
+    /**
      * Add products to compare list
      *
-     * @param array $productIds
-     * @return \Magento\Catalog\Model\Product\Compare\ListCompare
+     * @param string[] $productIds
+     * @return $this
      */
     public function addProducts($productIds)
     {
@@ -134,7 +149,7 @@ class ListCompare extends \Magento\Object
     /**
      * Retrieve Compare Items Collection
      *
-     * @return product_compare_item_collection
+     * @return Collection
      */
     public function getItemCollection()
     {
@@ -145,7 +160,7 @@ class ListCompare extends \Magento\Object
      * Remove product from compare list
      *
      * @param int|\Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Compare\ListCompare
+     * @return $this
      */
     public function removeProduct($product)
     {
@@ -165,13 +180,13 @@ class ListCompare extends \Magento\Object
      * Add visitor and customer data to compare item
      *
      * @param \Magento\Catalog\Model\Product\Compare\Item $item
-     * @return \Magento\Catalog\Model\Product\Compare\ListCompare
+     * @return $this
      */
     protected function _addVisitorToItem($item)
     {
-        $item->addVisitorId($this->_logVisitor->getId());
+        $item->addVisitorId($this->_customerVisitor->getId());
         if ($this->_customerSession->isLoggedIn()) {
-            $item->addCustomerData($this->_customerSession->getCustomer());
+            $item->setCustomerId($this->_customerSession->getCustomerId());
         }
 
         return $this;
@@ -186,7 +201,6 @@ class ListCompare extends \Magento\Object
      */
     public function hasItems($customerId, $visitorId)
     {
-        return $this->_catalogProductCompareItem
-            ->getCount($customerId, $visitorId);
+        return (bool)$this->_catalogProductCompareItem->getCount($customerId, $visitorId);
     }
 }

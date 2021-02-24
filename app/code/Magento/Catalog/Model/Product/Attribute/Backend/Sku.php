@@ -1,39 +1,16 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-
-/**
- * Catalog product SKU backend attribute model
- *
- * @category   Magento
- * @package    Magento_Catalog
- * @author     Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Catalog\Model\Product\Attribute\Backend;
 
+use Magento\Catalog\Model\Product;
+
+/**
+ * Catalog product SKU backend attribute model.
+ */
 class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
 {
     /**
@@ -46,39 +23,38 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\Logger $logger
-     * @param \Magento\Stdlib\String $string
+     * @param \Magento\Framework\Stdlib\StringUtils $string
      */
-    public function __construct(
-        \Magento\Logger $logger,
-        \Magento\Stdlib\String $string
-    ) {
+    public function __construct(\Magento\Framework\Stdlib\StringUtils $string)
+    {
         $this->string = $string;
-        parent::__construct($logger);
     }
 
     /**
      * Validate SKU
      *
-     * @param \Magento\Catalog\Model\Product $object
-     * @throws \Magento\Core\Exception
+     * @param Product $object
      * @return bool
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function validate($object)
     {
         $attrCode = $this->getAttribute()->getAttributeCode();
         $value = $object->getData($attrCode);
-        if ($this->getAttribute()->getIsRequired() && $this->getAttribute()->isValueEmpty($value)) {
-            return false;
+        if ($this->getAttribute()->getIsRequired() && strlen($value) === 0) {
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('The "%1" attribute value is empty. Set the attribute and try again.', $attrCode)
+            );
         }
 
         if ($this->string->strlen($object->getSku()) > self::SKU_MAX_LENGTH) {
-            throw new \Magento\Core\Exception(
+            throw new \Magento\Framework\Exception\LocalizedException(
                 __('SKU length should be %1 characters maximum.', self::SKU_MAX_LENGTH)
             );
         }
@@ -88,15 +64,19 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
     /**
      * Generate and set unique SKU to product
      *
-     * @param $object \Magento\Catalog\Model\Product
+     * @param Product $object
+     * @return void
      */
     protected function _generateUniqueSku($object)
     {
         $attribute = $this->getAttribute();
         $entity = $attribute->getEntity();
-        $increment = $this->_getLastSimilarAttributeValueIncrement($attribute, $object);
         $attributeValue = $object->getData($attribute->getAttributeCode());
+        $increment = null;
         while (!$entity->checkAttributeUniqueValue($attribute, $object)) {
+            if ($increment === null) {
+                $increment = $this->_getLastSimilarAttributeValueIncrement($attribute, $object);
+            }
             $sku = trim($attributeValue);
             if (strlen($sku . '-' . ++$increment) > self::SKU_MAX_LENGTH) {
                 $sku = substr($sku, 0, -strlen($increment) - 1);
@@ -109,12 +89,13 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
     /**
      * Make SKU unique before save
      *
-     * @param \Magento\Object $object
-     * @return \Magento\Catalog\Model\Product\Attribute\Backend\Sku
+     * @param Product $object
+     * @return $this
      */
     public function beforeSave($object)
     {
         $this->_generateUniqueSku($object);
+        $this->trimValue($object);
         return parent::beforeSave($object);
     }
 
@@ -122,26 +103,42 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
      * Return increment needed for SKU uniqueness
      *
      * @param \Magento\Eav\Model\Entity\Attribute\AbstractAttribute $attribute
-     * @param \Magento\Catalog\Model\Product $object
+     * @param Product $object
      * @return int
      */
     protected function _getLastSimilarAttributeValueIncrement($attribute, $object)
     {
-        $adapter = $this->getAttribute()->getEntity()->getReadConnection();
-        $select = $adapter->select();
+        $connection = $this->getAttribute()->getEntity()->getConnection();
+        $select = $connection->select();
         $value = $object->getData($attribute->getAttributeCode());
-        $bind = array(
-            'entity_type_id' => $attribute->getEntityTypeId(),
-            'attribute_code' => trim($value) . '-%'
-        );
+        $bind = ['attribute_code' => trim($value) . '-%'];
 
-        $select
-            ->from($this->getTable(), $attribute->getAttributeCode())
-            ->where('entity_type_id = :entity_type_id')
-            ->where($attribute->getAttributeCode() . ' LIKE :attribute_code')
-            ->order(array('entity_id DESC', $attribute->getAttributeCode() . ' ASC'))
-            ->limit(1);
-        $data = $adapter->fetchOne($select, $bind);
+        $select->from(
+            $this->getTable(),
+            $attribute->getAttributeCode()
+        )->where(
+            $attribute->getAttributeCode() . ' LIKE :attribute_code'
+        )->order(
+            ['entity_id DESC', $attribute->getAttributeCode() . ' ASC']
+        )->limit(
+            1
+        );
+        $data = $connection->fetchOne($select, $bind);
         return abs((int)str_replace($value, '', $data));
+    }
+
+    /**
+     * Remove extra spaces from attribute value before save.
+     *
+     * @param Product $object
+     * @return void
+     */
+    private function trimValue($object)
+    {
+        $attrCode = $this->getAttribute()->getAttributeCode();
+        $value = $object->getData($attrCode);
+        if ($value) {
+            $object->setData($attrCode, trim($value));
+        }
     }
 }

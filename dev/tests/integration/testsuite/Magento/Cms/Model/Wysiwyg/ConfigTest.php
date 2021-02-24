@@ -1,119 +1,89 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Core
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Cms\Model\Wysiwyg;
+
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestModuleWysiwygConfig\Model\Config as TestModuleWysiwygConfig;
 
 /**
  * @magentoAppArea adminhtml
  */
-class ConfigTest extends \PHPUnit_Framework_TestCase
+class ConfigTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Cms\Model\Wysiwyg\Config
      */
-    protected $_model;
+    private $model;
 
-    protected function setUp()
+    /**
+     * {@inheritdoc}
+     */
+    protected function setUp(): void
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Config\ScopeInterface')
-            ->setCurrentScope(\Magento\Backend\App\Area\FrontNameResolver::AREA_CODE);
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Cms\Model\Wysiwyg\Config');
+        $objectManager = Bootstrap::getObjectManager();
+        $this->model = $objectManager->create(\Magento\Cms\Model\Wysiwyg\Config::class);
     }
 
     /**
      * Tests that config returns valid config array in it
+     *
+     * @return void
      */
     public function testGetConfig()
     {
-        $config = $this->_model->getConfig();
-        $this->assertInstanceOf('Magento\Object', $config);
+        $config = $this->model->getConfig();
+        $this->assertInstanceOf(\Magento\Framework\DataObject::class, $config);
     }
 
     /**
-     * Tests that config returns right urls going to static js library
-     */
-    public function testGetConfigJsUrls()
-    {
-        $config = $this->_model->getConfig();
-        $this->assertStringMatchesFormat('http://localhost/pub/lib/%s', $config->getPopupCss());
-        $this->assertStringMatchesFormat('http://localhost/pub/lib/%s', $config->getContentCss());
-    }
-
-    /**
-     * Tests that config doesn't process incoming already prepared data
+     * Tests that config returns right urls going to the published library path
      *
-     * @dataProvider getConfigNoProcessingDataProvider
+     * @return void
      */
-    public function testGetConfigNoProcessing($original)
+    public function testGetConfigCssUrls()
     {
-        $config = $this->_model->getConfig($original);
-        $actual = $config->getData();
-        foreach (array_keys($actual) as $key) {
-            if (!isset($original[$key])) {
-                unset($actual[$key]);
+        $config = $this->model->getConfig();
+        $publicPathPattern = 'http://localhost/static/%s/adminhtml/Magento/backend/en_US/%s';
+        $tinyMce4Config = $config->getData('tinymce4');
+        $contentCss = $tinyMce4Config['content_css'];
+        if (is_array($contentCss)) {
+            foreach ($contentCss as $url) {
+                $this->assertStringMatchesFormat($publicPathPattern, $url);
             }
+        } else {
+            $this->assertStringMatchesFormat($publicPathPattern, $contentCss);
         }
-        $this->assertEquals($original, $actual);
     }
 
     /**
-     * @return array
+     * Test enabled module is able to modify WYSIWYG config
+     *
+     * @return void
+     *
+     * @magentoConfigFixture default/cms/wysiwyg/editor Magento_TestModuleWysiwygConfig/wysiwyg/tinymce4TestAdapter
      */
-    public function getConfigNoProcessingDataProvider()
+    public function testTestModuleEnabledModuleIsAbleToModifyConfig()
     {
-        return array(
-            array(
-                array(
-                    'files_browser_window_url'      => 'http://example.com/111/',
-                    'directives_url'                => 'http://example.com/222/',
-                    'popup_css'                     => 'http://example.com/333/popup.css',
-                    'content_css'                   => 'http://example.com/444/content.css',
-                    'directives_url_quoted'         => 'http://example.com/555/'
-                )
-            ),
-            array(
-                array(
-                    'files_browser_window_url'      => '/111/',
-                    'directives_url'                => '/222/',
-                    'popup_css'                     => '/333/popup.css',
-                    'content_css'                   => '/444/content.css',
-                    'directives_url_quoted'         => '/555/'
-                )
-            ),
-            array(
-                array(
-                    'files_browser_window_url'      => '111/',
-                    'directives_url'                => '222/',
-                    'popup_css'                     => '333/popup.css',
-                    'content_css'                   => '444/content.css',
-                    'directives_url_quoted'         => '555/'
-                )
-            )
+        $objectManager = Bootstrap::getObjectManager();
+        $compositeConfigProvider = $objectManager->create(\Magento\Cms\Model\Wysiwyg\CompositeConfigProvider::class);
+        $model = $objectManager->create(
+            \Magento\Cms\Model\Wysiwyg\Config::class,
+            ['configProvider' => $compositeConfigProvider]
+        );
+        $config = $model->getConfig();
+        // @phpstan-ignore-next-line
+        $this->assertEquals(TestModuleWysiwygConfig::CONFIG_HEIGHT, $config['height']);
+        // @phpstan-ignore-next-line
+        $this->assertEquals(TestModuleWysiwygConfig::CONFIG_CONTENT_CSS, $config['content_css']);
+        $this->assertArrayHasKey('tinymce4', $config);
+        $this->assertArrayHasKey('toolbar', $config['tinymce4']);
+        $this->assertStringNotContainsString(
+            'charmap',
+            $config['tinymce4']['toolbar'],
+            'Failed to address that the custom test module removes "charmap" button from the toolbar'
         );
     }
 }

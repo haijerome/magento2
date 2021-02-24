@@ -1,101 +1,195 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Model;
+
+use Magento\Customer\Api\AddressMetadataInterface;
+use Magento\Customer\Api\Data\AddressInterface;
+use Magento\Customer\Api\Data\AddressInterfaceFactory;
+use Magento\Customer\Api\Data\RegionInterfaceFactory;
+use Magento\Framework\Indexer\StateInterface;
 
 /**
  * Customer address model
  *
- * @method int getParentId() getParentId()
- * @method \Magento\Customer\Model\Address setParentId() setParentId(int $parentId)
+ * @api
+ * @method int getParentId()
+ * @method \Magento\Customer\Model\Address setParentId(int $parentId)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
-namespace Magento\Customer\Model;
-
 class Address extends \Magento\Customer\Model\Address\AbstractAddress
 {
     /**
      * Customer entity
      *
-     * @var \Magento\Customer\Model\Customer
+     * @var Customer
      */
     protected $_customer;
 
     /**
-     * @var \Magento\Customer\Model\CustomerFactory
+     * @var CustomerFactory
      */
     protected $_customerFactory;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @var \Magento\Framework\Reflection\DataObjectProcessor
+     */
+    protected $dataProcessor;
+
+    /**
+     * @var \Magento\Framework\Api\DataObjectHelper
+     */
+    protected $dataObjectHelper;
+
+    /**
+     * @var \Magento\Framework\Indexer\IndexerRegistry
+     */
+    protected $indexerRegistry;
+
+    /**
+     * @var \Magento\Customer\Model\Address\CustomAttributeListInterface
+     */
+    private $attributeList;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory
      * @param \Magento\Directory\Helper\Data $directoryData
      * @param \Magento\Eav\Model\Config $eavConfig
-     * @param \Magento\Customer\Model\Address\Config $addressConfig
+     * @param Address\Config $addressConfig
      * @param \Magento\Directory\Model\RegionFactory $regionFactory
      * @param \Magento\Directory\Model\CountryFactory $countryFactory
-     * @param \Magento\Customer\Model\CustomerFactory $customerFactory
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param AddressMetadataInterface $metadataService
+     * @param AddressInterfaceFactory $addressDataFactory
+     * @param RegionInterfaceFactory $regionDataFactory
+     * @param \Magento\Framework\Api\DataObjectHelper $dataObjectHelper
+     * @param CustomerFactory $customerFactory
+     * @param \Magento\Framework\Reflection\DataObjectProcessor $dataProcessor
+     * @param \Magento\Framework\Indexer\IndexerRegistry $indexerRegistry
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
      * @param array $data
+     *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
         \Magento\Directory\Helper\Data $directoryData,
         \Magento\Eav\Model\Config $eavConfig,
         \Magento\Customer\Model\Address\Config $addressConfig,
         \Magento\Directory\Model\RegionFactory $regionFactory,
         \Magento\Directory\Model\CountryFactory $countryFactory,
-        \Magento\Customer\Model\CustomerFactory $customerFactory,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        AddressMetadataInterface $metadataService,
+        AddressInterfaceFactory $addressDataFactory,
+        RegionInterfaceFactory $regionDataFactory,
+        \Magento\Framework\Api\DataObjectHelper $dataObjectHelper,
+        CustomerFactory $customerFactory,
+        \Magento\Framework\Reflection\DataObjectProcessor $dataProcessor,
+        \Magento\Framework\Indexer\IndexerRegistry $indexerRegistry,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
+        $this->dataProcessor = $dataProcessor;
         $this->_customerFactory = $customerFactory;
+        $this->indexerRegistry = $indexerRegistry;
         parent::__construct(
             $context,
             $registry,
+            $extensionFactory,
+            $customAttributeFactory,
             $directoryData,
             $eavConfig,
             $addressConfig,
             $regionFactory,
             $countryFactory,
+            $metadataService,
+            $addressDataFactory,
+            $regionDataFactory,
+            $dataObjectHelper,
             $resource,
             $resourceCollection,
             $data
         );
     }
 
+    /**
+     * Initialize address model
+     *
+     * @return void
+     */
     protected function _construct()
     {
-        $this->_init('Magento\Customer\Model\Resource\Address');
+        $this->_init(\Magento\Customer\Model\ResourceModel\Address::class);
+    }
+
+    /**
+     * Update Model with the data from Data Interface
+     *
+     * @param AddressInterface $address
+     * @return $this
+     * Use Api/RepositoryInterface for the operations in the Data Interfaces. Don't rely on Address Model
+     */
+    public function updateData(AddressInterface $address)
+    {
+        // Set all attributes
+        $attributes = $this->dataProcessor
+            ->buildOutputDataArray($address, \Magento\Customer\Api\Data\AddressInterface::class);
+
+        foreach ($attributes as $attributeCode => $attributeData) {
+            if (AddressInterface::REGION === $attributeCode) {
+                $this->setRegion($address->getRegion()->getRegion());
+                $this->setRegionCode($address->getRegion()->getRegionCode());
+                $this->setRegionId($address->getRegion()->getRegionId());
+            } else {
+                $this->setDataUsingMethod($attributeCode, $attributeData);
+            }
+        }
+        // Need to explicitly set this due to discrepancy in the keys between model and data object
+        $this->setIsDefaultBilling($address->isDefaultBilling());
+        $this->setIsDefaultShipping($address->isDefaultShipping());
+        $customAttributes = $address->getCustomAttributes();
+        if ($customAttributes !== null) {
+            foreach ($customAttributes as $attribute) {
+                $this->setData($attribute->getAttributeCode(), $attribute->getValue());
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Create address data object based on current address model.
+     *
+     * @param int|null $defaultBillingAddressId
+     * @param int|null $defaultShippingAddressId
+     * @return AddressInterface
+     * Use Api/Data/AddressInterface as a result of service operations. Don't rely on the model to provide
+     * the instance of Api/Data/AddressInterface
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     */
+    public function getDataModel($defaultBillingAddressId = null, $defaultShippingAddressId = null)
+    {
+        if ($this->getCustomerId() || $this->getParentId()) {
+            $customer = $this->getCustomer();
+            $defaultBillingAddressId = $customer->getDefaultBilling() ?: $defaultBillingAddressId;
+            $defaultShippingAddressId = $customer->getDefaultShipping() ?: $defaultShippingAddressId;
+        }
+        return parent::getDataModel($defaultBillingAddressId, $defaultShippingAddressId);
     }
 
     /**
      * Retrieve address customer identifier
      *
-     * @return integer
+     * @return int
      */
     public function getCustomerId()
     {
@@ -105,8 +199,8 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     /**
      * Declare address customer identifier
      *
-     * @param integer $id
-     * @return \Magento\Customer\Model\Address
+     * @param int $id
+     * @return $this
      */
     public function setCustomerId($id)
     {
@@ -118,7 +212,7 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     /**
      * Retrieve address customer
      *
-     * @return \Magento\Customer\Model\Customer|bool
+     * @return Customer|false
      */
     public function getCustomer()
     {
@@ -126,8 +220,7 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
             return false;
         }
         if (empty($this->_customer)) {
-            $this->_customer = $this->_createCustomer()
-                ->load($this->getCustomerId());
+            $this->_customer = $this->_createCustomer()->load($this->getCustomerId());
         }
         return $this->_customer;
     }
@@ -135,10 +228,10 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     /**
      * Specify address customer
      *
-     * @param \Magento\Customer\Model\Customer $customer
-     * @return \Magento\Customer\Model\Address
+     * @param Customer $customer
+     * @return $this
      */
-    public function setCustomer(\Magento\Customer\Model\Customer $customer)
+    public function setCustomer(Customer $customer)
     {
         $this->_customer = $customer;
         $this->setCustomerId($customer->getId());
@@ -146,34 +239,35 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     }
 
     /**
-     * Delete customer address
-     *
-     * @return \Magento\Customer\Model\Address
-     */
-    public function delete()
-    {
-        parent::delete();
-        $this->setData(array());
-        return $this;
-    }
-
-    /**
      * Retrieve address entity attributes
      *
-     * @return array
+     * @return Attribute[]
      */
     public function getAttributes()
     {
         $attributes = $this->getData('attributes');
-        if (is_null($attributes)) {
-            $attributes = $this->_getResource()
-                ->loadAllAttributes($this)
-                ->getSortedAttributes();
+        if ($attributes === null) {
+            $attributes = $this->_getResource()->loadAllAttributes($this)->getSortedAttributes();
             $this->setData('attributes', $attributes);
         }
         return $attributes;
     }
 
+    /**
+     * Get attributes created by default
+     *
+     * @return string[]
+     */
+    public function getDefaultAttributeCodes()
+    {
+        return $this->_getResource()->getDefaultAttributes();
+    }
+
+    /**
+     * Clone address
+     *
+     * @return void
+     */
     public function __clone()
     {
         $this->setId(null);
@@ -190,47 +284,121 @@ class Address extends \Magento\Customer\Model\Address\AbstractAddress
     }
 
     /**
-     * Return Entity Type ID
-     *
-     * @return int
-     */
-    public function getEntityTypeId()
-    {
-        $entityTypeId = $this->getData('entity_type_id');
-        if (!$entityTypeId) {
-            $entityTypeId = $this->getEntityType()->getId();
-            $this->setData('entity_type_id', $entityTypeId);
-        }
-        return $entityTypeId;
-    }
-
-    /**
      * Return Region ID
      *
      * @return int
      */
     public function getRegionId()
     {
-        return (int) $this->getData('region_id');
+        return (int)$this->getData('region_id');
     }
 
     /**
      * Set Region ID. $regionId is automatically converted to integer
      *
      * @param int $regionId
-     * @return \Magento\Customer\Model\Address
+     * @return $this
      */
     public function setRegionId($regionId)
     {
-        $this->setData('region_id', (int) $regionId);
+        $this->setData('region_id', (int)$regionId);
         return $this;
     }
 
     /**
-     * @return \Magento\Customer\Model\Customer
+     * Create customer model
+     *
+     * @return Customer
      */
     protected function _createCustomer()
     {
         return $this->_customerFactory->create();
+    }
+
+    /**
+     * Return Entity Type ID
+     *
+     * @return int
+     */
+    public function getEntityTypeId()
+    {
+        return $this->getEntityType()->getId();
+    }
+
+    /**
+     * Processing object after save data
+     *
+     * @return $this
+     */
+    public function afterSave()
+    {
+        $indexer = $this->indexerRegistry->get(Customer::CUSTOMER_GRID_INDEXER_ID);
+        if ($indexer->getState()->getStatus() == StateInterface::STATUS_VALID) {
+            $this->_getResource()->addCommitCallback([$this, 'reindex']);
+        }
+        return parent::afterSave();
+    }
+
+    /**
+     * Init indexing process after customer delete
+     *
+     * @return \Magento\Framework\Model\AbstractModel
+     */
+    public function afterDeleteCommit()
+    {
+        $this->reindex();
+        return parent::afterDeleteCommit();
+    }
+
+    /**
+     * Init indexing process after customer save
+     *
+     * @return void
+     */
+    public function reindex()
+    {
+        /** @var \Magento\Framework\Indexer\IndexerInterface $indexer */
+        $indexer = $this->indexerRegistry->get(Customer::CUSTOMER_GRID_INDEXER_ID);
+        $indexer->reindexRow($this->getCustomerId());
+    }
+
+    /**
+     * Get a list of custom attribute codes.
+     *
+     * By default, entity can be extended only using extension attributes functionality.
+     *
+     * @return string[]
+     * @since 100.0.6
+     */
+    protected function getCustomAttributesCodes()
+    {
+        return array_keys($this->getAttributeList()->getAttributes());
+    }
+
+    /**
+     * Get new AttributeList dependency for application code.
+     *
+     * @return \Magento\Customer\Model\Address\CustomAttributeListInterface
+     * @deprecated 100.0.6
+     */
+    private function getAttributeList()
+    {
+        if (!$this->attributeList) {
+            $this->attributeList = \Magento\Framework\App\ObjectManager::getInstance()->get(
+                \Magento\Customer\Model\Address\CustomAttributeListInterface::class
+            );
+        }
+        return $this->attributeList;
+    }
+
+    /**
+     * Retrieve attribute set id for customer address.
+     *
+     * @return int
+     * @since 101.0.0
+     */
+    public function getAttributeSetId()
+    {
+        return parent::getAttributeSetId() ?: AddressMetadataInterface::ATTRIBUTE_SET_ID_ADDRESS;
     }
 }

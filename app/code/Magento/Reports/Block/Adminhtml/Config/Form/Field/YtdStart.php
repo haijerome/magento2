@@ -1,59 +1,41 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Dashboard Year-To-Date Month and Day starts Field Renderer
- *
- * @category   Magento
- * @package    Magento_Reports
- * @author     Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Reports\Block\Adminhtml\Config\Form\Field;
 
-class YtdStart extends \Magento\Backend\Block\System\Config\Form\Field
+use Magento\Config\Block\System\Config\Form\Field;
+use Magento\Framework\Data\Form\Element\AbstractElement;
+
+/**
+ * Dashboard Year-To-Date Month and Day starts Field Renderer
+ */
+class YtdStart extends Field
 {
-    protected function _getElementHtml(\Magento\Data\Form\Element\AbstractElement $element)
+    /**
+     * Get Month and Day Element
+     *
+     * @param AbstractElement $element
+     * @return string
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     */
+    protected function _getElementHtml(AbstractElement $element)
     {
-        $_months = array();
+        $_months = [];
         for ($i = 1; $i <= 12; $i++) {
-            $_months[$i] = $this->_locale->date(mktime(null, null, null, $i))
-                ->get(\Zend_Date::MONTH_NAME);
+            $month = $this->_localeDate->date(mktime(null, null, null, $i, 1))
+                ->format('m');
+            $_months[$month] = $month;
         }
+        ksort($_months);
 
-        $_days = array();
+        $_days = [];
         for ($i = 1; $i <= 31; $i++) {
-            $_days[$i] = $i < 10 ? '0'.$i : $i;
+            $_days[$i] = $i < 10 ? '0' . $i : $i;
         }
 
-        if ($element->getValue()) {
-            $values = explode(',', $element->getValue());
-        } else {
-            $values = array();
-        }
-
+        $values = $element->getValue() ? explode(',', $element->getValue()) : [];
         $element->setName($element->getName() . '[]');
 
         $_monthsHtml = $element->setStyle('width:100px;')

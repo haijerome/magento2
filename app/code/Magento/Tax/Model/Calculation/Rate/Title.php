@@ -1,58 +1,107 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Tax Rate Title Model
  *
- * @method \Magento\Tax\Model\Resource\Calculation\Rate\Title _getResource()
- * @method \Magento\Tax\Model\Resource\Calculation\Rate\Title getResource()
  * @method int getTaxCalculationRateId()
- * @method \Magento\Tax\Model\Calculation\Rate\Title setTaxCalculationRateId(int $value)
- * @method int getStoreId()
- * @method \Magento\Tax\Model\Calculation\Rate\Title setStoreId(int $value)
- * @method string getValue()
- * @method \Magento\Tax\Model\Calculation\Rate\Title setValue(string $value)
  *
- * @category    Magento
- * @package     Magento_Tax
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Tax\Model\Calculation\Rate;
 
-class Title extends \Magento\Core\Model\AbstractModel
+use Magento\Tax\Api\Data\TaxRateTitleInterface;
+
+class Title extends \Magento\Framework\Model\AbstractExtensibleModel implements TaxRateTitleInterface
 {
+    /**#@+
+     *
+     * Tax rate field key.
+     */
+    const KEY_STORE_ID = 'store_id';
+    const KEY_VALUE_ID = 'value';
+    /**#@-*/
+
+    /**
+     * @return void
+     */
     protected function _construct()
     {
-        $this->_init('Magento\Tax\Model\Resource\Calculation\Rate\Title');
+        $this->_init(\Magento\Tax\Model\ResourceModel\Calculation\Rate\Title::class);
     }
 
+    /**
+     * @param int $rateId
+     * @return $this
+     */
     public function deleteByRateId($rateId)
     {
         $this->getResource()->deleteByRateId($rateId);
         return $this;
+    }
+
+    /**
+     * @codeCoverageIgnoreStart
+     * {@inheritdoc}
+     */
+    public function getStoreId()
+    {
+        return $this->getData(self::KEY_STORE_ID);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getValue()
+    {
+        return $this->getData(self::KEY_VALUE_ID);
+    }
+
+    /**
+     * Set store id
+     *
+     * @param string $storeId
+     * @return $this
+     */
+    public function setStoreId($storeId)
+    {
+        return $this->setData(self::KEY_STORE_ID, $storeId);
+    }
+
+    /**
+     * Set title value
+     *
+     * @param string $value
+     * @return string
+     */
+    public function setValue($value)
+    {
+        return $this->setData(self::KEY_VALUE_ID, $value);
+    }
+
+    // @codeCoverageIgnoreEnd
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return \Magento\Tax\Api\Data\TaxRateTitleExtensionInterface|null
+     */
+    public function getExtensionAttributes()
+    {
+        return $this->_getExtensionAttributes();
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @param \Magento\Tax\Api\Data\TaxRateTitleExtensionInterface $extensionAttributes
+     * @return $this
+     */
+    public function setExtensionAttributes(\Magento\Tax\Api\Data\TaxRateTitleExtensionInterface $extensionAttributes)
+    {
+        return $this->_setExtensionAttributes($extensionAttributes);
     }
 }

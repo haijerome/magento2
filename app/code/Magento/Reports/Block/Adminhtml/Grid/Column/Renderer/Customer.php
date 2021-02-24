@@ -1,58 +1,34 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
+namespace Magento\Reports\Block\Adminhtml\Grid\Column\Renderer;
 
 /**
  * Adminhtml Report Customers Reviews renderer
  *
- * @category   Magento
- * @package    Magento_Reports
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Reports\Block\Adminhtml\Grid\Column\Renderer;
-
-class Customer
-    extends \Magento\Adminhtml\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+class Customer extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
     /**
      * Renders grid column
      *
-     * @param   \Magento\Object $row
-     * @return  string
+     * @param \Magento\Framework\DataObject $row
+     * @return \Magento\Framework\Phrase|string
      */
-    public function render(\Magento\Object $row)
+    public function render(\Magento\Framework\DataObject $row)
     {
-        $id   = $row->getCustomerId();
+        $id = $row->getCustomerId();
 
         if (!$id) {
             return __('Show Reviews');
         }
 
-        return sprintf('<a href="%s">%s</a>',
-            $this->getUrl('adminhtml/catalog_product_review', array('customerId' => $id)),
+        return sprintf(
+            '<a href="%s">%s</a>',
+            $this->getUrl('review/product/', ['customerId' => $id]),
             __('Show Reviews')
         );
     }

@@ -1,42 +1,23 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
 namespace Magento\Widget\Model\Widget;
 
-class InstanceTest extends \PHPUnit_Framework_TestCase
+class InstanceTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Widget\Model\Widget\Instance
      */
     protected $_model;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Widget\Model\Widget\Instance');
+        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
+            \Magento\Widget\Model\Widget\Instance::class
+        );
     }
 
     public function testSetGetType()
@@ -48,12 +29,11 @@ class InstanceTest extends \PHPUnit_Framework_TestCase
 
     public function testSetThemeId()
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\App\State')
+        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(\Magento\Framework\App\State::class)
             ->setAreaCode('frontend');
-        $theme = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->get('Magento\View\DesignInterface')
-            ->setDefaultDesignTheme()
-            ->getDesignTheme();
+        $theme = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+            \Magento\Framework\View\DesignInterface::class
+        )->setDefaultDesignTheme()->getDesignTheme();
         $this->_model->setThemeId($theme->getId());
 
         $this->assertEquals($theme->getId(), $this->_model->getThemeId());
@@ -64,22 +44,26 @@ class InstanceTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetWidgetConfigAsArray()
     {
-        $this->markTestIncomplete('Functionality is failed because widget'
-            . ' "app/design/frontend/magento_iphone_html5/etc/widget.xml" replaces'
-            . ' "new_products" widget in Catalog module');
-        $config = $this->_model->setType('Magento\Catalog\Block\Product\Widget\NewWidget')->getWidgetConfigAsArray();
-        $this->assertTrue(is_array($config));
+        $config = $this->_model->setType(\Magento\Catalog\Block\Product\Widget\NewWidget::class)
+            ->getWidgetConfigAsArray();
+        $this->assertIsArray($config);
         $element = null;
-        if (isset($config['parameters']) && isset($config['parameters']['template'])
-            && isset($config['parameters']['template']['values'])
-            && isset($config['parameters']['template']['values']['list'])
+        if (isset(
+            $config['parameters']
+        ) && isset(
+            $config['parameters']['template']
+        ) && isset(
+            $config['parameters']['template']['values']
+        ) && isset(
+            $config['parameters']['template']['values']['list']
+        )
         ) {
             $element = $config['parameters']['template']['values']['list'];
         }
-        $expected = array(
+        $expected = [
             'value' => 'product/widget/new/content/new_list.phtml',
-            'label' => 'New Products List Template'
-        );
+            'label' => 'New Products List Template',
+        ];
         $this->assertNotNull($element);
         $this->assertEquals($expected, $element);
 
@@ -91,15 +75,13 @@ class InstanceTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetWidgetSupportedContainers()
     {
-        $this->markTestIncomplete('Functionality is failed because widget'
-            . ' "app/design/frontend/magento_iphone_html5/etc/widget.xml" replaces'
-            . ' "new_products" widget in Catalog module');
-        $this->_model->setType('Magento\Catalog\Block\Product\Widget\NewWidget');
+        $this->_model->setType(\Magento\Catalog\Block\Product\Widget\NewWidget::class);
         $containers = $this->_model->getWidgetSupportedContainers();
-        $this->assertInternalType('array', $containers);
-        $this->assertContains('left', $containers);
+        $this->assertIsArray($containers);
+        $this->assertContains('sidebar.main', $containers);
         $this->assertContains('content', $containers);
-        $this->assertContains('right', $containers);
+        $this->assertContains('sidebar.additional', $containers);
+
         return $this->_model;
     }
 
@@ -111,7 +93,7 @@ class InstanceTest extends \PHPUnit_Framework_TestCase
     {
         $templates = $model->getWidgetSupportedTemplatesByContainer('content');
         $this->assertNotEmpty($templates);
-        $this->assertInternalType('array', $templates);
+        $this->assertIsArray($templates);
         foreach ($templates as $row) {
             $this->assertArrayHasKey('value', $row);
             $this->assertArrayHasKey('label', $row);
@@ -119,25 +101,76 @@ class InstanceTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
+     * @covers  \Magento\Widget\Model\Widget\Instance::generateLayoutUpdateXml()
+     * @covers  \Magento\Widget\Model\Widget\Instance::getWidgetParameters()
      * @param \Magento\Widget\Model\Widget\Instance $model
      * @depends testGetWidgetConfigAsArray
      */
     public function testGenerateLayoutUpdateXml(\Magento\Widget\Model\Widget\Instance $model)
     {
-        $params = array(
+        $params = [
             'display_mode' => 'fixed',
-            'types'        => array('type_1', 'type_2'),
-        );
+            'types' => ['type_1', 'type_2'],
+            'conditions' => [
+                '1' => [
+                    'type' => \Magento\CatalogWidget\Model\Rule\Condition\Combine::class,
+                    'aggregator' => 'all',
+                    'value' => '1',
+                    'new_child' => '',
+                ],
+                '1--1' => [
+                    'type' => \Magento\CatalogWidget\Model\Rule\Condition\Product::class,
+                    'attribute' => 'attribute_set_id',
+                    'value' => '4',
+                    'operator' => '==',
+                ],
+            ],
+        ];
         $model->setData('widget_parameters', $params);
         $this->assertEquals('', $model->generateLayoutUpdateXml('content'));
-        $model->setId('test_id')->setPackageTheme('magento_plushe');
+        $model->setId('test_id')->setPackageTheme('Magento/luma');
         $result = $model->generateLayoutUpdateXml('content');
-        $this->assertContains('<referenceContainer name="content">', $result);
-        $this->assertContains('<block class="' . $model->getType() . '"', $result);
+        $this->assertStringContainsString('<body><referenceContainer name="content">', $result);
+        $this->assertStringContainsString('<block class="' . $model->getType() . '"', $result);
         $this->assertEquals(count($params), substr_count($result, '<action method="setData">'));
-        $this->assertContains('<argument name="name" xsi:type="string">display_mode</argument>', $result);
-        $this->assertContains('<argument name="value" xsi:type="string">fixed</argument>', $result);
-        $this->assertContains('<argument name="name" xsi:type="string">types</argument>', $result);
-        $this->assertContains('<argument name="value" xsi:type="string">type_1,type_2</argument>', $result);
+        $this->assertStringContainsString('<argument name="name" xsi:type="string">display_mode</argument>', $result);
+        $this->assertStringContainsString('<argument name="value" xsi:type="string">fixed</argument>', $result);
+        $this->assertStringContainsString('<argument name="name" xsi:type="string">types</argument>', $result);
+        $this->assertStringContainsString('<argument name="value" xsi:type="string">type_1,type_2</argument>', $result);
+        $this->assertStringContainsString(
+            '<argument name="name" xsi:type="string">conditions_encoded</argument>',
+            $result
+        );
+        $this->assertStringContainsString('`Magento||CatalogWidget||Model||Rule||Condition||Combine`', $result);
+        $this->assertStringContainsString('`Magento||CatalogWidget||Model||Rule||Condition||Product`', $result);
+    }
+
+    /**
+     * @covers \Magento\Widget\Model\Widget\Instance::beforeSave()
+     * @magentoDataFixture Magento/Widget/_files/new_widget.php
+     * @dataProvider beforeSaveDataProvider
+     * @param array $expected
+     */
+    public function testBeforeSave(array $expected)
+    {
+        /** @var \Magento\Widget\Model\ResourceModel\Widget\Instance $resourceModel */
+        $resourceModel = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
+            ->get(\Magento\Widget\Model\ResourceModel\Widget\Instance::class);
+        $resourceModel->load($this->_model, 'Magento\Widget\NewSampleWidget', 'instance_type');
+
+        $this->assertSame($expected, $this->_model->getWidgetParameters());
+    }
+
+    /**
+     * @return array
+     */
+    public function beforeSaveDataProvider()
+    {
+        return [
+            # Variation 1
+            [
+                ['block_id' => '2']
+            ]
+        ];
     }
 }

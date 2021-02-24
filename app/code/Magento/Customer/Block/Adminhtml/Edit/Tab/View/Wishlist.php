@@ -1,73 +1,57 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Adminhtml\Edit\Tab\View;
+
+use Magento\Customer\Controller\RegistryConstants;
 
 /**
  * Adminhtml customer view wishlist block
  *
- * @category   Magento
- * @package    Magento_Customer
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Customer\Block\Adminhtml\Edit\Tab\View;
-
-class Wishlist extends \Magento\Adminhtml\Block\Widget\Grid
+class Wishlist extends \Magento\Backend\Block\Widget\Grid\Extended
 {
     /**
-     * Core registry
+     * Core registry.
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @var \Magento\Wishlist\Model\Resource\Item\CollectionFactory
+     * Wishlist item collection factory.
+     *
+     * @var \Magento\Wishlist\Model\ResourceModel\Item\CollectionFactory
      */
     protected $_collectionFactory;
 
     /**
+     * Constructor
+     *
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Wishlist\Model\Resource\Item\CollectionFactory $collectionFactory
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * @param \Magento\Backend\Helper\Data $backendHelper
+     * @param \Magento\Wishlist\Model\ResourceModel\Item\CollectionFactory $collectionFactory
+     * @param \Magento\Framework\Registry $coreRegistry
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Wishlist\Model\Resource\Item\CollectionFactory $collectionFactory,
-        \Magento\Core\Model\Registry $coreRegistry,
-        array $data = array()
+        \Magento\Backend\Helper\Data $backendHelper,
+        \Magento\Wishlist\Model\ResourceModel\Item\CollectionFactory $collectionFactory,
+        \Magento\Framework\Registry $coreRegistry,
+        array $data = []
     ) {
         $this->_coreRegistry = $coreRegistry;
         $this->_collectionFactory = $collectionFactory;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
     /**
-     * Initial settings
+     * Initial settings.
      *
      * @return void
      */
@@ -78,21 +62,21 @@ class Wishlist extends \Magento\Adminhtml\Block\Widget\Grid
         $this->setSortable(false);
         $this->setPagerVisibility(false);
         $this->setFilterVisibility(false);
-        $this->setEmptyText(__("There are no items in customer's wishlist at the moment"));
+        $this->setEmptyText(__('There are no items in customer\'s shopping cart.'));
     }
 
     /**
-     * Prepare collection
+     * Prepare collection.
      *
-     * @return \Magento\Customer\Block\Adminhtml\Edit\Tab\View\Wishlist
+     * @return $this
      */
     protected function _prepareCollection()
     {
-        $collection = $this->_collectionFactory->create()
-            ->addCustomerIdFilter($this->_coreRegistry->registry('current_customer')->getId())
-            ->addDaysInWishlist()
-            ->addStoreData()
-            ->setInStockFilter(true);
+        $collection = $this->_collectionFactory->create()->addCustomerIdFilter(
+            $this->_coreRegistry->registry(RegistryConstants::CURRENT_CUSTOMER_ID)
+        )->addDaysInWishlist()->addStoreData()->setInStockFilter(
+            true
+        );
 
         $this->setCollection($collection);
 
@@ -100,47 +84,47 @@ class Wishlist extends \Magento\Adminhtml\Block\Widget\Grid
     }
 
     /**
-     * Prepare columns
+     * Prepare columns.
      *
-     * @return \Magento\Customer\Block\Adminhtml\Edit\Tab\View\Wishlist
+     * @return $this
      */
     protected function _prepareColumns()
     {
-        $this->addColumn('product_id', array(
-            'header'    => __('ID'),
-            'index'     => 'product_id',
-            'type'      => 'number',
-            'width'     => '100px'
-        ));
+        $this->addColumn(
+            'product_id',
+            ['header' => __('ID'), 'index' => 'product_id', 'type' => 'number', 'width' => '100px']
+        );
 
-        $this->addColumn('product_name', array(
-            'header'    => __('Product'),
-            'index'     => 'product_name',
-            'renderer'  => 'Magento\Customer\Block\Adminhtml\Edit\Tab\View\Grid\Renderer\Item'
-        ));
+        $this->addColumn(
+            'product_name',
+            [
+                'header' => __('Product'),
+                'index' => 'product_name',
+                'renderer' => \Magento\Customer\Block\Adminhtml\Edit\Tab\View\Grid\Renderer\Item::class
+            ]
+        );
 
         if (!$this->_storeManager->isSingleStoreMode()) {
-            $this->addColumn('store', array(
-                'header'    => __('Add Locale'),
-                'index'     => 'store_id',
-                'type'      => 'store',
-                'width'     => '160px',
-            ));
+            $this->addColumn(
+                'store',
+                ['header' => __('Add Locale'), 'index' => 'store_id', 'type' => 'store', 'width' => '160px']
+            );
         }
 
-        $this->addColumn('added_at', array(
-            'header'    => __('Add Date'),
-            'index'     => 'added_at',
-            'type'      => 'date',
-            'width'     => '140px',
-        ));
+        $this->addColumn(
+            'added_at',
+            ['header' => __('Add Date'), 'index' => 'added_at', 'type' => 'date', 'width' => '140px']
+        );
 
-        $this->addColumn('days', array(
-            'header'    => __('Days in Wish List'),
-            'index'     => 'days_in_wishlist',
-            'type'      => 'number',
-            'width'     => '140px',
-        ));
+        $this->addColumn(
+            'days',
+            [
+                'header' => __('Days in Wish List'),
+                'index' => 'days_in_wishlist',
+                'type' => 'number',
+                'width' => '140px'
+            ]
+        );
 
         return parent::_prepareColumns();
     }
@@ -149,20 +133,19 @@ class Wishlist extends \Magento\Adminhtml\Block\Widget\Grid
      * Get headers visibility
      *
      * @return bool
+     *
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getHeadersVisibility()
     {
-        return ($this->getCollection()->getSize() >= 0);
+        return $this->getCollection()->getSize() >= 0;
     }
 
     /**
-     * Get row url
-     *
-     * @param \Magento\Wishlist\Model\Item $item
-     * @return string
+     * {@inheritdoc}
      */
     public function getRowUrl($row)
     {
-        return $this->getUrl('catalog/product/edit', array('id' => $row->getProductId()));
+        return $this->getUrl('catalog/product/edit', ['id' => $row->getProductId()]);
     }
 }

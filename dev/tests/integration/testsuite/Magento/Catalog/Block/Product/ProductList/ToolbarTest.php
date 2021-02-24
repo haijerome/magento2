@@ -1,46 +1,180 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
 namespace Magento\Catalog\Block\Product\ProductList;
 
-class ToolbarTest extends \PHPUnit_Framework_TestCase
-{
-    public function testGetPagerHtml()
-    {
-        /** @var $layout \Magento\Core\Model\Layout */
-        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\LayoutInterface');
-        /** @var $block \Magento\Catalog\Block\Product\ProductList\Toolbar */
-        $block = $layout->createBlock('Magento\Catalog\Block\Product\ProductList\Toolbar', 'block');
-        /** @var $childBlock \Magento\View\Element\Text */
-        $childBlock = $layout->addBlock('Magento\View\Element\Text', 'product_list_toolbar_pager', 'block');
+use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\View\Element\Text;
+use Magento\Framework\View\LayoutInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use PHPUnit\Framework\TestCase;
+use Magento\TestFramework\Helper\Xpath;
 
+/**
+ * Checks product list toolbar.
+ *
+ * @see \Magento\Catalog\Block\Product\ProductList\Toolbar
+ * @magentoAppArea frontend
+ * @magentoDbIsolation enabled
+ */
+class ToolbarTest extends TestCase
+{
+    /** @var string */
+    private const XPATH_TEMPLATE_FOR_NOT_VISIBLE_ICON_CASES = '//div[contains(@class, "modes")]/*[@data-value="%s"]';
+
+    /** @var string */
+    private const ACTIVE_MODE_XPATH_TEMPLATE =
+        '//div[contains(@class, "modes")]/strong[@data-value="%s" and contains(@class, "active")]';
+
+    /** @var string */
+    private const NOT_ACTIVE_MODE_XPATH_TEMPLATE = '//div[contains(@class, "modes")]/a[@data-value="%s"]';
+
+    /** @var ObjectManagerInterface */
+    private $objectManager;
+
+    /** @var LayoutInterface */
+    private $layout;
+
+    /** @var Toolbar */
+    private $toolbarBlock;
+
+    /**
+     * @inheritdoc
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->objectManager = Bootstrap::getObjectManager();
+        $this->layout = $this->objectManager->get(LayoutInterface::class);
+        $this->toolbarBlock = $this->layout->createBlock(Toolbar::class);
+    }
+
+    /**
+     * @return void
+     */
+    public function testGetPagerHtml(): void
+    {
+        $this->toolbarBlock->setNameInLayout('block');
+        /** @var $childBlock Text */
+        $childBlock = $this->layout->addBlock(
+            Text::class,
+            'product_list_toolbar_pager',
+            'block'
+        );
         $expectedHtml = '<b>Any text there</b>';
-        $this->assertNotEquals($expectedHtml, $block->getPagerHtml());
+        $this->assertNotEquals($expectedHtml, $this->toolbarBlock->getPagerHtml());
         $childBlock->setText($expectedHtml);
-        $this->assertEquals($expectedHtml, $block->getPagerHtml());
+        $this->assertEquals($expectedHtml, $this->toolbarBlock->getPagerHtml());
+    }
+
+    /**
+     * @magentoConfigFixture current_store catalog/frontend/list_mode grid
+     * @return void
+     */
+    public function testToHtmlGridOnly(): void
+    {
+        $htmlOutput = $this->getModeSwitcherHtml();
+        $this->assertNotEmpty($htmlOutput);
+        $this->assertEquals(
+            0,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::XPATH_TEMPLATE_FOR_NOT_VISIBLE_ICON_CASES, 'grid'),
+                $htmlOutput
+            )
+        );
+        $this->assertEquals(
+            0,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::XPATH_TEMPLATE_FOR_NOT_VISIBLE_ICON_CASES, 'list'),
+                $htmlOutput
+            )
+        );
+    }
+
+    /**
+     * @magentoConfigFixture current_store catalog/frontend/list_mode list
+     * @return void
+     */
+    public function testToHtmlListOnly(): void
+    {
+        $htmlOutput = $this->getModeSwitcherHtml();
+        $this->assertNotEmpty($htmlOutput);
+        $this->assertEquals(
+            0,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::XPATH_TEMPLATE_FOR_NOT_VISIBLE_ICON_CASES, 'grid'),
+                $htmlOutput
+            )
+        );
+        $this->assertEquals(
+            0,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::XPATH_TEMPLATE_FOR_NOT_VISIBLE_ICON_CASES, 'list'),
+                $htmlOutput
+            )
+        );
+    }
+
+    /**
+     * @magentoConfigFixture current_store catalog/frontend/list_mode grid-list
+     * @return void
+     */
+    public function testToHtmlGridList(): void
+    {
+        $htmlOutput = $this->getModeSwitcherHtml();
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::ACTIVE_MODE_XPATH_TEMPLATE, 'grid'),
+                $htmlOutput
+            )
+        );
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::NOT_ACTIVE_MODE_XPATH_TEMPLATE, 'list'),
+                $htmlOutput
+            )
+        );
+    }
+
+    /**
+     * @magentoConfigFixture current_store catalog/frontend/list_mode list-grid
+     * @return void
+     */
+    public function testToHtmlListGrid(): void
+    {
+        $htmlOutput = $this->getModeSwitcherHtml();
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::ACTIVE_MODE_XPATH_TEMPLATE, 'list'),
+                $htmlOutput
+            )
+        );
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(self::NOT_ACTIVE_MODE_XPATH_TEMPLATE, 'grid'),
+                $htmlOutput
+            )
+        );
+    }
+
+    /**
+     * Mode switcher html
+     *
+     * @return string
+     */
+    private function getModeSwitcherHtml(): string
+    {
+        $this->toolbarBlock->setTemplate('Magento_Catalog::product/list/toolbar/viewmode.phtml');
+
+        return $this->toolbarBlock->toHtml();
     }
 }

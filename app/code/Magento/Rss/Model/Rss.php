@@ -1,73 +1,118 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Rss
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
+declare(strict_types=1);
 
-/**
- * Auth session model
- *
- * @category   Magento
- * @package    Magento_Rss
- * @author      Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Rss\Model;
 
+use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\FeedFactoryInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\App\Rss\DataProviderInterface;
+use Magento\Framework\Exception\InputException;
+use Magento\Framework\Exception\RuntimeException;
+use Magento\Framework\Serialize\SerializerInterface;
+
+/**
+ * Provides functionality to work with RSS feeds
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Rss
 {
-    protected $_feedArray = array();
+    /**
+     * @var DataProviderInterface
+     */
+    protected $dataProvider;
 
-    public function _addHeader($data = array())
+    /**
+     * @var CacheInterface
+     */
+    protected $cache;
+
+    /**
+     * @var FeedFactoryInterface
+     */
+    private $feedFactory;
+
+    /**
+     * @var SerializerInterface
+     */
+    private $serializer;
+
+    /**
+     * Rss constructor
+     *
+     * @param CacheInterface $cache
+     * @param SerializerInterface|null $serializer
+     * @param FeedFactoryInterface|null $feedFactory
+     */
+    public function __construct(
+        CacheInterface $cache,
+        SerializerInterface $serializer = null,
+        FeedFactoryInterface $feedFactory = null
+    ) {
+        $this->cache = $cache;
+        $this->serializer = $serializer ?: ObjectManager::getInstance()->get(SerializerInterface::class);
+        $this->feedFactory = $feedFactory ?: ObjectManager::getInstance()->get(FeedFactoryInterface::class);
+    }
+
+    /**
+     * Returns feeds
+     *
+     * @return array
+     */
+    public function getFeeds()
     {
-        $this->_feedArray = $data;
+        if ($this->dataProvider === null) {
+            return [];
+        }
+        $cacheKey = $this->dataProvider->getCacheKey();
+        $cacheLifeTime = $this->dataProvider->getCacheLifetime();
+
+        $cache = $cacheKey && $cacheLifeTime ? $this->cache->load($cacheKey) : false;
+        if ($cache) {
+            return $this->serializer->unserialize($cache);
+        }
+
+        // serializing data to make sure all Phrase objects converted to a string
+        $serializedData = $this->serializer->serialize($this->dataProvider->getRssData());
+
+        if ($cacheKey && $cacheLifeTime) {
+            $this->cache->save($serializedData, $cacheKey, ['rss'], $cacheLifeTime);
+        }
+
+        return $this->serializer->unserialize($serializedData);
+    }
+
+    /**
+     * Sets data provider
+     *
+     * @param DataProviderInterface $dataProvider
+     * @return $this
+     */
+    public function setDataProvider(DataProviderInterface $dataProvider)
+    {
+        $this->dataProvider = $dataProvider;
+
         return $this;
     }
 
-    public function _addEntries($entries)
-    {
-        $this->_feedArray['entries'] = $entries;
-        return $this;
-    }
-
-    public function _addEntry($entry)
-    {
-        $this->_feedArray['entries'][] = $entry;
-        return $this;
-    }
-
-    public function getFeedArray()
-    {
-        return $this->_feedArray;
-    }
-
+    /**
+     * Returns rss xml
+     *
+     * @return string
+     * @throws InputException
+     * @throws RuntimeException
+     */
     public function createRssXml()
     {
-        try {
-            $rssFeedFromArray = \Zend_Feed::importArray($this->getFeedArray(), 'rss');
-            return $rssFeedFromArray->saveXML();
-        } catch (\Exception $e) {
-            return __('Error in processing xml. %1',$e->getMessage());
-        }
+        $feed = $this->feedFactory->create($this->getFeeds(), FeedFactoryInterface::FORMAT_RSS);
+
+        return $feed->getFormattedContent();
     }
 }

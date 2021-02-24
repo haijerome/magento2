@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,12 +9,22 @@
  */
 namespace Magento\TestFramework\Annotation;
 
+use Magento\Framework\App\Config\MutableScopeConfigInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Handler for applying magentoAdminConfigFixture annotation
+ */
 class AdminConfigFixture
 {
+    public const ANNOTATION = 'magentoAdminConfigFixture';
+
     /**
      * Test instance that is available between 'startTest' and 'stopTest' events
      *
-     * @var \PHPUnit_Framework_TestCase
+     * @var TestCase
      */
     protected $_currentTest;
 
@@ -44,7 +33,7 @@ class AdminConfigFixture
      *
      * @var array
      */
-    private $_configValues = array();
+    private $_configValues = [];
 
     /**
      * Retrieve configuration node value
@@ -54,8 +43,7 @@ class AdminConfigFixture
      */
     protected function _getConfigValue($configPath)
     {
-        return \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Backend\App\ConfigInterface')
-            ->getValue($configPath);
+        return Bootstrap::getObjectManager()->get(MutableScopeConfigInterface::class)->getValue($configPath);
     }
 
     /**
@@ -63,25 +51,27 @@ class AdminConfigFixture
      *
      * @param string $configPath
      * @param string $value
+     * @return void
      */
     protected function _setConfigValue($configPath, $value)
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Backend\App\ConfigInterface')
-            ->setValue($configPath, $value);
+        Bootstrap::getObjectManager()->get(MutableScopeConfigInterface::class)->setValue($configPath, $value);
     }
 
     /**
      * Assign required config values and save original ones
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param TestCase $test
+     * @return void
      */
-    protected function _assignConfigData(\PHPUnit_Framework_TestCase $test)
+    protected function _assignConfigData(TestCase $test)
     {
+        $resolver = Resolver::getInstance();
         $annotations = $test->getAnnotations();
-        if (!isset($annotations['method']['magentoAdminConfigFixture'])) {
-            return;
-        }
-        foreach ($annotations['method']['magentoAdminConfigFixture'] as $configPathAndValue) {
+        $existingFixtures = $annotations['method'][self::ANNOTATION] ?? [];
+        /* Need to be applied even test does not have added fixtures because fixture can be added via config */
+        $testAnnotations = $resolver->applyConfigFixtures($test, $existingFixtures, self::ANNOTATION);
+        foreach ($testAnnotations as $configPathAndValue) {
             list($configPath, $requiredValue) = preg_split('/\s+/', $configPathAndValue, 2);
 
             $originalValue = $this->_getConfigValue($configPath);
@@ -93,21 +83,24 @@ class AdminConfigFixture
 
     /**
      * Restore original values for changed config options
+     *
+     * @return void
      */
     protected function _restoreConfigData()
     {
         foreach ($this->_configValues as $configPath => $originalValue) {
             $this->_setConfigValue($configPath, $originalValue);
         }
-        $this->_configValues = array();
+        $this->_configValues = [];
     }
 
     /**
      * Handler for 'startTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param TestCase $test
+     * @return void
      */
-    public function startTest(\PHPUnit_Framework_TestCase $test)
+    public function startTest(TestCase $test)
     {
         $this->_currentTest = $test;
         $this->_assignConfigData($test);
@@ -116,11 +109,11 @@ class AdminConfigFixture
     /**
      * Handler for 'endTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
-     *
+     * @param TestCase $test
+     * @return void
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function endTest(\PHPUnit_Framework_TestCase $test)
+    public function endTest(TestCase $test)
     {
         $this->_currentTest = null;
         $this->_restoreConfigData();
@@ -128,6 +121,8 @@ class AdminConfigFixture
 
     /**
      * Reassign configuration data whenever application is reset
+     *
+     * @return void
      */
     public function initStoreAfter()
     {

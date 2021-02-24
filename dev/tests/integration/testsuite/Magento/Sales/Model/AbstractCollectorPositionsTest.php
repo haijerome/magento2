@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -27,7 +9,7 @@
  */
 namespace Magento\Sales\Model;
 
-abstract class AbstractCollectorPositionsTest extends \PHPUnit_Framework_TestCase
+abstract class AbstractCollectorPositionsTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @param string $collectorCode
@@ -39,18 +21,21 @@ abstract class AbstractCollectorPositionsTest extends \PHPUnit_Framework_TestCas
      */
     public function testCollectorPosition($collectorCode, $configType, array $before, array $after)
     {
-        $allCollectors = $this->_getConfigCollectors($configType);
+        $allCollectors = self::_getConfigCollectors($configType);
         $collectorCodes = array_keys($allCollectors);
         $collectorPos = array_search($collectorCode, $collectorCodes);
-        $this->assertNotSame(false, $collectorPos, "'{$collectorCode}' total collector is not found");
+        $this->assertNotFalse($collectorPos, "'{$collectorCode}' total collector is not found");
 
         foreach ($before as $compareWithCode) {
             $compareWithPos = array_search($compareWithCode, $collectorCodes);
             if ($compareWithPos === false) {
                 continue;
             }
-            $this->assertLessThan($compareWithPos, $collectorPos,
-                "The '{$collectorCode}' collector must go before '{$compareWithCode}'");
+            $this->assertLessThan(
+                $compareWithPos,
+                $collectorPos,
+                "The '{$collectorCode}' collector must go before '{$compareWithCode}'"
+            );
         }
 
         foreach ($after as $compareWithCode) {
@@ -58,8 +43,11 @@ abstract class AbstractCollectorPositionsTest extends \PHPUnit_Framework_TestCas
             if ($compareWithPos === false) {
                 continue;
             }
-            $this->assertGreaterThan($compareWithPos, $collectorPos,
-                "The '{$collectorCode}' collector must go after '{$compareWithCode}'");
+            $this->assertGreaterThan(
+                $compareWithPos,
+                $collectorPos,
+                "The '{$collectorCode}' collector must go after '{$compareWithCode}'"
+            );
         }
     }
 
@@ -74,23 +62,22 @@ abstract class AbstractCollectorPositionsTest extends \PHPUnit_Framework_TestCas
     {
         switch ($configType) {
             case 'quote':
-                $configClass = 'Magento\Sales\Model\Quote\Address\Total\Collector';
+                $configClass = \Magento\Quote\Model\Quote\Address\Total\Collector::class;
                 $methodGetCollectors = 'getCollectors';
                 break;
             case 'invoice':
-                $configClass = 'Magento\Sales\Model\Order\Invoice\Config';
+                $configClass = \Magento\Sales\Model\Order\Invoice\Config::class;
                 $methodGetCollectors = 'getTotalModels';
                 break;
             case 'creditmemo':
-                $configClass = 'Magento\Sales\Model\Order\Creditmemo\Config';
+                $configClass = \Magento\Sales\Model\Order\Creditmemo\Config::class;
                 $methodGetCollectors = 'getTotalModels';
                 break;
             default:
                 throw new \InvalidArgumentException('Unknown config type: ' . $configType);
         }
-        $config = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create($configClass);
-        return $config->$methodGetCollectors();
+        $config = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create($configClass);
+        return $config->{$methodGetCollectors}();
     }
 
     /**

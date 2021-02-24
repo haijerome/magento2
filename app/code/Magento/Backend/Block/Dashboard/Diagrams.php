@@ -1,44 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Dashboard;
 
 /**
  * Adminhtml dashboard diagram tabs
+ * @deprecated dashboard graphs were migrated to dynamic chart.js solution
+ * @see dashboard.diagrams in adminhtml_dashboard_index.xml
  *
- * @category   Magento
- * @package    Magento_Backend
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
-namespace Magento\Backend\Block\Dashboard;
-
-class Diagrams extends \Magento\Adminhtml\Block\Widget\Tabs
+class Diagrams extends \Magento\Backend\Block\Widget\Tabs
 {
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Backend::widget/tabshoriz.phtml';
 
-    protected $_template = 'Magento_Adminhtml::widget/tabshoriz.phtml';
-
+    /**
+     * Internal constructor, that is called from real constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -46,18 +31,33 @@ class Diagrams extends \Magento\Adminhtml\Block\Widget\Tabs
         $this->setDestElementId('diagram_tab_content');
     }
 
+    /**
+     * Preparing global layout
+     *
+     * @return $this
+     */
     protected function _prepareLayout()
     {
-        $this->addTab('orders', array(
-            'label'     => __('Orders'),
-            'content'   => $this->getLayout()->createBlock('Magento\Backend\Block\Dashboard\Tab\Orders')->toHtml(),
-            'active'    => true
-        ));
+        $this->addTab(
+            'orders',
+            [
+                'label' => __('Orders'),
+                'content' => $this->getLayout()->createBlock(
+                    \Magento\Backend\Block\Dashboard\Tab\Orders::class
+                )->toHtml(),
+                'active' => true
+            ]
+        );
 
-        $this->addTab('amounts', array(
-            'label'     => __('Amounts'),
-            'content'   => $this->getLayout()->createBlock('Magento\Backend\Block\Dashboard\Tab\Amounts')->toHtml(),
-        ));
+        $this->addTab(
+            'amounts',
+            [
+                'label' => __('Amounts'),
+                'content' => $this->getLayout()->createBlock(
+                    \Magento\Backend\Block\Dashboard\Tab\Amounts::class
+                )->toHtml()
+            ]
+        );
         return parent::_prepareLayout();
     }
 }

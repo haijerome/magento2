@@ -1,91 +1,70 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Backend\Model\Auth;
 
+use Magento\TestFramework\Bootstrap as TestHelper;
+use Magento\TestFramework\Helper\Bootstrap;
+
 /**
  * @magentoAppArea adminhtml
+ * @magentoAppIsolation enabled
+ * @magentoDbIsolation enabled
  */
-class SessionTest extends \PHPUnit_Framework_TestCase
+class SessionTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Backend\Model\Auth
      */
-    protected $_auth;
+    private $auth;
 
     /**
      * @var \Magento\Backend\Model\Auth\Session
      */
-    protected $_model;
+    private $authSession;
 
-    protected function setUp()
+    /**
+     * @var \Magento\Framework\ObjectManagerInterface
+     */
+    private $objectManager;
+
+    protected function setUp(): void
     {
         parent::setUp();
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Config\ScopeInterface')
+        $this->objectManager = Bootstrap::getObjectManager();
+        $this->objectManager->get(\Magento\Framework\Config\ScopeInterface::class)
             ->setCurrentScope(\Magento\Backend\App\Area\FrontNameResolver::AREA_CODE);
-        $this->_auth  = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Backend\Model\Auth');
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Backend\Model\Auth\Session');
-        $this->_auth->setAuthStorage($this->_model);
+        $this->auth = $this->objectManager->create(\Magento\Backend\Model\Auth::class);
+        $this->authSession = $this->objectManager->create(\Magento\Backend\Model\Auth\Session::class);
+        $this->auth->setAuthStorage($this->authSession);
+        $this->auth->logout();
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
-        $this->_model = null;
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Config\ScopeInterface')
-            ->setCurrentScope(null);
-    }
-
-    /**
-     * Disabled form security in order to prevent exit from the app
-     * @magentoAdminConfigFixture admin/security/session_lifetime 100
-     */
-    public function testIsLoggedIn()
-    {
-        $this->_auth->login(
-            \Magento\TestFramework\Bootstrap::ADMIN_NAME, \Magento\TestFramework\Bootstrap::ADMIN_PASSWORD);
-        $this->assertTrue($this->_model->isLoggedIn());
-
-        $this->_model->setUpdatedAt(time() - 101);
-        $this->assertFalse($this->_model->isLoggedIn());
+        $this->auth = null;
+        $this->objectManager->get(\Magento\Framework\Config\ScopeInterface::class)->setCurrentScope(null);
     }
 
     /**
-     * Disabled form security in order to prevent exit from the app
-     * @magentoConfigFixture current_store admin/security/session_lifetime 59
+     * @dataProvider loginDataProvider
      */
-    public function testIsLoggedInWithIgnoredLifetime()
+    public function testIsLoggedIn($loggedIn)
     {
-        $this->_auth->login(
-            \Magento\TestFramework\Bootstrap::ADMIN_NAME, \Magento\TestFramework\Bootstrap::ADMIN_PASSWORD);
-        $this->assertTrue($this->_model->isLoggedIn());
+        if ($loggedIn) {
+            $this->auth->login(
+                TestHelper::ADMIN_NAME,
+                TestHelper::ADMIN_PASSWORD
+            );
+        }
+        $this->assertEquals($loggedIn, $this->authSession->isLoggedIn());
+    }
 
-        $this->_model->setUpdatedAt(time() - 101);
-        $this->assertTrue($this->_model->isLoggedIn());
+    public function loginDataProvider()
+    {
+        return [[false], [true]];
     }
 }

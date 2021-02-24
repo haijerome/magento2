@@ -1,115 +1,214 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Model\Category\Attribute\Backend;
 
+use Magento\Catalog\Model\ImageUploader;
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\File\Uploader;
+use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Catalog category image attribute backend model
  *
- * @category   Magento
- * @package    Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Model\Category\Attribute\Backend;
-
 class Image extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
 {
     /**
-     * @var \Magento\Core\Model\File\UploaderFactory
+     * @var \Magento\MediaStorage\Model\File\UploaderFactory
+     *
+     * @deprecated 101.0.0
      */
     protected $_uploaderFactory;
 
     /**
-     * Dir model
+     * @var \Magento\Framework\Filesystem
      *
-     * @var \Magento\App\Dir
+     * @deprecated 101.0.0
      */
-    protected $_dir;
+    protected $_filesystem;
 
     /**
-     * File Uploader factory
+     * @var \Magento\MediaStorage\Model\File\UploaderFactory
      *
-     * @var \Magento\Core\Model\File\UploaderFactory
+     * @deprecated 101.0.0
      */
     protected $_fileUploaderFactory;
 
     /**
-     * Construct
+     * @var \Psr\Log\LoggerInterface
      *
-     * @param \Magento\Logger $logger
-     * @param \Magento\App\Dir $dir
-     * @param \Magento\Core\Model\File\UploaderFactory $fileUploaderFactory
+     * @deprecated 101.0.0
+     */
+    protected $_logger;
+
+    /**
+     * @var ImageUploader
+     */
+    private $imageUploader;
+
+    /**
+     * @var string
+     */
+    private $additionalData = '_additional_data_';
+
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\MediaStorage\Model\File\UploaderFactory $fileUploaderFactory
+     * @param StoreManagerInterface $storeManager
+     * @param ImageUploader $imageUploader
      */
     public function __construct(
-        \Magento\Logger $logger,
-        \Magento\App\Dir $dir,
-        \Magento\Core\Model\File\UploaderFactory $fileUploaderFactory
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\MediaStorage\Model\File\UploaderFactory $fileUploaderFactory,
+        StoreManagerInterface $storeManager = null,
+        ImageUploader $imageUploader = null
     ) {
-        $this->_dir = $dir;
+        $this->_filesystem = $filesystem;
         $this->_fileUploaderFactory = $fileUploaderFactory;
-        parent::__construct($logger);
+        $this->_logger = $logger;
+        $this->storeManager = $storeManager ??
+            ObjectManager::getInstance()->get(StoreManagerInterface::class);
+        $this->imageUploader = $imageUploader ??
+            ObjectManager::getInstance()->get(ImageUploader::class);
+    }
+
+    /**
+     * Gets image name from $value array.
+     *
+     * Will return empty string in a case when $value is not an array.
+     *
+     * @param array $value Attribute value
+     * @return string
+     */
+    private function getUploadedImageName($value)
+    {
+        if (is_array($value) && isset($value[0]['name'])) {
+            return $value[0]['name'];
+        }
+
+        return '';
+    }
+
+    /**
+     * Check that image name exists in catalog/category directory and return new image name if it already exists.
+     *
+     * @param string $imageName
+     * @return string
+     */
+    private function checkUniqueImageName(string $imageName): string
+    {
+        $mediaDirectory = $this->_filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $imageAbsolutePath = $mediaDirectory->getAbsolutePath(
+            $this->imageUploader->getBasePath() . DIRECTORY_SEPARATOR . $imageName
+        );
+
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        $imageName = call_user_func([Uploader::class, 'getNewFilename'], $imageAbsolutePath);
+
+        return $imageName;
+    }
+
+    /**
+     * Avoiding saving potential upload data to DB.
+     *
+     * Will set empty image attribute value if image was not uploaded.
+     *
+     * @param \Magento\Framework\DataObject $object
+     * @return $this
+     * @since 101.0.8
+     */
+    public function beforeSave($object)
+    {
+        $attributeName = $this->getAttribute()->getName();
+        $value = $object->getData($attributeName);
+
+        if ($this->isTmpFileAvailable($value) && $imageName = $this->getUploadedImageName($value)) {
+            try {
+                /** @var StoreInterface $store */
+                $store = $this->storeManager->getStore();
+                $baseMediaDir = $store->getBaseMediaDir();
+                $newImgRelativePath = $this->imageUploader->moveFileFromTmp($imageName, true);
+                $value[0]['url'] = '/' . $baseMediaDir . '/' . $newImgRelativePath;
+                $value[0]['name'] = $value[0]['url'];
+            } catch (\Exception $e) {
+                $this->_logger->critical($e);
+            }
+        } elseif ($this->fileResidesOutsideCategoryDir($value)) {
+            // use relative path for image attribute so we know it's outside of category dir when we fetch it
+            // phpcs:ignore Magento2.Functions.DiscouragedFunction
+            $value[0]['url'] = parse_url($value[0]['url'], PHP_URL_PATH);
+            $value[0]['name'] = $value[0]['url'];
+        }
+
+        if ($imageName = $this->getUploadedImageName($value)) {
+            if (!$this->fileResidesOutsideCategoryDir($value)) {
+                $imageName = $this->checkUniqueImageName($imageName);
+            }
+            $object->setData($this->additionalData . $attributeName, $value);
+            $object->setData($attributeName, $imageName);
+        } elseif (!is_string($value)) {
+            $object->setData($attributeName, null);
+        }
+
+        return parent::beforeSave($object);
+    }
+
+    /**
+     * Check if temporary file is available for new image upload.
+     *
+     * @param array $value
+     * @return bool
+     */
+    private function isTmpFileAvailable($value)
+    {
+        return is_array($value) && isset($value[0]['tmp_name']);
+    }
+
+    /**
+     * Check for file path resides outside of category media dir. The URL will be a path including pub/media if true
+     *
+     * @param array|null $value
+     * @return bool
+     */
+    private function fileResidesOutsideCategoryDir($value)
+    {
+        if (!is_array($value) || !isset($value[0]['url'])) {
+            return false;
+        }
+
+        $fileUrl = ltrim($value[0]['url'], '/');
+        $baseMediaDir = $this->_filesystem->getUri(DirectoryList::MEDIA);
+
+        if (!$baseMediaDir) {
+            return false;
+        }
+
+        return strpos($fileUrl, $baseMediaDir) !== false;
     }
 
     /**
      * Save uploaded file and set its name to category
      *
-     * @param \Magento\Object $object
+     * @param \Magento\Framework\DataObject $object
      * @return \Magento\Catalog\Model\Category\Attribute\Backend\Image
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function afterSave($object)
     {
-        $value = $object->getData($this->getAttribute()->getName() . '_additional_data');
-
-        // if no image was set - nothing to do
-        if (empty($value) && empty($_FILES)) {
-            return $this;
-        }
-
-        if (is_array($value) && !empty($value['delete'])) {
-            $object->setData($this->getAttribute()->getName(), '');
-            $this->getAttribute()->getEntity()
-                ->saveAttribute($object, $this->getAttribute()->getName());
-            return $this;
-        }
-
-        $path = $this->_dir->getDir(\Magento\App\Dir::MEDIA) . DS . 'catalog' . DS . 'category' . DS;
-
-        try {
-            /** @var $uploader \Magento\Core\Model\File\Uploader */
-            $uploader = $this->_fileUploaderFactory->create(array('fileId' => $this->getAttribute()->getName()));
-            $uploader->setAllowedExtensions(array('jpg','jpeg','gif','png'));
-            $uploader->setAllowRenameFiles(true);
-            $result = $uploader->save($path);
-
-            $object->setData($this->getAttribute()->getName(), $result['file']);
-            $this->getAttribute()->getEntity()->saveAttribute($object, $this->getAttribute()->getName());
-        } catch (\Exception $e) {
-            if ($e->getCode() != \Magento\Core\Model\File\Uploader::TMP_NAME_EMPTY) {
-                $this->_logger->logException($e);
-            }
-        }
         return $this;
     }
 }

@@ -1,90 +1,50 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Wishlist block shared items
  *
- * @category   Magento
- * @package    Magento_Wishlist
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Wishlist\Block\Share;
 
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
 {
     /**
      * Customer instance
      *
-     * @var \Magento\Customer\Model\Customer
+     * @var \Magento\Customer\Api\Data\CustomerInterface
      */
     protected $_customer = null;
 
     /**
-     * @var \Magento\Customer\Model\CustomerFactory
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
      */
-    protected $_customerFactory;
+    protected $customerRepository;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Wishlist\Helper\Data $wishlistData
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Catalog\Model\ProductFactory $productFactory
-     * @param \Magento\Customer\Model\CustomerFactory $customerFactory
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Framework\App\Http\Context $httpContext
+     * @param \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Wishlist\Helper\Data $wishlistData,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Catalog\Model\ProductFactory $productFactory,
-        \Magento\Customer\Model\CustomerFactory $customerFactory,
-        array $data = array()
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Framework\App\Http\Context $httpContext,
+        \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository,
+        array $data = []
     ) {
-        $this->_customerFactory = $customerFactory;
+        $this->customerRepository = $customerRepository;
         parent::__construct(
             $context,
-            $catalogConfig,
-            $registry,
-            $taxData,
-            $catalogData,
-            $mathRandom,
-            $wishlistData,
-            $customerSession,
-            $productFactory,
+            $httpContext,
             $data
         );
     }
@@ -92,30 +52,25 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     /**
      * Prepare global layout
      *
-     * @return \Magento\Wishlist\Block\Share\Wishlist
+     * @return $this
      *
      */
     protected function _prepareLayout()
     {
         parent::_prepareLayout();
-
-        $headBlock = $this->getLayout()->getBlock('head');
-        if ($headBlock) {
-            $headBlock->setTitle($this->getHeader());
-        }
+        $this->pageConfig->getTitle()->set($this->getHeader());
         return $this;
     }
 
     /**
      * Retrieve Shared Wishlist Customer instance
      *
-     * @return \Magento\Customer\Model\Customer
+     * @return \Magento\Customer\Api\Data\CustomerInterface
      */
     public function getWishlistCustomer()
     {
-        if (is_null($this->_customer)) {
-            $this->_customer = $this->_customerFactory->create()
-                ->load($this->_getWishlist()->getCustomerId());
+        if ($this->_customer === null) {
+            $this->_customer = $this->customerRepository->getById($this->_getWishlist()->getCustomerId());
         }
 
         return $this->_customer;
@@ -124,7 +79,7 @@ class Wishlist extends \Magento\Wishlist\Block\AbstractBlock
     /**
      * Retrieve Page Header
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getHeader()
     {

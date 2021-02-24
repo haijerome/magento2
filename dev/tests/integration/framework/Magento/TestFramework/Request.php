@@ -1,46 +1,28 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * HTTP request implementation that is used instead core one for testing
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\TestFramework;
 
-class Request extends \Magento\App\Request\Http
+use \Laminas\Stdlib\ParametersInterface;
+
+/**
+ * HTTP request implementation that is used instead core one for testing
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ */
+class Request extends \Magento\Framework\App\Request\Http
 {
     /**
      * Server super-global mock
      *
-     * @var array
+     * @var ParametersInterface
      */
-    protected $_server = array();
+    protected $_server;
 
     /**
      * Retrieve HTTP HOST.
+     *
      * This method is a stub - all parameters are ignored, just static value returned.
      *
      * @param bool $trimPort
@@ -50,16 +32,16 @@ class Request extends \Magento\App\Request\Http
      */
     public function getHttpHost($trimPort = true)
     {
-        return 'localhost';
+        return $trimPort ? 'localhost' : 'localhost:81';
     }
 
     /**
      * Set "server" super-global mock
      *
-     * @param array $server
+     * @param ParametersInterface $server
      * @return \Magento\TestFramework\Request
      */
-    public function setServer(array $server)
+    public function setServer(ParametersInterface $server)
     {
         $this->_server = $server;
         return $this;
@@ -68,16 +50,15 @@ class Request extends \Magento\App\Request\Http
     /**
      * Overridden getter to avoid using of $_SERVER
      *
-     * @param string|null $key
+     * @param string|null $name
      * @param mixed|null $default
-     * @return array|mixed|null
+     * @return ParametersInterface|array|mixed|null
      */
-    public function getServer($key = null, $default = null)
+    public function getServer($name = null, $default = null)
     {
-        if (null === $key) {
+        if (null === $name) {
             return $this->_server;
         }
-
-        return (isset($this->_server[$key])) ? $this->_server[$key] : $default;
+        return $this->_server->get($name, $default);
     }
 }

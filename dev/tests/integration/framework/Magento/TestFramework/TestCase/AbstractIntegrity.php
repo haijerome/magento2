@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Test
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,7 +9,7 @@
  */
 namespace Magento\TestFramework\TestCase;
 
-abstract class AbstractIntegrity extends \PHPUnit_Framework_TestCase
+abstract class AbstractIntegrity extends \PHPUnit\Framework\TestCase
 {
     /**
      * Cached index of enabled modules
@@ -48,7 +27,7 @@ abstract class AbstractIntegrity extends \PHPUnit_Framework_TestCase
     {
         if ($this->_enabledModules === null) {
             /** @var $helper \Magento\TestFramework\Helper\Config */
-            $helper = \Magento\TestFramework\Helper\Factory::getHelper('Magento\TestFramework\Helper\Config');
+            $helper = \Magento\TestFramework\Helper\Factory::getHelper(\Magento\TestFramework\Helper\Config::class);
             $enabledModules = $helper->getEnabledModules();
             $this->_enabledModules = array_combine($enabledModules, $enabledModules);
         }
@@ -76,15 +55,16 @@ abstract class AbstractIntegrity extends \PHPUnit_Framework_TestCase
     /**
      * Returns flat array of themes currently located in system
      *
-     * @return \Magento\Core\Model\Theme[]
+     * @return \Magento\Theme\Model\Theme[]
      */
     protected function _getDesignThemes()
     {
-        $themeItems = array();
-        /** @var $themeCollection \Magento\Core\Model\Theme\Collection */
-        $themeCollection = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Core\Model\Resource\Theme\Collection');
-        /** @var $theme \Magento\View\Design\ThemeInterface */
+        $themeItems = [];
+        /** @var $themeCollection \Magento\Theme\Model\Theme\Collection */
+        $themeCollection = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
+            \Magento\Theme\Model\ResourceModel\Theme\Collection::class
+        );
+        /** @var $theme \Magento\Framework\View\Design\ThemeInterface */
         foreach ($themeCollection as $theme) {
             $themeItems[$theme->getId()] = $theme;
         }

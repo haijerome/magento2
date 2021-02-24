@@ -1,27 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -29,47 +9,236 @@
  */
 namespace Magento\Catalog\Model\System\Config\Backend\Catalog\Url\Rewrite;
 
-class Suffix extends \Magento\Core\Model\Config\Value
+use Magento\CatalogUrlRewrite\Model\CategoryUrlPathGenerator;
+use Magento\CatalogUrlRewrite\Model\CategoryUrlRewriteGenerator;
+use Magento\CatalogUrlRewrite\Model\ProductUrlPathGenerator;
+use Magento\CatalogUrlRewrite\Model\ProductUrlRewriteGenerator;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Store\Model\ScopeInterface;
+use Magento\UrlRewrite\Model\Storage\DbStorage;
+use Magento\UrlRewrite\Service\V1\Data\UrlRewrite;
+
+/**
+ * URL suffix backend model
+ *
+ * @api
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
+ */
+class Suffix extends \Magento\Framework\App\Config\Value
 {
     /**
-     * Core url rewrite
-     *
-     * @var \Magento\Core\Helper\Url\Rewrite
+     * @var \Magento\UrlRewrite\Helper\UrlRewrite
      */
-    protected $_coreUrlRewrite = null;
+    protected $urlRewriteHelper;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Config $config
-     * @param \Magento\Core\Helper\Url\Rewrite $coreUrlRewrite
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @var \Magento\Store\Model\StoreManagerInterface
+     */
+    protected $storeManager;
+
+    /**
+     * @var \Magento\UrlRewrite\Model\UrlFinderInterface
+     */
+    protected $urlFinder;
+
+    /**
+     * @var \Magento\Framework\DB\Adapter\AdapterInterface
+     */
+    protected $connection;
+
+    /**
+     * @var \Magento\Framework\App\ResourceConnection
+     * @since 101.0.0
+     */
+    protected $resource;
+
+    /**
+     * @var \Magento\Framework\App\Config
+     */
+    private $appConfig;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $config
+     * @param \Magento\Framework\App\Cache\TypeListInterface $cacheTypeList
+     * @param \Magento\UrlRewrite\Helper\UrlRewrite $urlRewriteHelper
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param ResourceConnection $appResource
+     * @param \Magento\UrlRewrite\Model\UrlFinderInterface $urlFinder
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Config $config,
-        \Magento\Core\Helper\Url\Rewrite $coreUrlRewrite,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\App\Config\ScopeConfigInterface $config,
+        \Magento\Framework\App\Cache\TypeListInterface $cacheTypeList,
+        \Magento\UrlRewrite\Helper\UrlRewrite $urlRewriteHelper,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\App\ResourceConnection $appResource,
+        \Magento\UrlRewrite\Model\UrlFinderInterface $urlFinder,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        $this->_coreUrlRewrite = $coreUrlRewrite;
-        parent::__construct($context, $registry, $storeManager, $config, $resource, $resourceCollection, $data);
+        parent::__construct($context, $registry, $config, $cacheTypeList, $resource, $resourceCollection, $data);
+        $this->urlRewriteHelper = $urlRewriteHelper;
+        $this->connection = $appResource->getConnection();
+        $this->urlFinder = $urlFinder;
+        $this->storeManager = $storeManager;
+        $this->resource = $appResource;
+    }
+
+    /**
+     * Get instance of ScopePool
+     *
+     * @return \Magento\Framework\App\Config
+     * @deprecated 102.0.0
+     */
+    private function getAppConfig()
+    {
+        if ($this->appConfig === null) {
+            $this->appConfig = \Magento\Framework\App\ObjectManager::getInstance()->get(
+                \Magento\Framework\App\Config::class
+            );
+        }
+        return $this->appConfig;
     }
 
     /**
      * Check url rewrite suffix - whether we can support it
      *
-     * @return \Magento\Catalog\Model\System\Config\Backend\Catalog\Url\Rewrite\Suffix
+     * @return $this
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
-        $this->_coreUrlRewrite->validateSuffix($this->getValue());
+        $this->urlRewriteHelper->validateSuffix($this->getValue());
         return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function afterSave()
+    {
+        if ($this->isValueChanged()) {
+            $this->updateSuffixForUrlRewrites();
+            if ($this->isCategorySuffixChanged()) {
+                $this->cacheTypeList->invalidate([
+                    \Magento\Framework\App\Cache\Type\Block::TYPE_IDENTIFIER,
+                    \Magento\Framework\App\Cache\Type\Collection::TYPE_IDENTIFIER
+                ]);
+            }
+        }
+        return parent::afterSave();
+    }
+
+    /**
+     * {@inheritdoc}
+     * @since 102.0.0
+     */
+    public function afterDeleteCommit()
+    {
+        if ($this->isValueChanged()) {
+            $this->updateSuffixForUrlRewrites();
+            if ($this->isCategorySuffixChanged()) {
+                $this->cacheTypeList->invalidate([
+                    \Magento\Framework\App\Cache\Type\Block::TYPE_IDENTIFIER,
+                    \Magento\Framework\App\Cache\Type\Collection::TYPE_IDENTIFIER
+                ]);
+            }
+        }
+
+        return parent::afterDeleteCommit();
+    }
+
+    /**
+     * Check is category suffix changed
+     *
+     * @return bool
+     */
+    private function isCategorySuffixChanged()
+    {
+        return $this->isValueChanged()
+            && ($this->getPath() == CategoryUrlPathGenerator::XML_PATH_CATEGORY_URL_SUFFIX);
+    }
+
+    /**
+     * Update suffix for url rewrites
+     *
+     * @return $this
+     */
+    protected function updateSuffixForUrlRewrites()
+    {
+        $map = [
+            ProductUrlPathGenerator::XML_PATH_PRODUCT_URL_SUFFIX => ProductUrlRewriteGenerator::ENTITY_TYPE,
+            CategoryUrlPathGenerator::XML_PATH_CATEGORY_URL_SUFFIX => CategoryUrlRewriteGenerator::ENTITY_TYPE,
+        ];
+        if (!isset($map[$this->getPath()])) {
+            return $this;
+        }
+        $dataFilter = [UrlRewrite::ENTITY_TYPE => $map[$this->getPath()]];
+        $storesIds = $this->getStoreIds();
+        if ($storesIds) {
+            $dataFilter[UrlRewrite::STORE_ID] = $storesIds;
+        }
+        $entities = $this->urlFinder->findAllByData($dataFilter);
+        $oldSuffixPattern = '~' . preg_quote($this->getOldValue()) . '$~';
+        if ($this->getValue() !== null) {
+            $suffix = $this->getValue();
+        } else {
+            $this->getAppConfig()->clean();
+            $suffix = $this->_config->getValue($this->getPath());
+        }
+        foreach ($entities as $urlRewrite) {
+            $bind = $urlRewrite->getIsAutogenerated()
+                ? [UrlRewrite::REQUEST_PATH => preg_replace($oldSuffixPattern, $suffix, $urlRewrite->getRequestPath())]
+                : [UrlRewrite::TARGET_PATH => preg_replace($oldSuffixPattern, $suffix, $urlRewrite->getTargetPath())];
+            $this->connection->update(
+                $this->resource->getTableName(DbStorage::TABLE_NAME),
+                $bind,
+                $this->connection->quoteIdentifier(UrlRewrite::URL_REWRITE_ID) . ' = ' . $urlRewrite->getUrlRewriteId()
+            );
+        }
+        return $this;
+    }
+
+    /**
+     * @return array|null
+     */
+    protected function getStoreIds()
+    {
+        if ($this->getScope() == 'stores') {
+            $storeIds = [$this->getScopeId()];
+        } elseif ($this->getScope() == 'websites') {
+            $website = $this->storeManager->getWebsite($this->getScopeId());
+            $storeIds = array_keys($website->getStoreIds());
+            $storeIds = array_diff($storeIds, $this->getOverrideStoreIds($storeIds));
+        } else {
+            $storeIds = array_keys($this->storeManager->getStores());
+            $storeIds = array_diff($storeIds, $this->getOverrideStoreIds($storeIds));
+        }
+        return $storeIds;
+    }
+
+    /**
+     * @param array $storeIds
+     * @return array
+     */
+    protected function getOverrideStoreIds($storeIds)
+    {
+        $excludeIds = [];
+        foreach ($storeIds as $storeId) {
+            $suffix = $this->_config->getValue($this->getPath(), ScopeInterface::SCOPE_STORE, $storeId);
+            if ($suffix != $this->getOldValue()) {
+                $excludeIds[] = $storeId;
+            }
+        }
+        return $excludeIds;
     }
 }

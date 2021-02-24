@@ -1,140 +1,163 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Order history block
- *
- * @category   Magento
- * @package    Magento_Sales
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Adminhtml\Order\View;
 
+use Magento\Eav\Model\AttributeDataFactory;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Sales\Model\Order\Address;
+
+/**
+ * @api
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
+ */
 class Info extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
 {
     /**
-     * @var \Magento\Customer\Model\GroupFactory
+     * Customer service
+     *
+     * @var \Magento\Customer\Api\CustomerMetadataInterface
      */
-    protected $_groupFactory;
+    protected $metadata;
 
     /**
-     * @var \Magento\Eav\Model\AttributeDataFactory
+     * Group service
+     *
+     * @var \Magento\Customer\Api\GroupRepositoryInterface
      */
-    protected $_attrDataFactory;
+    protected $groupRepository;
 
     /**
-     * @var \Magento\Customer\Model\CustomerFactory
+     * Metadata element factory
+     *
+     * @var \Magento\Customer\Model\Metadata\ElementFactory
      */
-    protected $_customerFactory;
+    protected $_metadataElementFactory;
 
     /**
-     * @var \Magento\Eav\Model\Config
+     * @var Address\Renderer
      */
-    protected $_eavConfig;
+    protected $addressRenderer;
 
     /**
+     * Constructor
+     *
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Customer\Model\GroupFactory $groupFactory
-     * @param \Magento\Customer\Model\CustomerFactory $customerFactory
-     * @param \Magento\Eav\Model\Config $eavConfig
-     * @param \Magento\Eav\Model\AttributeDataFactory $attrDataFactory
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Sales\Helper\Admin $adminHelper
+     * @param \Magento\Customer\Api\GroupRepositoryInterface $groupRepository
+     * @param \Magento\Customer\Api\CustomerMetadataInterface $metadata
+     * @param \Magento\Customer\Model\Metadata\ElementFactory $elementFactory
+     * @param \Magento\Sales\Model\Order\Address\Renderer $addressRenderer
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Customer\Model\GroupFactory $groupFactory,
-        \Magento\Customer\Model\CustomerFactory $customerFactory,
-        \Magento\Eav\Model\Config $eavConfig,
-        \Magento\Eav\Model\AttributeDataFactory $attrDataFactory,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        \Magento\Sales\Helper\Admin $adminHelper,
+        \Magento\Customer\Api\GroupRepositoryInterface $groupRepository,
+        \Magento\Customer\Api\CustomerMetadataInterface $metadata,
+        \Magento\Customer\Model\Metadata\ElementFactory $elementFactory,
+        \Magento\Sales\Model\Order\Address\Renderer $addressRenderer,
+        array $data = []
     ) {
-        $this->_customerFactory = $customerFactory;
-        $this->_groupFactory = $groupFactory;
-        $this->_eavConfig = $eavConfig;
-        $this->_attrDataFactory = $attrDataFactory;
-        parent::__construct($context, $registry, $data);
+        $this->groupRepository = $groupRepository;
+        $this->metadata = $metadata;
+        $this->_metadataElementFactory = $elementFactory;
+        $this->addressRenderer = $addressRenderer;
+        parent::__construct($context, $registry, $adminHelper, $data);
     }
 
     /**
      * Retrieve required options from parent
+     *
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @return void
      */
     protected function _beforeToHtml()
     {
         if (!$this->getParentBlock()) {
-            throw new \Magento\Core\Exception(__('Please correct the parent block for this block.'));
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('Please correct the parent block for this block.')
+            );
         }
         $this->setOrder($this->getParentBlock()->getOrder());
 
-        foreach ($this->getParentBlock()->getOrderInfoData() as $k => $v) {
-            $this->setDataUsingMethod($k, $v);
+        foreach ($this->getParentBlock()->getOrderInfoData() as $key => $value) {
+            $this->setDataUsingMethod($key, $value);
         }
 
         parent::_beforeToHtml();
     }
 
+    /**
+     * Get order store name
+     *
+     * @return null|string
+     */
     public function getOrderStoreName()
     {
         if ($this->getOrder()) {
             $storeId = $this->getOrder()->getStoreId();
-            if (is_null($storeId)) {
+            if ($storeId === null) {
                 $deleted = __(' [deleted]');
                 return nl2br($this->getOrder()->getStoreName()) . $deleted;
             }
             $store = $this->_storeManager->getStore($storeId);
-            $name = array(
-                $store->getWebsite()->getName(),
-                $store->getGroup()->getName(),
-                $store->getName()
-            );
+            $name = [$store->getWebsite()->getName(), $store->getGroup()->getName(), $store->getName()];
             return implode('<br/>', $name);
         }
+
         return null;
     }
 
+    /**
+     * Return name of the customer group.
+     *
+     * @return string
+     */
     public function getCustomerGroupName()
     {
         if ($this->getOrder()) {
-            return $this->_groupFactory->create()->load((int)$this->getOrder()->getCustomerGroupId())->getCode();
+            $customerGroupId = $this->getOrder()->getCustomerGroupId();
+            try {
+                if ($customerGroupId !== null) {
+                    return $this->groupRepository->getById($customerGroupId)->getCode();
+                }
+            } catch (NoSuchEntityException $e) {
+                return '';
+            }
         }
-        return null;
+
+        return '';
     }
 
+    /**
+     * Get URL to edit the customer.
+     *
+     * @return string
+     */
     public function getCustomerViewUrl()
     {
         if ($this->getOrder()->getCustomerIsGuest() || !$this->getOrder()->getCustomerId()) {
-            return false;
+            return '';
         }
-        return $this->getUrl('customer/index/edit', array('id' => $this->getOrder()->getCustomerId()));
+
+        return $this->getUrl('customer/index/edit', ['id' => $this->getOrder()->getCustomerId()]);
     }
 
+    /**
+     * Get order view URL.
+     *
+     * @param int $orderId
+     * @return string
+     */
     public function getViewUrl($orderId)
     {
-        return $this->getUrl('sales/order/view', array('order_id'=>$orderId));
+        return $this->getUrl('sales/order/view', ['order_id' => $orderId]);
     }
 
     /**
@@ -150,6 +173,7 @@ class Info extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
         if (isset($data[$sortOrder])) {
             return $this->_prepareAccountDataSortOrder($data, $sortOrder + 1);
         }
+
         return $sortOrder;
     }
 
@@ -161,31 +185,27 @@ class Info extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
      */
     public function getCustomerAccountData()
     {
-        $accountData = array();
-
+        $accountData = [];
         $entityType = 'customer';
-        $customer   = $this->_customerFactory->create();
-        foreach ($this->_eavConfig->getEntityAttributeCodes($entityType) as $attributeCode) {
-            /* @var $attribute \Magento\Customer\Model\Attribute */
-            $attribute = $this->_eavConfig->getAttribute($entityType, $attributeCode);
-            if (!$attribute->getIsVisible() || $attribute->getIsSystem()) {
+
+        /* @var \Magento\Customer\Api\Data\AttributeMetadataInterface $attribute */
+        foreach ($this->metadata->getAllAttributesMetadata($entityType) as $attribute) {
+            if (!$attribute->isVisible() || $attribute->isSystem()) {
                 continue;
             }
-            $orderKey   = sprintf('customer_%s', $attribute->getAttributeCode());
+            $orderKey = sprintf('customer_%s', $attribute->getAttributeCode());
             $orderValue = $this->getOrder()->getData($orderKey);
             if ($orderValue != '') {
-                $customer->setData($attribute->getAttributeCode(), $orderValue);
-                $dataModel  = $this->_attrDataFactory->create($attribute, $customer);
-                $value      = $dataModel->outputValue(\Magento\Eav\Model\AttributeDataFactory::OUTPUT_FORMAT_HTML);
-                $sortOrder  = $attribute->getSortOrder() + $attribute->getIsUserDefined() ? 200 : 0;
-                $sortOrder  = $this->_prepareAccountDataSortOrder($accountData, $sortOrder);
-                $accountData[$sortOrder] = array(
+                $metadataElement = $this->_metadataElementFactory->create($attribute, $orderValue, $entityType);
+                $value = $metadataElement->outputValue(AttributeDataFactory::OUTPUT_FORMAT_HTML);
+                $sortOrder = $attribute->getSortOrder() + $attribute->isUserDefined() ? 200 : 0;
+                $sortOrder = $this->_prepareAccountDataSortOrder($accountData, $sortOrder);
+                $accountData[$sortOrder] = [
                     'label' => $attribute->getFrontendLabel(),
-                    'value' => $this->escapeHtml($value, array('br'))
-                );
+                    'value' => $this->escapeHtml($value, ['br']),
+                ];
             }
         }
-
         ksort($accountData, SORT_NUMERIC);
 
         return $accountData;
@@ -198,30 +218,111 @@ class Info extends \Magento\Sales\Block\Adminhtml\Order\AbstractOrder
      * @param string $label
      * @return string
      */
-    public function getAddressEditLink($address, $label='')
+    public function getAddressEditLink($address, $label = '')
     {
-        if (empty($label)) {
-            $label = __('Edit');
+        if ($this->_authorization->isAllowed('Magento_Sales::actions_edit')) {
+            if (empty($label)) {
+                $label = __('Edit');
+            }
+            $url = $this->getUrl('sales/order/address', ['address_id' => $address->getId()]);
+            return '<a href="' . $this->escapeUrl($url) . '">' . $this->escapeHtml($label) . '</a>';
         }
-        $url = $this->getUrl('sales/order/address', array('address_id'=>$address->getId()));
-        return '<a href="'.$url.'">' . $label . '</a>';
+
+        return '';
     }
 
     /**
      * Whether Customer IP address should be displayed on sales documents
+     *
      * @return bool
      */
     public function shouldDisplayCustomerIp()
     {
-        return !$this->_storeConfig
-            ->getConfigFlag('sales/general/hide_customer_ip', $this->getOrder()->getStoreId());
+        return !$this->_scopeConfig->isSetFlag(
+            'sales/general/hide_customer_ip',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $this->getOrder()->getStoreId()
+        );
     }
 
     /**
+     * Check if is single store mode
+     *
      * @return bool
      */
     public function isSingleStoreMode()
     {
         return $this->_storeManager->isSingleStoreMode();
+    }
+
+    /**
+     * Get object created at date affected with object store timezone
+     *
+     * @param mixed $store
+     * @param string $createdAt
+     * @return \DateTime
+     */
+    public function getCreatedAtStoreDate($store, $createdAt)
+    {
+        return $this->_localeDate->scopeDate($store, $createdAt, true);
+    }
+
+    /**
+     * Get timezone for store
+     *
+     * @param mixed $store
+     * @return string
+     */
+    public function getTimezoneForStore($store)
+    {
+        return $this->_localeDate->getConfigTimezone(
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $store->getCode()
+        );
+    }
+
+    /**
+     * Get object created at date
+     *
+     * @param string $createdAt
+     * @return \DateTime
+     */
+    public function getOrderAdminDate($createdAt)
+    {
+        return $this->_localeDate->date(new \DateTime($createdAt));
+    }
+
+    /**
+     * Returns string with formatted address
+     *
+     * @param Address $address
+     * @return null|string
+     */
+    public function getFormattedAddress(Address $address)
+    {
+        return $this->addressRenderer->format($address, 'html');
+    }
+
+    /**
+     * @inheritdoc
+     * @since 101.0.0
+     */
+    public function getChildHtml($alias = '', $useCache = true)
+    {
+        $layout = $this->getLayout();
+
+        if ($alias || !$layout) {
+            return parent::getChildHtml($alias, $useCache);
+        }
+
+        $childNames = $layout->getChildNames($this->getNameInLayout());
+        $outputChildNames = array_diff($childNames, ['extra_customer_info']);
+
+        $out = '';
+        foreach ($outputChildNames as $childName) {
+            $out .= $layout->renderElement($childName, $useCache);
+        }
+
+        return $out;
     }
 }

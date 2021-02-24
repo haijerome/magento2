@@ -1,36 +1,49 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Sales\Block\Adminhtml\Items\Column;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Filter\TruncateFilter\Result;
+use Magento\Catalog\Helper\Data as CatalogHelper;
 
 /**
  * Sales Order items name column renderer
+ *
+ * @api
+ * @since 100.0.2
  */
 class Name extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
 {
+    /**
+     * @param \Magento\Backend\Block\Template\Context $context
+     * @param \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry
+     * @param \Magento\CatalogInventory\Api\StockConfigurationInterface $stockConfiguration
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Catalog\Model\Product\OptionFactory $optionFactory
+     * @param array $data
+     * @param CatalogHelper|null $catalogHelper
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
+        \Magento\CatalogInventory\Api\StockConfigurationInterface $stockConfiguration,
+        \Magento\Framework\Registry $registry,
+        \Magento\Catalog\Model\Product\OptionFactory $optionFactory,
+        array $data = [],
+        ?CatalogHelper $catalogHelper = null
+    ) {
+        $data['catalogHelper'] = $catalogHelper ?? ObjectManager::getInstance()->get(CatalogHelper::class);
+        parent::__construct($context, $stockRegistry, $stockConfiguration, $registry, $optionFactory, $data);
+    }
+
+    /**
+     * @var Result
+     */
+    private $truncateResult = null;
+
     /**
      * Truncate string
      *
@@ -40,15 +53,15 @@ class Name extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
      * @param string &$remainder
      * @param bool $breakWords
      * @return string
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function truncateString($value, $length = 80, $etc = '...', &$remainder = '', $breakWords = true)
     {
-        return $this->filterManager->truncate($value, array(
-            'length' => $length,
-            'etc' => $etc,
-            'remainder' => $remainder,
-            'breakWords' => $breakWords
-        ));
+        $this->truncateResult = $this->filterManager->truncateFilter(
+            $value,
+            ['length' => $length, 'etc' => $etc, 'breakWords' => $breakWords]
+        );
+        return $this->truncateResult->getValue();
     }
 
     /**
@@ -60,11 +73,11 @@ class Name extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
     public function getFormattedOption($value)
     {
         $remainder = '';
-        $value = $this->truncateString($value, 55, '', $remainder);
-        $result = array(
-            'value' => nl2br($value),
-            'remainder' => nl2br($remainder)
-        );
+        $this->truncateString($value, 55, '', $remainder);
+        $result = [
+            'value' => nl2br($this->truncateResult->getValue()),
+            'remainder' => nl2br($this->truncateResult->getRemainder())
+        ];
 
         return $result;
     }

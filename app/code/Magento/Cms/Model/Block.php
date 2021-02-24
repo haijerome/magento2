@@ -1,58 +1,46 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Cms\Model;
+
+use Magento\Cms\Api\Data\BlockInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\DataObject\IdentityInterface;
+use Magento\Framework\Model\AbstractModel;
+use Magento\Framework\Validation\ValidationException;
+use Magento\Framework\Validator\HTML\WYSIWYGValidatorInterface;
+use Magento\Framework\Model\Context;
+use Magento\Framework\Registry;
+use Magento\Framework\Model\ResourceModel\AbstractResource;
+use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Backend\Model\Validator\UrlKey\CompositeUrlKey;
+use Magento\Framework\Exception\LocalizedException;
 
 /**
  * CMS block model
  *
- * @method \Magento\Cms\Model\Resource\Block _getResource()
- * @method \Magento\Cms\Model\Resource\Block getResource()
- * @method string getTitle()
- * @method \Magento\Cms\Model\Block setTitle(string $value)
- * @method string getIdentifier()
- * @method \Magento\Cms\Model\Block setIdentifier(string $value)
- * @method string getContent()
- * @method \Magento\Cms\Model\Block setContent(string $value)
- * @method string getCreationTime()
- * @method \Magento\Cms\Model\Block setCreationTime(string $value)
- * @method string getUpdateTime()
- * @method \Magento\Cms\Model\Block setUpdateTime(string $value)
- * @method int getIsActive()
- * @method \Magento\Cms\Model\Block setIsActive(int $value)
- *
- * @category    Magento
- * @package     Magento_Cms
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @method Block setStoreId(int $storeId)
+ * @method int getStoreId()
  */
-
-namespace Magento\Cms\Model;
-
-class Block extends \Magento\Core\Model\AbstractModel
+class Block extends AbstractModel implements BlockInterface, IdentityInterface
 {
-    const CACHE_TAG     = 'cms_block';
-    protected $_cacheTag= 'cms_block';
+    /**
+     * CMS block cache tag
+     */
+    const CACHE_TAG = 'cms_b';
+
+    /**#@+
+     * Block's statuses
+     */
+    const STATUS_ENABLED = 1;
+    const STATUS_DISABLED = 0;
+
+    /**#@-*/
+
+    /**#@-*/
+    protected $_cacheTag = self::CACHE_TAG;
 
     /**
      * Prefix of model events names
@@ -61,25 +49,266 @@ class Block extends \Magento\Core\Model\AbstractModel
      */
     protected $_eventPrefix = 'cms_block';
 
+    /**
+     * @var WYSIWYGValidatorInterface
+     */
+    private $wysiwygValidator;
+
+    /**
+     * @var CompositeUrlKey
+     */
+    private $compositeUrlValidator;
+
+    /**
+     * @param Context $context
+     * @param Registry $registry
+     * @param AbstractResource|null $resource
+     * @param AbstractDb|null $resourceCollection
+     * @param array $data
+     * @param WYSIWYGValidatorInterface|null $wysiwygValidator
+     * @param CompositeUrlKey|null $compositeUrlValidator
+     */
+    public function __construct(
+        Context $context,
+        Registry $registry,
+        AbstractResource $resource = null,
+        AbstractDb $resourceCollection = null,
+        array $data = [],
+        ?WYSIWYGValidatorInterface $wysiwygValidator = null,
+        CompositeUrlKey $compositeUrlValidator = null
+    ) {
+        parent::__construct($context, $registry, $resource, $resourceCollection, $data);
+        $this->wysiwygValidator = $wysiwygValidator
+            ?? ObjectManager::getInstance()->get(WYSIWYGValidatorInterface::class);
+        $this->compositeUrlValidator = $compositeUrlValidator
+            ?? ObjectManager::getInstance()->get(CompositeUrlKey::class);
+    }
+
+    /**
+     * Construct.
+     *
+     * @return void
+     */
     protected function _construct()
     {
-        $this->_init('Magento\Cms\Model\Resource\Block');
+        $this->_init(\Magento\Cms\Model\ResourceModel\Block::class);
     }
 
     /**
      * Prevent blocks recursion
      *
-     * @return \Magento\Core\Model\AbstractModel
-     * @throws \Magento\Core\Exception
+     * @return AbstractModel
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
-        $needle = 'block_id="' . $this->getBlockId() . '"';
-        if (false == strstr($this->getContent(), $needle)) {
-            return parent::_beforeSave();
+        if ($this->hasDataChanges()) {
+            $this->setUpdateTime(null);
         }
-        throw new \Magento\Core\Exception(
-            __('Make sure that static block content does not reference the block itself.')
-        );
+
+        $needle = 'block_id="' . $this->getId() . '"';
+        if (strstr($this->getContent(), (string) $needle) !== false) {
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('Make sure that static block content does not reference the block itself.')
+            );
+        }
+
+        $errors = $this->compositeUrlValidator->validate($this->getIdentifier());
+        if (!empty($errors)) {
+            throw new LocalizedException($errors[0]);
+        }
+
+        parent::beforeSave();
+
+        //Validating HTML content.
+        if ($this->getContent() && $this->getContent() !== $this->getOrigData(self::CONTENT)) {
+            try {
+                $this->wysiwygValidator->validate($this->getContent());
+            } catch (ValidationException $exception) {
+                throw new ValidationException(
+                    __('Content field contains restricted HTML elements. %1', $exception->getMessage()),
+                    $exception
+                );
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get identities
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        return [self::CACHE_TAG . '_' . $this->getId(), self::CACHE_TAG . '_' . $this->getIdentifier()];
+    }
+
+    /**
+     * Retrieve block id
+     *
+     * @return int
+     */
+    public function getId()
+    {
+        return $this->getData(self::BLOCK_ID);
+    }
+
+    /**
+     * Retrieve block identifier
+     *
+     * @return string
+     */
+    public function getIdentifier()
+    {
+        return (string)$this->getData(self::IDENTIFIER);
+    }
+
+    /**
+     * Retrieve block title
+     *
+     * @return string
+     */
+    public function getTitle()
+    {
+        return $this->getData(self::TITLE);
+    }
+
+    /**
+     * Retrieve block content
+     *
+     * @return string
+     */
+    public function getContent()
+    {
+        return $this->getData(self::CONTENT);
+    }
+
+    /**
+     * Retrieve block creation time
+     *
+     * @return string
+     */
+    public function getCreationTime()
+    {
+        return $this->getData(self::CREATION_TIME);
+    }
+
+    /**
+     * Retrieve block update time
+     *
+     * @return string
+     */
+    public function getUpdateTime()
+    {
+        return $this->getData(self::UPDATE_TIME);
+    }
+
+    /**
+     * Is active
+     *
+     * @return bool
+     */
+    public function isActive()
+    {
+        return (bool)$this->getData(self::IS_ACTIVE);
+    }
+
+    /**
+     * Set ID
+     *
+     * @param int $id
+     * @return BlockInterface
+     */
+    public function setId($id)
+    {
+        return $this->setData(self::BLOCK_ID, $id);
+    }
+
+    /**
+     * Set identifier
+     *
+     * @param string $identifier
+     * @return BlockInterface
+     */
+    public function setIdentifier($identifier)
+    {
+        return $this->setData(self::IDENTIFIER, $identifier);
+    }
+
+    /**
+     * Set title
+     *
+     * @param string $title
+     * @return BlockInterface
+     */
+    public function setTitle($title)
+    {
+        return $this->setData(self::TITLE, $title);
+    }
+
+    /**
+     * Set content
+     *
+     * @param string $content
+     * @return BlockInterface
+     */
+    public function setContent($content)
+    {
+        return $this->setData(self::CONTENT, $content);
+    }
+
+    /**
+     * Set creation time
+     *
+     * @param string $creationTime
+     * @return BlockInterface
+     */
+    public function setCreationTime($creationTime)
+    {
+        return $this->setData(self::CREATION_TIME, $creationTime);
+    }
+
+    /**
+     * Set update time
+     *
+     * @param string $updateTime
+     * @return BlockInterface
+     */
+    public function setUpdateTime($updateTime)
+    {
+        return $this->setData(self::UPDATE_TIME, $updateTime);
+    }
+
+    /**
+     * Set is active
+     *
+     * @param bool|int $isActive
+     * @return BlockInterface
+     */
+    public function setIsActive($isActive)
+    {
+        return $this->setData(self::IS_ACTIVE, $isActive);
+    }
+
+    /**
+     * Receive page store ids
+     *
+     * @return int[]
+     */
+    public function getStores()
+    {
+        return $this->hasData('stores') ? $this->getData('stores') : $this->getData('store_id');
+    }
+
+    /**
+     * Prepare block's statuses.
+     *
+     * @return array
+     */
+    public function getAvailableStatuses()
+    {
+        return [self::STATUS_ENABLED => __('Enabled'), self::STATUS_DISABLED => __('Disabled')];
     }
 }

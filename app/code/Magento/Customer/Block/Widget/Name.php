@@ -1,39 +1,68 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Customer\Block\Widget;
 
-class Name extends \Magento\Customer\Block\Widget\AbstractWidget
+use Magento\Customer\Api\AddressMetadataInterface;
+use Magento\Customer\Api\CustomerMetadataInterface;
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Customer\Helper\Address as AddressHelper;
+use Magento\Customer\Model\Options;
+use Magento\Framework\View\Element\Template\Context;
+
+/**
+ * Widget for showing customer name.
+ *
+ * @method CustomerInterface getObject()
+ * @method Name setObject(CustomerInterface $customer)
+ *
+ * @SuppressWarnings(PHPMD.DepthOfInheritance)
+ */
+class Name extends AbstractWidget
 {
+    /**
+     * @var AddressMetadataInterface
+     */
+    protected $addressMetadata;
+
+    /**
+     * @var Options
+     */
+    protected $options;
+
+    /**
+     * @param Context $context
+     * @param AddressHelper $addressHelper
+     * @param CustomerMetadataInterface $customerMetadata
+     * @param Options $options
+     * @param AddressMetadataInterface $addressMetadata
+     * @param array $data
+     */
+    public function __construct(
+        Context $context,
+        AddressHelper $addressHelper,
+        CustomerMetadataInterface $customerMetadata,
+        Options $options,
+        AddressMetadataInterface $addressMetadata,
+        array $data = []
+    ) {
+        $this->options = $options;
+        parent::__construct($context, $addressHelper, $customerMetadata, $data);
+        $this->addressMetadata = $addressMetadata;
+        $this->_isScopePrivate = true;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function _construct()
     {
         parent::_construct();
 
         // default template location
-        $this->setTemplate('widget/name.phtml');
+        $this->setTemplate('Magento_Customer::widget/name.phtml');
     }
 
     /**
@@ -54,7 +83,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function showPrefix()
     {
-        return (bool)$this->_getAttribute('prefix')->getIsVisible();
+        return $this->_isAttributeVisible('prefix');
     }
 
     /**
@@ -64,7 +93,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function isPrefixRequired()
     {
-        return (bool)$this->_getAttribute('prefix')->getIsRequired();
+        return $this->_isAttributeRequired('prefix');
     }
 
     /**
@@ -74,11 +103,14 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function getPrefixOptions()
     {
-        $prefixOptions = $this->helper('Magento\Customer\Helper\Data')->getNamePrefixOptions();
+        $prefixOptions = $this->options->getNamePrefixOptions();
 
         if ($this->getObject() && !empty($prefixOptions)) {
-            $oldPrefix = $this->escapeHtml(trim($this->getObject()->getPrefix()));
-            $prefixOptions[$oldPrefix] = $oldPrefix;
+            $prefixOption = $this->getObject()->getPrefix();
+            $oldPrefix = $this->escapeHtml(trim($prefixOption));
+            if ($prefixOption !== null && !isset($prefixOptions[$oldPrefix]) && !isset($prefixOptions[$prefixOption])) {
+                $prefixOptions[$oldPrefix] = $oldPrefix;
+            }
         }
         return $prefixOptions;
     }
@@ -90,7 +122,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function showMiddlename()
     {
-        return (bool)$this->_getAttribute('middlename')->getIsVisible();
+        return $this->_isAttributeVisible('middlename');
     }
 
     /**
@@ -100,7 +132,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function isMiddlenameRequired()
     {
-        return (bool)$this->_getAttribute('middlename')->getIsRequired();
+        return $this->_isAttributeRequired('middlename');
     }
 
     /**
@@ -110,7 +142,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function showSuffix()
     {
-        return (bool)$this->_getAttribute('suffix')->getIsVisible();
+        return $this->_isAttributeVisible('suffix');
     }
 
     /**
@@ -120,7 +152,7 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function isSuffixRequired()
     {
-        return (bool)$this->_getAttribute('suffix')->getIsRequired();
+        return $this->_isAttributeRequired('suffix');
     }
 
     /**
@@ -130,10 +162,13 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
      */
     public function getSuffixOptions()
     {
-        $suffixOptions = $this->helper('Magento\Customer\Helper\Data')->getNameSuffixOptions();
+        $suffixOptions = $this->options->getNameSuffixOptions();
         if ($this->getObject() && !empty($suffixOptions)) {
-            $oldSuffix = $this->escapeHtml(trim($this->getObject()->getSuffix()));
-            $suffixOptions[$oldSuffix] = $oldSuffix;
+            $suffixOption = $this->getObject()->getSuffix();
+            $oldSuffix = $this->escapeHtml(trim($suffixOption));
+            if ($suffixOption !== null && !isset($suffixOptions[$oldSuffix]) && !isset($suffixOptions[$suffixOption])) {
+                $suffixOptions[$oldSuffix] = $oldSuffix;
+            }
         }
         return $suffixOptions;
     }
@@ -166,22 +201,23 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
     }
 
     /**
-     * Retrieve customer or customer address attribute instance
-     *
-     * @param string $attributeCode
-     * @return \Magento\Customer\Model\Attribute|false
+     * @inheritdoc
      */
     protected function _getAttribute($attributeCode)
     {
-        if ($this->getForceUseCustomerAttributes() || $this->getObject() instanceof \Magento\Customer\Model\Customer) {
+        if ($this->getForceUseCustomerAttributes() || $this->getObject() instanceof CustomerInterface) {
             return parent::_getAttribute($attributeCode);
         }
 
-        $attribute = $this->_eavConfig->getAttribute('customer_address', $attributeCode);
+        try {
+            $attribute = $this->addressMetadata->getAttributeMetadata($attributeCode);
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+            return null;
+        }
 
-        if ($this->getForceUseCustomerRequiredAttributes() && $attribute && !$attribute->getIsRequired()) {
+        if ($this->getForceUseCustomerRequiredAttributes() && $attribute && !$attribute->isRequired()) {
             $customerAttribute = parent::_getAttribute($attributeCode);
-            if ($customerAttribute && $customerAttribute->getIsRequired()) {
+            if ($customerAttribute && $customerAttribute->isRequired()) {
                 $attribute = $customerAttribute;
             }
         }
@@ -199,5 +235,41 @@ class Name extends \Magento\Customer\Block\Widget\AbstractWidget
     {
         $attribute = $this->_getAttribute($attributeCode);
         return $attribute ? __($attribute->getStoreLabel()) : '';
+    }
+
+    /**
+     * Get string with frontend validation classes for attribute
+     *
+     * @param string $attributeCode
+     * @return string
+     */
+    public function getAttributeValidationClass($attributeCode)
+    {
+        $attributeMetadata = $this->_getAttribute($attributeCode);
+        return $attributeMetadata ? $attributeMetadata->getFrontendClass() : '';
+    }
+
+    /**
+     * Check if attribute is required
+     *
+     * @param string $attributeCode
+     * @return bool
+     */
+    private function _isAttributeRequired($attributeCode)
+    {
+        $attributeMetadata = $this->_getAttribute($attributeCode);
+        return $attributeMetadata ? (bool)$attributeMetadata->isRequired() : false;
+    }
+
+    /**
+     * Check if attribute is visible
+     *
+     * @param string $attributeCode
+     * @return bool
+     */
+    private function _isAttributeVisible($attributeCode)
+    {
+        $attributeMetadata = $this->_getAttribute($attributeCode);
+        return $attributeMetadata ? (bool)$attributeMetadata->isVisible() : false;
     }
 }

@@ -1,39 +1,21 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Sales\Block\Adminhtml\Transactions;
+
+use Magento\Sales\Api\OrderPaymentRepositoryInterface;
 
 /**
  * Adminhtml transaction detail
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author     Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Transactions;
-
-class Detail extends \Magento\Adminhtml\Block\Widget\Container
+class Detail extends \Magento\Backend\Block\Widget\Container
 {
     /**
      * Transaction model
@@ -45,27 +27,44 @@ class Detail extends \Magento\Adminhtml\Block\Widget\Container
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @var \Magento\Sales\Helper\Admin
+     */
+    private $adminHelper;
+
+    /**
+     * @var OrderPaymentRepositoryInterface
+     */
+    protected $orderPaymentRepository;
+
+    /**
+     * @param \Magento\Backend\Block\Widget\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Sales\Helper\Admin $adminHelper
+     * @param \Magento\Sales\Api\OrderPaymentRepositoryInterface $orderPaymentRepository
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Backend\Block\Widget\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Sales\Helper\Admin $adminHelper,
+        OrderPaymentRepositoryInterface $orderPaymentRepository,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
+        $this->adminHelper = $adminHelper;
+        $this->orderPaymentRepository = $orderPaymentRepository;
         parent::__construct($context, $data);
     }
 
     /**
      * Add control buttons
      *
+     * @return void
      */
     protected function _construct()
     {
@@ -76,61 +75,81 @@ class Detail extends \Magento\Adminhtml\Block\Widget\Container
             return;
         }
 
-        $backUrl = ($this->_txn->getOrderUrl()) ? $this->_txn->getOrderUrl() : $this->getUrl('sales/*/');
-        $this->_addButton('back', array(
-            'label'   => __('Back'),
-            'onclick' => "setLocation('{$backUrl}')",
-            'class'   => 'back'
-        ));
+        $backUrl = $this->_txn->getOrderUrl() ? $this->_txn->getOrderUrl() : $this->getUrl('sales/*/');
+        $this->buttonList->add(
+            'back',
+            ['label' => __('Back'), 'onclick' => "setLocation('{$backUrl}')", 'class' => 'back']
+        );
 
-        if ($this->_authorization->isAllowed('Magento_Sales::transactions_fetch')
-            && $this->_txn->getOrderPaymentObject()->getMethodInstance()->canFetchTransactionInfo()) {
-            $fetchUrl = $this->getUrl('sales/*/fetch' , array('_current' => true));
-            $this->_addButton('fetch', array(
-                'label'   => __('Fetch'),
-                'onclick' => "setLocation('{$fetchUrl}')",
-                'class'   => 'button'
-            ));
+        $fetchTransactionAllowed = $this->_authorization->isAllowed('Magento_Sales::transactions_fetch');
+        $canFetchTransaction = $this->orderPaymentRepository->get($this->_txn->getPaymentId())
+            ->getMethodInstance()
+            ->canFetchTransactionInfo();
+
+        if ($fetchTransactionAllowed && $canFetchTransaction) {
+            $fetchUrl = $this->getUrl('sales/*/fetch', ['_current' => true]);
+            $this->buttonList->add(
+                'fetch',
+                ['label' => __('Fetch'), 'onclick' => "setLocation('{$fetchUrl}')", 'class' => 'button']
+            );
         }
     }
 
     /**
      * Retrieve header text
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getHeaderText()
     {
-        return __("Transaction # %1 | %2", $this->_txn->getTxnId(), $this->formatDate($this->_txn->getCreatedAt(), \Magento\Core\Model\LocaleInterface::FORMAT_TYPE_MEDIUM, true));
+        return __(
+            "Transaction # %1 | %2",
+            $this->_txn->getTxnId(),
+            $this->formatDate(
+                $this->_txn->getCreatedAt(),
+                \IntlDateFormatter::MEDIUM,
+                true
+            )
+        );
     }
 
+    /**
+     * Render block html
+     *
+     * @return string
+     */
     protected function _toHtml()
     {
-        $this->setTxnIdHtml($this->escapeHtml($this->_txn->getTxnId()));
+        $this->setTxnIdHtml($this->adminHelper->escapeHtmlWithLinks(
+            $this->_txn->getHtmlTxnId(),
+            ['a']
+        ));
 
         $this->setParentTxnIdUrlHtml(
-            $this->escapeHtml($this->getUrl('sales/transactions/view', array('txn_id' => $this->_txn->getParentId())))
+            $this->escapeHtml($this->getUrl('sales/transactions/view', ['txn_id' => $this->_txn->getParentId()]))
         );
 
-        $this->setParentTxnIdHtml(
-            $this->escapeHtml($this->_txn->getParentTxnId())
-        );
+        $this->setParentTxnIdHtml($this->escapeHtml($this->_txn->getParentTxnId()));
 
         $this->setOrderIncrementIdHtml($this->escapeHtml($this->_txn->getOrder()->getIncrementId()));
 
-        $this->setTxnTypeHtml($this->escapeHtml($this->_txn->getTxnType()));
+        $this->setTxnTypeHtml($this->escapeHtml(__($this->_txn->getTxnType())));
 
         $this->setOrderIdUrlHtml(
-            $this->escapeHtml($this->getUrl('sales/order/view', array('order_id' => $this->_txn->getOrderId())))
+            $this->escapeHtml($this->getUrl('sales/order/view', ['order_id' => $this->_txn->getOrderId()]))
         );
 
-        $this->setIsClosedHtml(
-            ($this->_txn->getIsClosed()) ? __('Yes') : __('No')
-        );
+        $this->setIsClosedHtml($this->_txn->getIsClosed() ? __('Yes') : __('No'));
 
-        $createdAt = (strtotime($this->_txn->getCreatedAt()))
-            ? $this->formatDate($this->_txn->getCreatedAt(), \Magento\Core\Model\LocaleInterface::FORMAT_TYPE_MEDIUM, true)
-            : __('N/A');
+        $createdAt = strtotime(
+            $this->_txn->getCreatedAt()
+        ) ? $this->formatDate(
+            $this->_txn->getCreatedAt(),
+            \IntlDateFormatter::MEDIUM,
+            true
+        ) : __(
+            'N/A'
+        );
         $this->setCreatedAtHtml($this->escapeHtml($createdAt));
 
         return parent::_toHtml();

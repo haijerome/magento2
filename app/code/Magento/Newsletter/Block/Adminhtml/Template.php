@@ -1,57 +1,63 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Newsletter
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Newsletter templates page content block
  *
- * @category   Magento
- * @package    Magento_Newsletter
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
 namespace Magento\Newsletter\Block\Adminhtml;
 
 class Template extends \Magento\Backend\Block\Template
 {
-    protected $_template = 'template/list.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Newsletter::template/list.phtml';
 
+    /**
+     * @return $this
+     */
     protected function _prepareLayout()
     {
+        $this->getToolbar()->addChild(
+            'add_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Add New Template'),
+                'onclick' => "window.location='" . $this->getCreateUrl() . "'",
+                'class' => 'add primary add-template'
+            ]
+        );
+
         $this->setChild(
             'grid',
-            $this->getLayout()->createBlock('Magento\Newsletter\Block\Adminhtml\Template\Grid', 'newsletter.template.grid')
+            $this->getLayout()->createBlock(
+                \Magento\Newsletter\Block\Adminhtml\Template\Grid::class,
+                'newsletter.template.grid'
+            )
         );
         return parent::_prepareLayout();
     }
 
+    /**
+     * Get the url for create
+     *
+     * @return string
+     */
     public function getCreateUrl()
     {
         return $this->getUrl('*/*/new');
     }
 
+    /**
+     * Get header text
+     *
+     * @return \Magento\Framework\Phrase
+     */
     public function getHeaderText()
     {
         return __('Newsletter Templates');

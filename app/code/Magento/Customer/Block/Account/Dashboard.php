@@ -1,145 +1,217 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Account;
+
+use Magento\Customer\Api\AccountManagementInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Customer\Api\Data\AddressInterface;
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Customer\Model\Session;
+use Magento\Framework\Phrase;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Newsletter\Model\Subscriber;
+use Magento\Newsletter\Model\SubscriberFactory;
 
 /**
  * Customer dashboard block
  *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Customer\Block\Account;
-
-class Dashboard extends \Magento\View\Element\Template
+class Dashboard extends Template
 {
     /**
-     * @var \Magento\Newsletter\Model\Subscriber
+     * @var Subscriber
      */
-    protected $_subscription;
+    protected $subscription;
 
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var Session
      */
-    protected $_customerSession;
+    protected $customerSession;
 
     /**
-     * @var \Magento\Newsletter\Model\SubscriberFactory
+     * @var SubscriberFactory
      */
-    protected $_subscriberFactory;
+    protected $subscriberFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
+     * @var CustomerRepositoryInterface
+     */
+    protected $customerRepository;
+
+    /**
+     * @var AccountManagementInterface
+     */
+    protected $customerAccountManagement;
+
+    /**
+     * @param Context $context
+     * @param Session $customerSession
+     * @param SubscriberFactory $subscriberFactory
+     * @param CustomerRepositoryInterface $customerRepository
+     * @param AccountManagementInterface $customerAccountManagement
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        array $data = array()
+        Context $context,
+        Session $customerSession,
+        SubscriberFactory $subscriberFactory,
+        CustomerRepositoryInterface $customerRepository,
+        AccountManagementInterface $customerAccountManagement,
+        array $data = []
     ) {
-        $this->_customerSession = $customerSession;
-        $this->_subscriberFactory = $subscriberFactory;
+        $this->customerSession = $customerSession;
+        $this->subscriberFactory = $subscriberFactory;
+        $this->customerRepository = $customerRepository;
+        $this->customerAccountManagement = $customerAccountManagement;
         parent::__construct($context, $data);
     }
 
+    /**
+     * Return the Customer given the customer Id stored in the session.
+     *
+     * @return CustomerInterface
+     */
     public function getCustomer()
     {
-        return $this->_customerSession->getCustomer();
+        return $this->customerRepository->getById($this->customerSession->getCustomerId());
     }
 
+    /**
+     * Retrieve the Url for editing the customer's account.
+     *
+     * @return string
+     */
     public function getAccountUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/account/edit', array('_secure'=>true));
+        return $this->_urlBuilder->getUrl('customer/account/edit', ['_secure' => true]);
     }
 
+    /**
+     * Retrieve the Url for customer addresses.
+     *
+     * @return string
+     */
     public function getAddressesUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/address/index', array('_secure'=>true));
+        return $this->_urlBuilder->getUrl('customer/address/index', ['_secure' => true]);
     }
 
+    /**
+     * Retrieve the Url for editing the specified address.
+     *
+     * @param AddressInterface $address
+     * @return string
+     */
     public function getAddressEditUrl($address)
     {
-        return $this->_urlBuilder->getUrl('customer/address/edit', array('_secure'=>true, 'id'=>$address->getId()));
+        return $this->_urlBuilder->getUrl(
+            'customer/address/edit',
+            ['_secure' => true, 'id' => $address->getId()]
+        );
     }
 
+    /**
+     * Retrieve the Url for customer orders.
+     *
+     * @return string
+     * @deprecated 102.0.3 Action does not exist
+     */
     public function getOrdersUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/order/index', array('_secure'=>true));
+        //phpcs:ignore Magento2.Functions.DiscouragedFunction
+        trigger_error('Method is deprecated', E_USER_DEPRECATED);
+        return '';
     }
 
-    public function getReviewsUrl()
-    {
-        return $this->_urlBuilder->getUrl('review/customer/index', array('_secure'=>true));
-    }
-
+    /**
+     * Retrieve the Url for managing customer wishlist.
+     *
+     * @return string
+     */
     public function getWishlistUrl()
     {
-        return $this->_urlBuilder->getUrl('customer/wishlist/index', array('_secure'=>true));
+        return $this->_urlBuilder->getUrl('wishlist/index', ['_secure' => true]);
     }
 
+    /**
+     * Retrieve the subscription object (i.e. the subscriber).
+     *
+     * @return Subscriber
+     */
     public function getSubscriptionObject()
     {
-        if(is_null($this->_subscription)) {
-            $this->_subscription = $this->_createSubscriber()->loadByCustomer($this->getCustomer());
+        if ($this->subscription === null) {
+            $websiteId = (int)$this->_storeManager->getWebsite()->getId();
+            $this->subscription = $this->_createSubscriber();
+            $this->subscription->loadByCustomer((int)$this->getCustomer()->getId(), $websiteId);
         }
 
-        return $this->_subscription;
+        return $this->subscription;
     }
 
+    /**
+     * Retrieve the Url for managing newsletter subscriptions.
+     *
+     * @return string
+     */
     public function getManageNewsletterUrl()
     {
         return $this->getUrl('newsletter/manage');
     }
 
+    /**
+     * Retrieve subscription text, either subscribed or not.
+     *
+     * @return Phrase
+     */
     public function getSubscriptionText()
     {
-        if($this->getSubscriptionObject()->isSubscribed()) {
-            return __('You subscribe to our newsletter.');
+        if ($this->getSubscriptionObject()->isSubscribed()) {
+            return __('You are subscribed to our newsletter.');
         }
 
-        return __('You are currently not subscribed to our newsletter.');
-    }
-
-    public function getPrimaryAddresses()
-    {
-        $addresses = $this->getCustomer()->getPrimaryAddresses();
-        if (empty($addresses)) {
-            return false;
-        }
-        return $addresses;
+        return __('You aren\'t subscribed to our newsletter.');
     }
 
     /**
-     * Get back url in account dashboard
+     * Retrieve the customer's primary addresses (i.e. default billing and shipping).
      *
-     * This method is copypasted in:
-     * \Magento\Wishlist\Block\Customer\Wishlist  - because of strange inheritance
-     * \Magento\Customer\Block\Address\Book - because of secure url
+     * @return AddressInterface[]|bool
+     */
+    public function getPrimaryAddresses()
+    {
+        $addresses = [];
+        $customerId = $this->getCustomer()->getId();
+
+        if ($defaultBilling = $this->customerAccountManagement->getDefaultBillingAddress($customerId)) {
+            $addresses[] = $defaultBilling;
+        }
+
+        if ($defaultShipping = $this->customerAccountManagement->getDefaultShippingAddress($customerId)) {
+            if ($defaultBilling) {
+                if ($defaultBilling->getId() != $defaultShipping->getId()) {
+                    $addresses[] = $defaultShipping;
+                }
+            } else {
+                $addresses[] = $defaultShipping;
+            }
+        }
+
+        return empty($addresses) ? false : $addresses;
+    }
+
+    /**
+     * Get back Url in account dashboard.
+     *
+     * This method is copy/pasted in:
+     * \Magento\Wishlist\Block\Customer\Wishlist  - Because of strange inheritance
+     * \Magento\Customer\Block\Address\Book - Because of secure Url
      *
      * @return string
      */
@@ -153,10 +225,12 @@ class Dashboard extends \Magento\View\Element\Template
     }
 
     /**
-     * @return \Magento\Newsletter\Model\Subscriber
+     * Create an instance of a subscriber.
+     *
+     * @return Subscriber
      */
     protected function _createSubscriber()
     {
-        return $this->_subscriberFactory->create();
+        return $this->subscriberFactory->create();
     }
 }

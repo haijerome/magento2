@@ -1,32 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+use Magento\Framework\App\Filesystem\DirectoryList;
 
 /** @var $config \Magento\Catalog\Model\Product\Media\Config */
-$config = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->get('Magento\Catalog\Model\Product\Media\Config');
-\Magento\Io\File::rmdirRecursive($config->getBaseMediaPath());
-\Magento\Io\File::rmdirRecursive($config->getBaseTmpMediaPath());
+$config = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+    \Magento\Catalog\Model\Product\Media\Config::class
+);
+/** @var $database \Magento\MediaStorage\Helper\File\Storage\Database */
+$database = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+    \Magento\MediaStorage\Helper\File\Storage\Database::class
+);
+
+/** @var \Magento\Framework\Filesystem\Directory\WriteInterface $mediaDirectory */
+$mediaDirectory = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+    \Magento\Framework\Filesystem::class
+)->getDirectoryWrite(
+    DirectoryList::MEDIA
+);
+
+$mediaDirectory->delete($config->getBaseMediaPath());
+$mediaDirectory->delete($config->getBaseTmpMediaPath());
+
+$database->deleteFolder($config->getBaseMediaPath());
+$database->deleteFolder($config->getBaseTmpMediaPath());

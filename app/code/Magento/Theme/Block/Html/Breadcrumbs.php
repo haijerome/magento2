@@ -1,54 +1,34 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Theme\Block\Html;
+
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\View\Element\Template;
 
 /**
  * Html page breadcrumbs block
+ *
+ * @api
+ * @since 100.0.2
  */
-class Breadcrumbs extends \Magento\View\Element\Template
+class Breadcrumbs extends \Magento\Framework\View\Element\Template
 {
     /**
      * Current template name
      *
      * @var string
      */
-    protected $_template = 'html/breadcrumbs.phtml';
+    protected $_template = 'Magento_Theme::html/breadcrumbs.phtml';
 
     /**
      * List of available breadcrumb properties
      *
-     * @var array
+     * @var string[]
      */
-    protected $_properties = array(
-        'label',
-        'title',
-        'link',
-        'first',
-        'last',
-        'readonly',
-    );
+    protected $_properties = ['label', 'title', 'link', 'first', 'last', 'readonly'];
 
     /**
      * List of breadcrumbs
@@ -65,11 +45,31 @@ class Breadcrumbs extends \Magento\View\Element\Template
     protected $_cacheKeyInfo;
 
     /**
+     * @var Json
+     */
+    private $serializer;
+
+    /**
+     * @param Template\Context $context
+     * @param array $data
+     * @param Json|null $serializer
+     */
+    public function __construct(
+        Template\Context $context,
+        array $data = [],
+        Json $serializer = null
+    ) {
+        parent::__construct($context, $data);
+        $this->serializer =
+            $serializer ?: \Magento\Framework\App\ObjectManager::getInstance()->get(Json::class);
+    }
+
+    /**
      * Add crumb
      *
      * @param string $crumbName
      * @param array $crumbInfo
-     * @return \Magento\Theme\Block\Html\Breadcrumbs
+     * @return $this
      */
     public function addCrumb($crumbName, $crumbInfo)
     {
@@ -79,7 +79,7 @@ class Breadcrumbs extends \Magento\View\Element\Template
             }
         }
 
-        if ((!isset($this->_crumbs[$crumbName])) || (!$this->_crumbs[$crumbName]['readonly'])) {
+        if (!isset($this->_crumbs[$crumbName]) || !$this->_crumbs[$crumbName]['readonly']) {
             $this->_crumbs[$crumbName] = $crumbInfo;
         }
 
@@ -95,11 +95,11 @@ class Breadcrumbs extends \Magento\View\Element\Template
      */
     public function getCacheKeyInfo()
     {
-        if (is_null($this->_cacheKeyInfo)) {
-            $this->_cacheKeyInfo = parent::getCacheKeyInfo() + array(
-                'crumbs' => base64_encode(serialize($this->_crumbs)),
-                'name' => $this->getNameInLayout(),
-            );
+        if ($this->_cacheKeyInfo === null) {
+            $this->_cacheKeyInfo = parent::getCacheKeyInfo() + [
+                'crumbs' => base64_encode($this->serializer->serialize($this->_crumbs)),
+                'name' => $this->getNameInLayout()
+            ];
         }
         return $this->_cacheKeyInfo;
     }

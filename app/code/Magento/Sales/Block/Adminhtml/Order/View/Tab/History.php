@@ -1,64 +1,52 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\View\Tab;
 
 /**
  * Order history tab
  *
- * @category   Magento
- * @package    Magento_Sales
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\View\Tab;
-
-class History
-    extends \Magento\Backend\Block\Template
-    implements \Magento\Adminhtml\Block\Widget\Tab\TabInterface
+class History extends \Magento\Backend\Block\Template implements \Magento\Backend\Block\Widget\Tab\TabInterface
 {
-
-    protected $_template = 'order/view/tab/history.phtml';
+    /**
+     * Template
+     *
+     * @var string
+     */
+    protected $_template = 'Magento_Sales::order/view/tab/history.phtml';
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
+     * @var \Magento\Sales\Helper\Admin
+     */
+    private $adminHelper;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Sales\Helper\Admin $adminHelper
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        \Magento\Sales\Helper\Admin $adminHelper,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
         parent::__construct($context, $data);
+        $this->adminHelper = $adminHelper;
     }
 
     /**
@@ -73,7 +61,11 @@ class History
 
     /**
      * Compose and get order full history.
+     *
      * Consists of the status history comments as well as of invoices, shipments and creditmemos creations
+     *
+     * @TODO This method requires refactoring. Need to create separate model for comment history handling
+     * and avoid generating it dynamically
      *
      * @return array
      */
@@ -81,76 +73,76 @@ class History
     {
         $order = $this->getOrder();
 
-        $history = array();
-        foreach ($order->getAllStatusHistory() as $orderComment){
+        $history = [];
+        foreach ($order->getAllStatusHistory() as $orderComment) {
             $history[] = $this->_prepareHistoryItem(
                 $orderComment->getStatusLabel(),
                 $orderComment->getIsCustomerNotified(),
-                $orderComment->getCreatedAtDate(),
+                $this->getOrderAdminDate($orderComment->getCreatedAt()),
                 $orderComment->getComment()
             );
         }
 
-        foreach ($order->getCreditmemosCollection() as $_memo){
+        foreach ($order->getCreditmemosCollection() as $_memo) {
             $history[] = $this->_prepareHistoryItem(
                 __('Credit memo #%1 created', $_memo->getIncrementId()),
                 $_memo->getEmailSent(),
-                $_memo->getCreatedAtDate()
+                $this->getOrderAdminDate($_memo->getCreatedAt())
             );
 
-            foreach ($_memo->getCommentsCollection() as $_comment){
+            foreach ($_memo->getCommentsCollection() as $_comment) {
                 $history[] = $this->_prepareHistoryItem(
                     __('Credit memo #%1 comment added', $_memo->getIncrementId()),
                     $_comment->getIsCustomerNotified(),
-                    $_comment->getCreatedAtDate(),
+                    $this->getOrderAdminDate($_comment->getCreatedAt()),
                     $_comment->getComment()
                 );
             }
         }
 
-        foreach ($order->getShipmentsCollection() as $_shipment){
+        foreach ($order->getShipmentsCollection() as $_shipment) {
             $history[] = $this->_prepareHistoryItem(
                 __('Shipment #%1 created', $_shipment->getIncrementId()),
                 $_shipment->getEmailSent(),
-                $_shipment->getCreatedAtDate()
+                $this->getOrderAdminDate($_shipment->getCreatedAt())
             );
 
-            foreach ($_shipment->getCommentsCollection() as $_comment){
+            foreach ($_shipment->getCommentsCollection() as $_comment) {
                 $history[] = $this->_prepareHistoryItem(
                     __('Shipment #%1 comment added', $_shipment->getIncrementId()),
                     $_comment->getIsCustomerNotified(),
-                    $_comment->getCreatedAtDate(),
+                    $this->getOrderAdminDate($_comment->getCreatedAt()),
                     $_comment->getComment()
                 );
             }
         }
 
-        foreach ($order->getInvoiceCollection() as $_invoice){
+        foreach ($order->getInvoiceCollection() as $_invoice) {
             $history[] = $this->_prepareHistoryItem(
                 __('Invoice #%1 created', $_invoice->getIncrementId()),
                 $_invoice->getEmailSent(),
-                $_invoice->getCreatedAtDate()
+                $this->getOrderAdminDate($_invoice->getCreatedAt())
             );
 
-            foreach ($_invoice->getCommentsCollection() as $_comment){
+            foreach ($_invoice->getCommentsCollection() as $_comment) {
                 $history[] = $this->_prepareHistoryItem(
                     __('Invoice #%1 comment added', $_invoice->getIncrementId()),
                     $_comment->getIsCustomerNotified(),
-                    $_comment->getCreatedAtDate(),
+                    $this->getOrderAdminDate($_comment->getCreatedAt()),
                     $_comment->getComment()
                 );
             }
         }
 
-        foreach ($order->getTracksCollection() as $_track){
+        foreach ($order->getTracksCollection() as $_track) {
             $history[] = $this->_prepareHistoryItem(
                 __('Tracking number %1 for %2 assigned', $_track->getNumber(), $_track->getTitle()),
                 false,
-                $_track->getCreatedAtDate()
+                $this->getOrderAdminDate($_track->getCreatedAt())
             );
         }
 
-        usort($history, array(__CLASS__, "_sortHistoryByTimestamp"));
+        usort($history, [__CLASS__, 'sortHistoryByTimestamp']);
         return $history;
     }
 
@@ -159,10 +151,10 @@ class History
      *
      * @param array $item
      * @param string $dateType
-     * @param string $format
+     * @param int $format
      * @return string
      */
-    public function getItemCreatedAt(array $item, $dateType = 'date', $format = 'medium')
+    public function getItemCreatedAt(array $item, $dateType = 'date', $format = \IntlDateFormatter::MEDIUM)
     {
         if (!isset($item['created_at'])) {
             return '';
@@ -181,14 +173,14 @@ class History
      */
     public function getItemTitle(array $item)
     {
-        return (isset($item['title']) ? $this->escapeHtml($item['title']) : '');
+        return isset($item['title']) ? $this->escapeHtml($item['title']) : '';
     }
 
     /**
      * Check whether status history comment is with customer notification
      *
      * @param array $item
-     * @param boolean $isSimpleCheck
+     * @param bool $isSimpleCheck
      * @return bool
      */
     public function isItemNotified(array $item, $isSimpleCheck = true)
@@ -207,8 +199,9 @@ class History
      */
     public function getItemComment(array $item)
     {
-        $allowedTags = array('b','br','strong','i','u');
-        return (isset($item['comment']) ? $this->escapeHtml($item['comment'], $allowedTags) : '');
+        $allowedTags = ['b', 'br', 'strong', 'i', 'u', 'a'];
+        return isset($item['comment'])
+            ? $this->adminHelper->escapeHtmlWithLinks($item['comment'], $allowedTags) : '';
     }
 
     /**
@@ -216,24 +209,17 @@ class History
      *
      * @param string $label
      * @param bool $notified
-     * @param \Zend_Date $created
+     * @param \DateTimeInterface $created
      * @param string $comment
      * @return array
      */
     protected function _prepareHistoryItem($label, $notified, $created, $comment = '')
     {
-        return array(
-            'title'      => $label,
-            'notified'   => $notified,
-            'comment'    => $comment,
-            'created_at' => $created
-        );
+        return ['title' => $label, 'notified' => $notified, 'comment' => $comment, 'created_at' => $created];
     }
 
     /**
-     * Get Tab Label
-     *
-     * @return string
+     * @inheritdoc
      */
     public function getTabLabel()
     {
@@ -241,9 +227,7 @@ class History
     }
 
     /**
-     * Get Tab Title
-     *
-     * @return string
+     * @inheritdoc
      */
     public function getTabTitle()
     {
@@ -277,13 +261,11 @@ class History
      */
     public function getTabUrl()
     {
-        return $this->getUrl('sales/*/commentsHistory', array('_current' => true));
+        return $this->getUrl('sales/*/commentsHistory', ['_current' => true]);
     }
 
     /**
-     * Can Show Tab
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function canShowTab()
     {
@@ -291,9 +273,7 @@ class History
     }
 
     /**
-     * Is Hidden
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function isHidden()
     {
@@ -304,11 +284,12 @@ class History
      * Customer Notification Applicable check method
      *
      * @param array $historyItem
-     * @return boolean
+     * @return bool
      */
     public function isCustomerNotificationNotApplicable($historyItem)
     {
-        return $historyItem['notified'] == \Magento\Sales\Model\Order\Status\History::CUSTOMER_NOTIFICATION_NOT_APPLICABLE;
+        return $historyItem['notified'] ==
+            \Magento\Sales\Model\Order\Status\History::CUSTOMER_NOTIFICATION_NOT_APPLICABLE;
     }
 
     /**
@@ -318,15 +299,22 @@ class History
      * @param mixed $b
      * @return int
      */
-    private static function _sortHistoryByTimestamp($a, $b)
+    public static function sortHistoryByTimestamp($a, $b)
     {
         $createdAtA = $a['created_at'];
         $createdAtB = $b['created_at'];
 
-        /** @var $createdAta \Zend_Date */
-        if ($createdAtA->getTimestamp() == $createdAtB->getTimestamp()) {
-            return 0;
-        }
-        return ($createdAtA->getTimestamp() < $createdAtB->getTimestamp()) ? -1 : 1;
+        return $createdAtA->getTimestamp() <=> $createdAtB->getTimestamp();
+    }
+
+    /**
+     * Get order admin date
+     *
+     * @param int $createdAt
+     * @return \DateTime
+     */
+    public function getOrderAdminDate($createdAt)
+    {
+        return $this->_localeDate->date(new \DateTime($createdAt));
     }
 }

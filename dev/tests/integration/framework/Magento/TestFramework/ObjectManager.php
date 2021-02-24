@@ -1,44 +1,41 @@
 <?php
 /**
- * Test object manager
- *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\TestFramework;
 
-class ObjectManager extends \Magento\App\ObjectManager
+/**
+ * ObjectManager for integration test framework.
+ */
+class ObjectManager extends \Magento\Framework\App\ObjectManager
 {
     /**
      * Classes with xml properties to explicitly call __destruct() due to https://bugs.php.net/bug.php?id=62468
      *
      * @var array
      */
-    protected $_classesToDestruct = array(
-        'Magento\Core\Model\Layout',
-        'Magento\Core\Model\Registry'
-    );
+    protected $_classesToDestruct = [
+        \Magento\Framework\View\Layout::class,
+        \Magento\Framework\Registry::class
+    ];
 
     /**
-     * Clear InstanceManager cache
+     * @var array
+     */
+    protected $persistedInstances = [
+        \Magento\Framework\App\ResourceConnection::class,
+        \Magento\Framework\Config\Scope::class,
+        \Magento\Framework\ObjectManager\RelationsInterface::class,
+        \Magento\Framework\ObjectManager\ConfigInterface::class,
+        \Magento\Framework\Interception\DefinitionInterface::class,
+        \Magento\Framework\ObjectManager\DefinitionInterface::class,
+        \Magento\Framework\Session\Config::class,
+        \Magento\Framework\ObjectManager\Config\Mapper\Dom::class,
+    ];
+
+    /**
+     * Clear InstanceManager cache.
      *
      * @return \Magento\TestFramework\ObjectManager
      */
@@ -46,61 +43,85 @@ class ObjectManager extends \Magento\App\ObjectManager
     {
         foreach ($this->_classesToDestruct as $className) {
             if (isset($this->_sharedInstances[$className])) {
-                $this->_sharedInstances[$className]->__destruct();
+                $this->_sharedInstances[$className] = null;
             }
         }
 
-        \Magento\Core\Model\Config\Base::destroy();
-        $sharedInstances = array(
-            'Magento\ObjectManager' => $this, 'Magento\App\ObjectManager' => $this
-        );
-        if (isset($this->_sharedInstances['Magento\App\Resource'])) {
-            $sharedInstances['Magento\App\Resource'] = $this->_sharedInstances['Magento\App\Resource'];
-        }
-
-        if (isset($this->_sharedInstances['Magento\Config\Scope'])) {
-            $sharedInstances['Magento\Config\Scope'] = $this->_sharedInstances['Magento\Config\Scope'];
+        \Magento\Framework\App\Config\Base::destroy();
+        $sharedInstances = [
+            \Magento\Framework\ObjectManagerInterface::class => $this,
+            \Magento\Framework\App\ObjectManager::class => $this,
+        ];
+        foreach ($this->persistedInstances as $persistedClass) {
+            if (isset($this->_sharedInstances[$persistedClass])) {
+                $sharedInstances[$persistedClass] = $this->_sharedInstances[$persistedClass];
+            }
         }
         $this->_sharedInstances = $sharedInstances;
         $this->_config->clean();
+        $this->clearMappedTableNames();
 
         return $this;
     }
 
     /**
-     * Add shared instance
+     * Clear mapped table names list.
+     *
+     * @return void
+     */
+    private function clearMappedTableNames()
+    {
+        $resourceConnection = $this->get(\Magento\Framework\App\ResourceConnection::class);
+        if ($resourceConnection) {
+            $reflection = new \ReflectionClass($resourceConnection);
+            $dataProperty = $reflection->getProperty('mappedTableNames');
+            $dataProperty->setAccessible(true);
+            $dataProperty->setValue($resourceConnection, null);
+        }
+    }
+
+    /**
+     * Add shared instance.
      *
      * @param mixed $instance
      * @param string $className
+     * @param bool $forPreference Resolve preference for class
+     * @return void
      */
-    public function addSharedInstance($instance, $className)
+    public function addSharedInstance($instance, $className, $forPreference = false)
     {
+        $className  = $forPreference ? $this->_config->getPreference($className) : $className;
         $this->_sharedInstances[$className] = $instance;
     }
 
     /**
-     * Remove shared instance
+     * Remove shared instance.
      *
      * @param string $className
+     * @param bool $forPreference Resolve preference for class
+     * @return void
      */
-    public function removeSharedInstance($className)
+    public function removeSharedInstance($className, $forPreference = false)
     {
+        $className  = $forPreference ? $this->_config->getPreference($className) : $className;
         unset($this->_sharedInstances[$className]);
     }
 
     /**
-     * Set objectManager
+     * Set objectManager.
      *
-     * @param \Magento\ObjectManager $objectManager
-     * @return \Magento\ObjectManager
+     * @param \Magento\Framework\ObjectManagerInterface $objectManager
+     * @return \Magento\Framework\ObjectManagerInterface
      */
-    public static function setInstance(\Magento\ObjectManager $objectManager)
+    public static function setInstance(\Magento\Framework\ObjectManagerInterface $objectManager)
     {
         return self::$_instance = $objectManager;
     }
 
     /**
-     * @return \Magento\ObjectManager\Factory|\Magento\ObjectManager\Factory\Factory
+     * Get object factory
+     *
+     * @return \Magento\Framework\ObjectManager\FactoryInterface|\Magento\Framework\ObjectManager\Factory\Factory
      */
     public function getFactory()
     {

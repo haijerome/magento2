@@ -1,86 +1,69 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Review\Block;
 
 /**
  * Review detailed view block
  *
- * @category   Magento
- * @package    Magento_Review
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-
-namespace Magento\Review\Block;
-
 class View extends \Magento\Catalog\Block\Product\AbstractProduct
 {
-    protected $_template = 'view.phtml';
+    /**
+     * View template name
+     *
+     * @var string
+     */
+    protected $_template = 'Magento_Review::view.phtml';
 
     /**
-     * @var \Magento\Rating\Model\Rating\Option\VoteFactory
+     * Rating option model
+     *
+     * @var \Magento\Review\Model\Rating\Option\VoteFactory
      */
     protected $_voteFactory;
 
     /**
-     * @var \Magento\Rating\Model\RatingFactory
+     * Rating model factory
+     *
+     * @var \Magento\Review\Model\RatingFactory
      */
     protected $_ratingFactory;
 
     /**
+     * Review model
+     *
      * @var \Magento\Review\Model\ReviewFactory
      */
     protected $_reviewFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Rating\Model\Rating\Option\VoteFactory $voteFactory
-     * @param \Magento\Rating\Model\RatingFactory $ratingFactory
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Review\Model\Rating\Option\VoteFactory $voteFactory
+     * @param \Magento\Review\Model\RatingFactory $ratingFactory
      * @param \Magento\Review\Model\ReviewFactory $reviewFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Rating\Model\Rating\Option\VoteFactory $voteFactory,
-        \Magento\Rating\Model\RatingFactory $ratingFactory,
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Review\Model\Rating\Option\VoteFactory $voteFactory,
+        \Magento\Review\Model\RatingFactory $ratingFactory,
         \Magento\Review\Model\ReviewFactory $reviewFactory,
-        array $data = array()
+        array $data = []
     ) {
         $this->_voteFactory = $voteFactory;
         $this->_reviewFactory = $reviewFactory;
+        $this->_ratingFactory = $ratingFactory;
 
-        parent::__construct($context, $catalogConfig, $registry, $taxData, $catalogData, $mathRandom, $data);
+        parent::__construct(
+            $context,
+            $data
+        );
     }
 
     /**
@@ -110,24 +93,26 @@ class View extends \Magento\Catalog\Block\Product\AbstractProduct
      */
     public function getBackUrl()
     {
-        return $this->getUrl('*/*/list', array('id' => $this->getProductData()->getId()));
+        return $this->getUrl('*/*/list', ['id' => $this->getProductData()->getId()]);
     }
 
     /**
      * Retrieve collection of ratings
      *
-     * @return \Magento\Rating\Model\Resource\Rating\Option\Vote\Collection
+     * @return \Magento\Review\Model\ResourceModel\Rating\Option\Vote\Collection
      */
     public function getRating()
     {
-        if( !$this->getRatingCollection() ) {
-            $ratingCollection = $this->_voteFactory->create()
-                ->getResourceCollection()
-                ->setReviewFilter($this->getReviewId())
-                ->setStoreFilter($this->_storeManager->getStore()->getId())
-                ->addRatingInfo($this->_storeManager->getStore()->getId())
-                ->load();
-            $this->setRatingCollection( ( $ratingCollection->getSize() ) ? $ratingCollection : false );
+        $reviewId = $this->getReviewId() ?: $this->getReviewData()->getId();
+        if (!$this->getRatingCollection()) {
+            $ratingCollection = $this->_voteFactory->create()->getResourceCollection()->setReviewFilter(
+                $reviewId
+            )->setStoreFilter(
+                $this->_storeManager->getStore()->getId()
+            )->addRatingInfo(
+                $this->_storeManager->getStore()->getId()
+            )->load();
+            $this->setRatingCollection($ratingCollection->getSize() ? $ratingCollection : false);
         }
         return $this->getRatingCollection();
     }
@@ -135,11 +120,12 @@ class View extends \Magento\Catalog\Block\Product\AbstractProduct
     /**
      * Retrieve rating summary for current product
      *
+     * @deprecated 100.3.3
      * @return string
      */
     public function getRatingSummary()
     {
-        if( !$this->getRatingSummaryCache() ) {
+        if (!$this->getRatingSummaryCache()) {
             $this->setRatingSummaryCache(
                 $this->_ratingFactory->create()->getEntitySummary($this->getProductData()->getId())
             );
@@ -154,10 +140,12 @@ class View extends \Magento\Catalog\Block\Product\AbstractProduct
      */
     public function getTotalReviews()
     {
-        if( !$this->getTotalReviewsCache() ) {
+        if (!$this->getTotalReviewsCache()) {
             $this->setTotalReviewsCache(
                 $this->_reviewFactory->create()->getTotalReviews(
-                    $this->getProductData()->getId(), false, $this->_storeManager->getStore()->getId()
+                    $this->getProductData()->getId(),
+                    false,
+                    $this->_storeManager->getStore()->getId()
                 )
             );
         }
@@ -172,6 +160,6 @@ class View extends \Magento\Catalog\Block\Product\AbstractProduct
      */
     public function dateFormat($date)
     {
-        return $this->formatDate($date, \Magento\Core\Model\LocaleInterface::FORMAT_TYPE_LONG);
+        return $this->formatDate($date, \IntlDateFormatter::LONG);
     }
 }

@@ -1,51 +1,42 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-/**
- * Reports data helper
- */
 namespace Magento\Reports\Helper;
 
-class Data extends \Magento\App\Helper\AbstractHelper
+use Magento\Framework\Data\Collection;
+
+/**
+ * Reports data helper.
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
-    const REPORT_PERIOD_TYPE_DAY    = 'day';
-    const REPORT_PERIOD_TYPE_MONTH  = 'month';
-    const REPORT_PERIOD_TYPE_YEAR   = 'year';
+    const REPORT_PERIOD_TYPE_DAY = 'day';
+
+    const REPORT_PERIOD_TYPE_MONTH = 'month';
+
+    const REPORT_PERIOD_TYPE_YEAR = 'year';
 
     /**
+     * Item factory
+     *
      * @var \Magento\Reports\Model\ItemFactory
      */
     protected $_itemFactory;
 
     /**
-     * @param \Magento\App\Helper\Context $context
+     * Constructor
+     *
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Reports\Model\ItemFactory $itemFactory
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Reports\Model\ItemFactory $itemFactory
     ) {
         parent::__construct($context);
@@ -59,50 +50,50 @@ class Data extends \Magento\App\Helper\AbstractHelper
      * @param string $to
      * @param string $period
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function getIntervals($from, $to, $period = self::REPORT_PERIOD_TYPE_DAY)
     {
-        $intervals = array();
-        if (!$from && !$to){
+        $intervals = [];
+        if (!$from && !$to) {
             return $intervals;
         }
 
-        $start = new \Zend_Date($from, \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
-
-        if ($period == self::REPORT_PERIOD_TYPE_DAY) {
-            $dateStart = $start;
+        $dateStart = new \DateTime($from);
+        $dateEnd = new \DateTime($to);
+        $dateFormat = 'Y-m-d';
+        $dateInterval = new \DateInterval('P1D');
+        switch ($period) {
+            case self::REPORT_PERIOD_TYPE_MONTH:
+                $dateFormat = 'Y-m';
+                $dateInterval = new \DateInterval('P1M');
+                break;
+            case self::REPORT_PERIOD_TYPE_YEAR:
+                $dateFormat = 'Y';
+                $dateInterval = new \DateInterval('P1Y');
+                break;
+        }
+        while ($dateStart->diff($dateEnd)->invert == 0) {
+            $intervals[] = $dateStart->format($dateFormat);
+            $dateStart->add($dateInterval);
         }
 
-        if ($period == self::REPORT_PERIOD_TYPE_MONTH) {
-            $dateStart = new \Zend_Date(date("Y-m", $start->getTimestamp()), \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
+        if (!in_array($dateEnd->format($dateFormat), $intervals)) {
+            $intervals[] = $dateEnd->format($dateFormat);
         }
 
-        if ($period == self::REPORT_PERIOD_TYPE_YEAR) {
-            $dateStart = new \Zend_Date(date("Y", $start->getTimestamp()), \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
-        }
-
-        $dateEnd = new \Zend_Date($to, \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
-
-        while ($dateStart->compare($dateEnd) <= 0) {
-            switch ($period) {
-                case self::REPORT_PERIOD_TYPE_DAY :
-                    $t = $dateStart->toString('yyyy-MM-dd');
-                    $dateStart->addDay(1);
-                    break;
-                case self::REPORT_PERIOD_TYPE_MONTH:
-                    $t = $dateStart->toString('yyyy-MM');
-                    $dateStart->addMonth(1);
-                    break;
-                case self::REPORT_PERIOD_TYPE_YEAR:
-                    $t = $dateStart->toString('yyyy');
-                    $dateStart->addYear(1);
-                    break;
-            }
-            $intervals[] = $t;
-        }
-        return  $intervals;
+        return $intervals;
     }
 
+    /**
+     * Add items to interval collection
+     *
+     * @param Collection $collection
+     * @param string $from
+     * @param string $to
+     * @param string $periodType
+     * @return void
+     */
     public function prepareIntervalsCollection($collection, $from, $to, $periodType = self::REPORT_PERIOD_TYPE_DAY)
     {
         $intervals = $this->getIntervals($from, $to, $periodType);

@@ -1,66 +1,68 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Adminhtml\Order\Creditmemo\Create;
 
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+use Magento\Sales\Model\Order;
+use Zend_Currency;
+
+/**
+ * Credit memo adjustments block
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Adjustments extends \Magento\Backend\Block\Template
 {
+    /**
+     * Source object
+     *
+     * @var \Magento\Framework\DataObject
+     */
     protected $_source;
 
     /**
+     * Tax config
+     *
      * @var \Magento\Tax\Model\Config
      */
     protected $_taxConfig;
 
     /**
+     * @var PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\Tax\Model\Config $taxConfig
+     * @param PriceCurrencyInterface $priceCurrency
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Tax\Model\Config $taxConfig,
-        array $data = array()
+        PriceCurrencyInterface $priceCurrency,
+        array $data = []
     ) {
         $this->_taxConfig = $taxConfig;
+        $this->priceCurrency = $priceCurrency;
         parent::__construct($context, $data);
     }
 
     /**
-     * Initialize creditmemo agjustment totals
+     * Initialize creditmemo adjustment totals
      *
-     * @return \Magento\Tax\Block\Sales\Order\Tax
+     * @return $this
      */
     public function initTotals()
     {
         $parent = $this->getParentBlock();
-        $this->_source  = $parent->getSource();
-        $total = new \Magento\Object(array(
-            'code'      => 'agjustments',
-            'block_name'=> $this->getNameInLayout()
-        ));
+        $this->_source = $parent->getSource();
+        $total = new \Magento\Framework\DataObject(['code' => 'adjustments', 'block_name' => $this->getNameInLayout()]);
         $parent->removeTotal('shipping');
         $parent->removeTotal('adjustment_positive');
         $parent->removeTotal('adjustment_negative');
@@ -68,6 +70,33 @@ class Adjustments extends \Magento\Backend\Block\Template
         return $this;
     }
 
+    /**
+     * Format value based on order currency
+     *
+     * @param null|float $value
+     *
+     * @return string
+     * @since 102.1.0
+     */
+    public function formatValue($value)
+    {
+        /** @var Order $order */
+        $order = $this->getSource()->getOrder();
+
+        return $order->getOrderCurrency()->formatPrecision(
+            $value,
+            2,
+            ['display' => Zend_Currency::NO_SYMBOL],
+            false,
+            false
+        );
+    }
+
+    /**
+     * Get source object
+     *
+     * @return \Magento\Framework\DataObject
+     */
     public function getSource()
     {
         return $this->_source;
@@ -75,6 +104,7 @@ class Adjustments extends \Magento\Backend\Block\Template
 
     /**
      * Get credit memo shipping amount depend on configuration settings
+     *
      * @return float
      */
     public function getShippingAmount()
@@ -85,11 +115,12 @@ class Adjustments extends \Magento\Backend\Block\Template
         } else {
             $shipping = $source->getBaseShippingAmount();
         }
-        return $this->_storeManager->getStore()->roundPrice($shipping) * 1;
+        return $this->priceCurrency->round($shipping) * 1;
     }
 
     /**
      * Get label for shipping total based on configuration settings
+     *
      * @return string
      */
     public function getShippingLabel()

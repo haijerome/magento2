@@ -1,50 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Catalog product country attribute source
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Model\Product\Attribute\Source;
 
-class Countryofmanufacture
-    extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
+use Magento\Eav\Model\Entity\Attribute\Source\AbstractSource;
+use Magento\Framework\Data\OptionSourceInterface;
+
+class Countryofmanufacture extends AbstractSource implements OptionSourceInterface
 {
     /**
-     * @var \Magento\App\Cache\Type\Config
+     * @var \Magento\Framework\App\Cache\Type\Config
      */
     protected $_configCacheType;
 
     /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
@@ -56,16 +36,21 @@ class Countryofmanufacture
     protected $_countryFactory;
 
     /**
+     * @var \Magento\Framework\Serialize\SerializerInterface
+     */
+    private $serializer;
+
+    /**
      * Construct
      *
      * @param \Magento\Directory\Model\CountryFactory $countryFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\App\Cache\Type\Config $configCacheType
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\App\Cache\Type\Config $configCacheType
      */
     public function __construct(
         \Magento\Directory\Model\CountryFactory $countryFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\App\Cache\Type\Config $configCacheType
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\App\Cache\Type\Config $configCacheType
     ) {
         $this->_countryFactory = $countryFactory;
         $this->_storeManager = $storeManager;
@@ -75,19 +60,36 @@ class Countryofmanufacture
     /**
      * Get list of all available countries
      *
-     * @return mixed
+     * @return array
      */
     public function getAllOptions()
     {
-        $cacheKey = 'DIRECTORY_COUNTRY_SELECT_STORE_' . $this->_storeManager->getStore()->getCode();
+        $cacheKey = 'COUNTRYOFMANUFACTURE_SELECT_STORE_' . $this->_storeManager->getStore()->getCode();
         if ($cache = $this->_configCacheType->load($cacheKey)) {
-            $options = unserialize($cache);
+            $options = $this->getSerializer()->unserialize($cache);
         } else {
-            $collection = $this->_countryFactory->create()->getResourceCollection()
-                ->loadByStore();
-            $options = $collection->toOptionArray();
-            $this->_configCacheType->save(serialize($options), $cacheKey);
+            /** @var \Magento\Directory\Model\Country $country */
+            $country = $this->_countryFactory->create();
+            /** @var \Magento\Directory\Model\ResourceModel\Country\Collection $collection */
+            $collection = $country->getResourceCollection();
+            $options = $collection->load()->toOptionArray();
+            $this->_configCacheType->save($this->getSerializer()->serialize($options), $cacheKey);
         }
         return $options;
+    }
+
+    /**
+     * Get serializer
+     *
+     * @return \Magento\Framework\Serialize\SerializerInterface
+     * @deprecated 102.0.0
+     */
+    private function getSerializer()
+    {
+        if ($this->serializer === null) {
+            $this->serializer = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\Serialize\SerializerInterface::class);
+        }
+        return $this->serializer;
     }
 }

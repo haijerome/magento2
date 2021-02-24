@@ -1,47 +1,39 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Abstract block context object. Will be used as rule condition constructor modification point after release.
- * Important: Should not be modified by extension developers.
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Rule\Model\Condition;
 
-class Context implements \Magento\ObjectManager\ContextInterface
+/**
+ * Constructor modification point for Magento\Catalog\Model\Layer.
+ *
+ * All context classes were introduced to allow for backwards compatible constructor modifications
+ * of classes that were supposed to be extended by extension developers.
+ *
+ * Do not call methods of this class directly.
+ *
+ * As Magento moves from inheritance-based APIs all such classes will be deprecated together with
+ * the classes they were introduced for.
+ *
+ * @api
+ * @deprecated 100.2.0
+ * @since 100.0.2
+ */
+class Context implements \Magento\Framework\ObjectManager\ContextInterface
 {
     /**
-     * @var \Magento\View\Url
+     * @var \Magento\Framework\View\Asset\Repository
      */
-    protected $_viewUrl;
+    protected $_assetRepo;
 
     /**
-     * @var \Magento\Core\Model\LocaleInterface
+     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
      */
-    protected $_locale;
+    protected $_localeDate;
 
     /**
-     * @var \Magento\View\LayoutInterface
+     * @var \Magento\Framework\View\LayoutInterface
      */
     protected $_layout;
 
@@ -51,49 +43,49 @@ class Context implements \Magento\ObjectManager\ContextInterface
     protected $_conditionFactory;
 
     /**
-     * @var \Magento\Logger
+     * @var \Psr\Log\LoggerInterface
      */
     protected $_logger;
 
     /**
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\View\LayoutInterface $layout
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Framework\View\LayoutInterface $layout
      * @param \Magento\Rule\Model\ConditionFactory $conditionFactory
-     * @param \Magento\Logger $logger
+     * @param \Psr\Log\LoggerInterface $logger
      */
     public function __construct(
-        \Magento\View\Url $viewUrl,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\View\LayoutInterface $layout,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Framework\View\LayoutInterface $layout,
         \Magento\Rule\Model\ConditionFactory $conditionFactory,
-        \Magento\Logger $logger
+        \Psr\Log\LoggerInterface $logger
     ) {
-        $this->_viewUrl = $viewUrl;
-        $this->_locale = $locale;
+        $this->_assetRepo = $assetRepo;
+        $this->_localeDate = $localeDate;
         $this->_layout = $layout;
         $this->_conditionFactory = $conditionFactory;
         $this->_logger = $logger;
     }
 
     /**
-     * @return \Magento\View\Url
+     * @return \Magento\Framework\View\Asset\Repository
      */
-    public function getViewUrl()
+    public function getAssetRepository()
     {
-        return $this->_viewUrl;
+        return $this->_assetRepo;
     }
 
     /**
-     * @return \Magento\Core\Model\LocaleInterface
+     * @return \Magento\Framework\Stdlib\DateTime\TimezoneInterface
      */
-    public function getLocale()
+    public function getLocaleDate()
     {
-        return $this->_locale;
+        return $this->_localeDate;
     }
 
     /**
-     * @return \Magento\View\LayoutInterface
+     * @return \Magento\Framework\View\LayoutInterface
      */
     public function getLayout()
     {
@@ -109,7 +101,7 @@ class Context implements \Magento\ObjectManager\ContextInterface
     }
 
     /**
-     * @return \Magento\Logger
+     * @return \Psr\Log\LoggerInterface
      */
     public function getLogger()
     {

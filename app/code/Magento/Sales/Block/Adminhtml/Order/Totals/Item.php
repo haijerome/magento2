@@ -1,40 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
- /**
-  * Totals item block
-  */
 namespace Magento\Sales\Block\Adminhtml\Order\Totals;
 
+/**
+ * Totals item block
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Item extends \Magento\Sales\Block\Adminhtml\Order\Totals
 {
     /**
      * Determine display parameters before rendering HTML
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Totals\Item
+     * @return $this
      */
     protected function _beforeToHtml()
     {
@@ -50,16 +32,18 @@ class Item extends \Magento\Sales\Block\Adminhtml\Order\Totals
     /**
      * Initialize totals object
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Totals\Item
+     * @return $this
      */
     public function initTotals()
     {
-        $total = new \Magento\Object(array(
-            'code'      => $this->getNameInLayout(),
-            'block_name'=> $this->getNameInLayout(),
-            'area'      => $this->getDisplayArea(),
-            'strong'    => $this->getStrong()
-        ));
+        $total = new \Magento\Framework\DataObject(
+            [
+                'code' => $this->getNameInLayout(),
+                'block_name' => $this->getNameInLayout(),
+                'area' => $this->getDisplayArea(),
+                'strong' => $this->getStrong(),
+            ]
+        );
         if ($this->getBeforeCondition()) {
             $this->getParentBlock()->addTotalBefore($total, $this->getBeforeCondition());
         } else {
@@ -77,7 +61,7 @@ class Item extends \Magento\Sales\Block\Adminhtml\Order\Totals
      */
     public function displayPrices($baseAmount, $amount)
     {
-        return $this->helper('Magento\Sales\Helper\Admin')->displayPrices($this->getOrder(), $baseAmount, $amount);
+        return $this->_adminHelper->displayPrices($this->getOrder(), $baseAmount, $amount);
     }
 
     /**
@@ -90,7 +74,7 @@ class Item extends \Magento\Sales\Block\Adminhtml\Order\Totals
      */
     public function displayPriceAttribute($code, $strong = false, $separator = '<br/>')
     {
-        return $this->helper('Magento\Sales\Helper\Admin')->displayPriceAttribute($this->getSource(), $code, $strong, $separator);
+        return $this->_adminHelper->displayPriceAttribute($this->getSource(), $code, $strong, $separator);
     }
 
     /**

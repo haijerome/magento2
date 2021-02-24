@@ -1,114 +1,106 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_CatalogSearch
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\CatalogSearch\Block;
 
+use Magento\Catalog\Block\Product\ListProduct;
+use Magento\Catalog\Model\Layer\Resolver as LayerResolver;
+use Magento\CatalogSearch\Helper\Data;
+use Magento\CatalogSearch\Model\ResourceModel\Fulltext\Collection;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Search\Model\QueryFactory;
 
 /**
  * Product search result block
  *
- * @category   Magento
- * @package    Magento_CatalogSearch
- * @module     Catalog
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\CatalogSearch\Block;
-
-class Result extends \Magento\View\Element\Template
+class Result extends Template
 {
     /**
      * Catalog Product collection
      *
-     * @var \Magento\CatalogSearch\Model\Resource\Fulltext\Collection
+     * @var Collection
      */
-    protected $_productCollection;
+    protected $productCollection;
 
     /**
      * Catalog search data
      *
-     * @var \Magento\CatalogSearch\Helper\Data
+     * @var Data
      */
-    protected $_catalogSearchData = null;
+    protected $catalogSearchData;
 
     /**
      * Catalog layer
      *
      * @var \Magento\Catalog\Model\Layer
      */
-    protected $_catalogLayer;
+    protected $catalogLayer;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Layer $catalogLayer
-     * @param \Magento\CatalogSearch\Helper\Data $catalogSearchData
+     * @var QueryFactory
+     */
+    private $queryFactory;
+
+    /**
+     * @param Context $context
+     * @param LayerResolver $layerResolver
+     * @param Data $catalogSearchData
+     * @param QueryFactory $queryFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Layer $catalogLayer,
-        \Magento\CatalogSearch\Helper\Data $catalogSearchData,
-        array $data = array()
+        Context $context,
+        LayerResolver $layerResolver,
+        Data $catalogSearchData,
+        QueryFactory $queryFactory,
+        array $data = []
     ) {
-        $this->_catalogLayer = $catalogLayer;
-        $this->_catalogSearchData = $catalogSearchData;
+        $this->catalogLayer = $layerResolver->get();
+        $this->catalogSearchData = $catalogSearchData;
+        $this->queryFactory = $queryFactory;
         parent::__construct($context, $data);
     }
 
     /**
      * Retrieve query model object
      *
-     * @return \Magento\CatalogSearch\Model\Query
+     * @return \Magento\Search\Model\Query
      */
     protected function _getQuery()
     {
-        return $this->helper('Magento\CatalogSearch\Helper\Data')->getQuery();
+        return $this->queryFactory->get();
     }
 
     /**
      * Prepare layout
      *
-     * @return \Magento\CatalogSearch\Block\Result
+     * @return $this
      */
     protected function _prepareLayout()
     {
+        $title = $this->getSearchQueryText();
+        $this->pageConfig->getTitle()->set($title);
         // add Home breadcrumb
         $breadcrumbs = $this->getLayout()->getBlock('breadcrumbs');
         if ($breadcrumbs) {
-            $title = __("Search results for: '%1'", $this->helper('Magento\CatalogSearch\Helper\Data')->getQueryText());
-
-            $breadcrumbs->addCrumb('home', array(
-                'label' => __('Home'),
-                'title' => __('Go to Home Page'),
-                'link'  => $this->_storeManager->getStore()->getBaseUrl(),
-            ))->addCrumb('search', array(
-                'label' => $title,
-                'title' => $title
-            ));
+            $breadcrumbs->addCrumb(
+                'home',
+                [
+                    'label' => __('Home'),
+                    'title' => __('Go to Home Page'),
+                    'link' => $this->_storeManager->getStore()->getBaseUrl()
+                ]
+            )->addCrumb(
+                'search',
+                ['label' => $title, 'title' => $title]
+            );
         }
-
-        // modify page title
-        $title = __("Search results for: '%1'", $this->helper('Magento\CatalogSearch\Helper\Data')->getEscapedQueryText());
-        $this->getLayout()->getBlock('head')->setTitle($title);
 
         return parent::_prepareLayout();
     }
@@ -126,7 +118,7 @@ class Result extends \Magento\View\Element\Template
     /**
      * Retrieve search list toolbar block
      *
-     * @return \Magento\Catalog\Block\Product\ListProduct
+     * @return ListProduct
      */
     public function getListBlock()
     {
@@ -136,22 +128,23 @@ class Result extends \Magento\View\Element\Template
     /**
      * Set search available list orders
      *
-     * @return \Magento\CatalogSearch\Block\Result
+     * @return $this
      */
     public function setListOrders()
     {
-        $category = $this->_catalogLayer->getCurrentCategory();
+        $category = $this->catalogLayer->getCurrentCategory();
         /* @var $category \Magento\Catalog\Model\Category */
         $availableOrders = $category->getAvailableSortByOptions();
         unset($availableOrders['position']);
-        $availableOrders = array_merge(array(
-            'relevance' => __('Relevance')
-        ), $availableOrders);
+        $availableOrders['relevance'] = __('Relevance');
 
-        $this->getListBlock()
-            ->setAvailableOrders($availableOrders)
-            ->setDefaultDirection('desc')
-            ->setSortBy('relevance');
+        $this->getListBlock()->setAvailableOrders(
+            $availableOrders
+        )->setDefaultDirection(
+            'desc'
+        )->setDefaultSortBy(
+            'relevance'
+        );
 
         return $this;
     }
@@ -159,28 +152,13 @@ class Result extends \Magento\View\Element\Template
     /**
      * Set available view mode
      *
-     * @return \Magento\CatalogSearch\Block\Result
+     * @return $this
      */
     public function setListModes()
     {
-        $this->getListBlock()
-            ->setModes(array(
-                'grid' => __('Grid'),
-                'list' => __('List'))
-            );
+        $test = $this->getListBlock();
+        $test->setModes(['grid' => __('Grid'), 'list' => __('List')]);
         return $this;
-    }
-
-    /**
-     * Set Search Result collection
-     *
-     * @return \Magento\CatalogSearch\Block\Result
-     */
-    public function setListCollection()
-    {
-//        $this->getListBlock()
-//           ->setCollection($this->_getProductCollection());
-       return $this;
     }
 
     /**
@@ -196,15 +174,25 @@ class Result extends \Magento\View\Element\Template
     /**
      * Retrieve loaded category collection
      *
-     * @return \Magento\CatalogSearch\Model\Resource\Fulltext\Collection
+     * @return Collection
      */
     protected function _getProductCollection()
     {
-        if (is_null($this->_productCollection)) {
-            $this->_productCollection = $this->getListBlock()->getLoadedProductCollection();
+        if (null === $this->productCollection) {
+            $this->productCollection = $this->getListBlock()->getLoadedProductCollection();
         }
 
-        return $this->_productCollection;
+        return $this->productCollection;
+    }
+
+    /**
+     * Get search query text
+     *
+     * @return \Magento\Framework\Phrase
+     */
+    public function getSearchQueryText()
+    {
+        return __("Search results for: '%1'", $this->catalogSearchData->getEscapedQueryText());
     }
 
     /**
@@ -216,7 +204,7 @@ class Result extends \Magento\View\Element\Template
     {
         if (!$this->getData('result_count')) {
             $size = $this->_getProductCollection()->getSize();
-            $this->_getQuery()->setNumResults($size);
+            $this->_getQuery()->saveNumResults($size);
             $this->setResultCount($size);
         }
         return $this->getData('result_count');
@@ -225,11 +213,11 @@ class Result extends \Magento\View\Element\Template
     /**
      * Retrieve No Result or Minimum query length Text
      *
-     * @return string
+     * @return \Magento\Framework\Phrase|string
      */
     public function getNoResultText()
     {
-        if ($this->_catalogSearchData->isMinQueryLength()) {
+        if ($this->catalogSearchData->isMinQueryLength()) {
             return __('Minimum Search query length is %1', $this->_getQuery()->getMinQueryLength());
         }
         return $this->_getData('no_result_text');
@@ -242,6 +230,6 @@ class Result extends \Magento\View\Element\Template
      */
     public function getNoteMessages()
     {
-        return $this->_catalogSearchData->getNoteMessages();
+        return $this->catalogSearchData->getNoteMessages();
     }
 }

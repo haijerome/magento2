@@ -1,133 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Order Shipments grid
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Adminhtml\Order\View\Tab;
 
-class Shipments
-    extends \Magento\Adminhtml\Block\Widget\Grid
-    implements \Magento\Adminhtml\Block\Widget\Tab\TabInterface
+/**
+ * Order Shipments grid
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Shipments extends \Magento\Framework\View\Element\Text\ListText implements
+    \Magento\Backend\Block\Widget\Tab\TabInterface
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @var \Magento\Sales\Model\Resource\Order\Collection\Factory
-     */
-    protected $_collectionFactory;
-
-    /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Sales\Model\Resource\Order\Collection\Factory $collectionFactory
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * Collection factory
+     *
+     * @param \Magento\Framework\View\Element\Context $context
+     * @param \Magento\Framework\Registry $coreRegistry
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Sales\Model\Resource\Order\Collection\Factory $collectionFactory,
-        \Magento\Core\Model\Registry $coreRegistry,
-        array $data = array()
+        \Magento\Framework\View\Element\Context $context,
+        \Magento\Framework\Registry $coreRegistry,
+        array $data = []
     ) {
         $this->_coreRegistry = $coreRegistry;
-        $this->_collectionFactory = $collectionFactory;
-        parent::__construct($context, $urlModel, $data);
-    }
-
-    protected function _construct()
-    {
-        parent::_construct();
-        $this->setId('order_shipments');
-        $this->setUseAjax(true);
-    }
-
-    /**
-     * Retrieve collection class
-     *
-     * @return string
-     */
-    protected function _getCollectionClass()
-    {
-        return 'Magento\Sales\Model\Resource\Order\Shipment\Grid\Collection';
-    }
-
-    protected function _prepareCollection()
-    {
-        $collection = $this->_collectionFactory->create($this->_getCollectionClass())
-            ->addFieldToSelect('entity_id')
-            ->addFieldToSelect('created_at')
-            ->addFieldToSelect('increment_id')
-            ->addFieldToSelect('total_qty')
-            ->addFieldToSelect('shipping_name')
-            ->setOrderFilter($this->getOrder())
-        ;
-        $this->setCollection($collection);
-        return parent::_prepareCollection();
-    }
-
-    protected function _prepareColumns()
-    {
-        $this->addColumn('increment_id', array(
-            'header' => __('Shipment'),
-            'index' => 'increment_id',
-            'header_css_class'  => 'col-memo',
-            'column_css_class'  => 'col-memo'
-        ));
-
-        $this->addColumn('shipping_name', array(
-            'header' => __('Ship-to Name'),
-            'index' => 'shipping_name',
-            'header_css_class'  => 'col-name',
-            'column_css_class'  => 'col-name'
-        ));
-
-        $this->addColumn('created_at', array(
-            'header' => __('Ship Date'),
-            'index' => 'created_at',
-            'type' => 'datetime',
-            'header_css_class'  => 'col-period',
-            'column_css_class'  => 'col-period'
-        ));
-
-        $this->addColumn('total_qty', array(
-            'header' => __('Total Quantity'),
-            'index' => 'total_qty',
-            'type'  => 'number',
-            'header_css_class'  => 'col-qty',
-            'column_css_class'  => 'col-qty'
-        ));
-
-        return parent::_prepareColumns();
+        parent::__construct($context, $data);
     }
 
     /**
@@ -140,34 +47,25 @@ class Shipments
         return $this->_coreRegistry->registry('current_order');
     }
 
-    public function getRowUrl($row)
-    {
-        return $this->getUrl(
-            '*/order_shipment/view',
-            array(
-                'shipment_id'=> $row->getId(),
-                'order_id'  => $row->getOrderId()
-         ));
-    }
-
-    public function getGridUrl()
-    {
-        return $this->getUrl('sales/*/shipments', array('_current' => true));
-    }
-
     /**
-     * ######################## TAB settings #################################
+     * {@inheritdoc}
      */
     public function getTabLabel()
     {
         return __('Shipments');
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function getTabTitle()
     {
         return __('Order Shipments');
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function canShowTab()
     {
         if ($this->getOrder()->getIsVirtual()) {
@@ -176,6 +74,9 @@ class Shipments
         return true;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function isHidden()
     {
         return false;

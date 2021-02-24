@@ -1,45 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Wishlist customer sharing block
  *
- * @category   Magento
- * @package    Magento_Wishlist
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Wishlist\Block\Customer;
 
-class Sharing extends \Magento\View\Element\Template
+use Magento\Captcha\Block\Captcha;
+
+/**
+ * Class Sharing
+ *
+ * @api
+ * @since 100.0.2
+ * @package Magento\Wishlist\Block\Customer
+ */
+class Sharing extends \Magento\Framework\View\Element\Template
 {
     /**
      * Entered Data cache
      *
-     * @param array
+     * @var array|null
      */
     protected $_enteredData = null;
 
@@ -51,21 +37,21 @@ class Sharing extends \Magento\View\Element\Template
     protected $_wishlistConfig;
 
     /**
-     * @var \Magento\Core\Model\Session\Generic
+     * @var \Magento\Framework\Session\Generic
      */
     protected $_wishlistSession;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Wishlist\Model\Config $wishlistConfig
-     * @param \Magento\Core\Model\Session\Generic $wishlistSession
+     * @param \Magento\Framework\Session\Generic $wishlistSession
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Wishlist\Model\Config $wishlistConfig,
-        \Magento\Core\Model\Session\Generic $wishlistSession,
-        array $data = array()
+        \Magento\Framework\Session\Generic $wishlistSession,
+        array $data = []
     ) {
         $this->_wishlistConfig = $wishlistConfig;
         $this->_wishlistSession = $wishlistSession;
@@ -75,14 +61,25 @@ class Sharing extends \Magento\View\Element\Template
     /**
      * Prepare Global Layout
      *
-     * @return \Magento\Wishlist\Block\Customer\Sharing
+     * @return void
      */
     protected function _prepareLayout()
     {
-        $headBlock = $this->getLayout()->getBlock('head');
-        if ($headBlock) {
-            $headBlock->setTitle(__('Wish List Sharing'));
+        if (!$this->getChildBlock('captcha')) {
+            $this->addChild(
+                'captcha',
+                Captcha::class,
+                [
+                    'cacheable' => false,
+                    'after' => '-',
+                    'form_id' => 'share_wishlist_form',
+                    'image_width' => 230,
+                    'image_height' => 230
+                ]
+            );
         }
+
+        $this->pageConfig->getTitle()->set(__('Wish List Sharing'));
     }
 
     /**
@@ -92,25 +89,24 @@ class Sharing extends \Magento\View\Element\Template
      */
     public function getSendUrl()
     {
-        return $this->getUrl('*/*/send');
+        return $this->getUrl('wishlist/index/send');
     }
 
     /**
      * Retrieve Entered Data by key
      *
      * @param string $key
-     * @return mixed
+     * @return string|null
      */
     public function getEnteredData($key)
     {
-        if (is_null($this->_enteredData)) {
+        if ($this->_enteredData === null) {
             $this->_enteredData = $this->_wishlistSession->getData('sharing_form', true);
         }
 
         if (!$this->_enteredData || !isset($this->_enteredData[$key])) {
             return null;
-        }
-        else {
+        } else {
             return $this->escapeHtml($this->_enteredData[$key]);
         }
     }
@@ -122,7 +118,7 @@ class Sharing extends \Magento\View\Element\Template
      */
     public function getBackUrl()
     {
-        return $this->getUrl('*/*/index');
+        return $this->getUrl('wishlist');
     }
 
     /**

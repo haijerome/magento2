@@ -1,38 +1,26 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Backend\Block\Media;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\Image\Adapter\UploadConfigInterface;
+use Magento\Backend\Model\Image\UploadResizeConfigInterface;
 
 /**
  * Adminhtml media library uploader
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Media;
-
-class Uploader extends \Magento\Adminhtml\Block\Widget
+class Uploader extends \Magento\Backend\Block\Widget
 {
     /**
-     * @var \Magento\Object
+     * @var \Magento\Framework\DataObject
      */
     protected $_config;
 
@@ -42,54 +30,86 @@ class Uploader extends \Magento\Adminhtml\Block\Widget
     protected $_template = 'Magento_Backend::media/uploader.phtml';
 
     /**
-     * @var \Magento\File\Size
+     * @var \Magento\Framework\File\Size
      */
     protected $_fileSizeService;
 
     /**
+     * @var Json
+     */
+    private $jsonEncoder;
+
+    /**
+     * @var UploadResizeConfigInterface
+     */
+    private $imageUploadConfig;
+
+    /**
+     * @var UploadConfigInterface
+     * @deprecated 101.0.1
+     * @see \Magento\Backend\Model\Image\UploadResizeConfigInterface
+     */
+    private $imageConfig;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\File\Size $fileSize
+     * @param \Magento\Framework\File\Size $fileSize
      * @param array $data
+     * @param Json $jsonEncoder
+     * @param UploadConfigInterface $imageConfig
+     * @param UploadResizeConfigInterface $imageUploadConfig
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\File\Size $fileSize,
-        array $data = array()
+        \Magento\Framework\File\Size $fileSize,
+        array $data = [],
+        Json $jsonEncoder = null,
+        UploadConfigInterface $imageConfig = null,
+        UploadResizeConfigInterface $imageUploadConfig = null
     ) {
         $this->_fileSizeService = $fileSize;
+        $this->jsonEncoder = $jsonEncoder ?: ObjectManager::getInstance()->get(Json::class);
+        $this->imageConfig = $imageConfig
+            ?: ObjectManager::getInstance()->get(UploadConfigInterface::class);
+        $this->imageUploadConfig = $imageUploadConfig
+            ?: ObjectManager::getInstance()->get(UploadResizeConfigInterface::class);
         parent::__construct($context, $data);
     }
 
+    /**
+     * Initialize block.
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
 
         $this->setId($this->getId() . '_Uploader');
 
-        $uploadUrl = $this->_urlBuilder->addSessionParam()->getUrl('adminhtml/*/upload');
+        $uploadUrl = $this->_urlBuilder->getUrl('adminhtml/*/upload');
         $this->getConfig()->setUrl($uploadUrl);
-        $this->getConfig()->setParams(array('form_key' => $this->getFormKey()));
+        $this->getConfig()->setParams(['form_key' => $this->getFormKey()]);
         $this->getConfig()->setFileField('file');
-        $this->getConfig()->setFilters(array(
-            'images' => array(
-                'label' => __('Images (.gif, .jpg, .png)'),
-                'files' => array('*.gif', '*.jpg', '*.png')
-            ),
-            'media' => array(
-                'label' => __('Media (.avi, .flv, .swf)'),
-                'files' => array('*.avi', '*.flv', '*.swf')
-            ),
-            'all' => array(
-                'label' => __('All Files'),
-                'files' => array('*.*')
-            )
-        ));
+        $this->getConfig()->setFilters(
+            [
+                'images' => [
+                    'label' => __('Images (.gif, .jpg, .png)'),
+                    'files' => ['*.gif', '*.jpg', '*.png'],
+                ],
+                'media' => [
+                    'label' => __('Media (.avi, .flv, .swf)'),
+                    'files' => ['*.avi', '*.flv', '*.swf'],
+                ],
+                'all' => ['label' => __('All Files'), 'files' => ['*.*']],
+            ]
+        );
     }
 
     /**
      * Get file size
      *
-     * @return \Magento\File\Size
+     * @return \Magento\Framework\File\Size
      */
     public function getFileSizeService()
     {
@@ -97,22 +117,35 @@ class Uploader extends \Magento\Adminhtml\Block\Widget
     }
 
     /**
+     * Get Image Upload Maximum Width Config.
+     *
+     * @return int
+     * @since 100.2.7
+     */
+    public function getImageUploadMaxWidth()
+    {
+        return $this->imageUploadConfig->getMaxWidth();
+    }
+
+    /**
+     * Get Image Upload Maximum Height Config.
+     *
+     * @return int
+     * @since 100.2.7
+     */
+    public function getImageUploadMaxHeight()
+    {
+        return $this->imageUploadConfig->getMaxHeight();
+    }
+
+    /**
      * Prepares layout and set element renderer
      *
-     * @return \Magento\Backend\Block\Media\Uploader
+     * @return $this
      */
     protected function _prepareLayout()
     {
-        $head = $this->getLayout()->getBlock('head');
-        if ($head) {
-            $head->addChild(
-                'jquery-fileUploader-css-jquery-fileupload-ui-css',
-                'Magento\Theme\Block\Html\Head\Css',
-                array(
-                    'file' => 'jquery/fileUploader/css/jquery.fileupload-ui.css'
-                )
-            );
-        }
+        $this->pageConfig->addPageAsset('jquery/fileUploader/css/jquery.fileupload-ui.css');
         return parent::_prepareLayout();
     }
 
@@ -133,18 +166,18 @@ class Uploader extends \Magento\Adminhtml\Block\Widget
      */
     public function getConfigJson()
     {
-        return $this->_coreData->jsonEncode($this->getConfig()->getData());
+        return $this->jsonEncoder->encode($this->getConfig()->getData());
     }
 
     /**
      * Retrieve config object
      *
-     * @return \Magento\Object
+     * @return \Magento\Framework\DataObject
      */
     public function getConfig()
     {
         if (null === $this->_config) {
-            $this->_config = new \Magento\Object();
+            $this->_config = new \Magento\Framework\DataObject();
         }
 
         return $this->_config;
@@ -156,11 +189,10 @@ class Uploader extends \Magento\Adminhtml\Block\Widget
      * Now uploader can be only in the same URL where backend located
      *
      * @param string $url url to uploader in current theme
-     *
      * @return string full URL
      */
     public function getUploaderUrl($url)
     {
-        return $this->_viewUrl->getViewFileUrl($url);
+        return $this->_assetRepo->getUrl($url);
     }
 }

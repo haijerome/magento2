@@ -1,46 +1,45 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\TestFramework;
 
-use Magento\App\Dir;
+use Magento\Framework\App\DeploymentConfig;
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\App\ObjectManager\ConfigLoader;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Filesystem\DriverPool;
+use Magento\Framework\Interception\PluginListInterface;
+use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\TestFramework\App\EnvironmentFactory;
+use Magento\TestFramework\Db\ConnectionAdapter;
 
-class ObjectManagerFactory extends \Magento\App\ObjectManagerFactory
+/**
+ * Configure ObjectManagerFactory for testing purpose
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class ObjectManagerFactory extends \Magento\Framework\App\ObjectManagerFactory
 {
     /**
      * Locator class name
      *
      * @var string
      */
-    protected $_locatorClassName = '\Magento\TestFramework\ObjectManager';
+    protected $_locatorClassName = ObjectManager::class;
 
     /**
      * Config class name
      *
      * @var string
      */
-    protected $_configClassName = '\Magento\TestFramework\ObjectManager\Config';
+    protected $_configClassName = \Magento\TestFramework\ObjectManager\Config::class;
+
+    /**
+     * @var string
+     */
+    protected $envFactoryClassName = EnvironmentFactory::class;
 
     /**
      * @var array
@@ -48,103 +47,74 @@ class ObjectManagerFactory extends \Magento\App\ObjectManagerFactory
     protected $_primaryConfigData = null;
 
     /**
-     * @var \Magento\TestFramework\Interception\PluginList
-     */
-    protected $_pluginList = null;
-
-    /**
      * Restore locator instance
      *
      * @param ObjectManager $objectManager
-     * @param string $rootDir
+     * @param DirectoryList $directoryList
      * @param array $arguments
      * @return ObjectManager
      */
-    public function restore(ObjectManager $objectManager, $rootDir, array $arguments)
+    public function restore(ObjectManager $objectManager, $directoryList, array $arguments)
     {
-        $directories = new Dir(
-            $rootDir,
-            isset($arguments[Dir::PARAM_APP_URIS]) ? $arguments[Dir::PARAM_APP_URIS] : array(),
-            isset($arguments[Dir::PARAM_APP_DIRS]) ? $arguments[Dir::PARAM_APP_DIRS] : array()
-        );
-
-        \Magento\TestFramework\ObjectManager::setInstance($objectManager);
-
-        $this->_pluginList->reset();
-
+        ObjectManager::setInstance($objectManager);
+        $this->directoryList = $directoryList;
         $objectManager->configure($this->_primaryConfigData);
-        $objectManager->addSharedInstance($directories, 'Magento\App\Dir');
-        $objectManager->configure(array(
-            'Magento\View\Design\FileResolution\Strategy\Fallback\CachingProxy' => array(
-                'parameters' => array('canSaveMap' => false)
-            ),
-            'default_setup' => array(
-                'type' => 'Magento\TestFramework\Db\ConnectionAdapter'
-            ),
-            'preferences' => array(
-                'Magento\Stdlib\Cookie' => 'Magento\TestFramework\Cookie',
-                'Magento\App\RequestInterface' => 'Magento\TestFramework\Request',
-                'Magento\App\ResponseInterface' => 'Magento\TestFramework\Response',
-            ),
-        ));
-
-        $options = new \Magento\App\Config(
-            $arguments,
-            new \Magento\App\Config\Loader($directories)
+        $objectManager->addSharedInstance($this->directoryList, DirectoryList::class);
+        $objectManager->addSharedInstance(
+            $this->directoryList,
+            \Magento\Framework\Filesystem\DirectoryList::class
         );
-        $objectManager->addSharedInstance($options, 'Magento\App\Config');
-        $objectManager->getFactory()->setArguments($options->get());
+        $deploymentConfig = $this->createDeploymentConfig($directoryList, $this->configFilePool, $arguments);
+        $this->factory->setArguments($arguments);
+        $objectManager->addSharedInstance($deploymentConfig, DeploymentConfig::class);
+        $objectManager->addSharedInstance(
+            $objectManager->get(ConfigLoader::class),
+            ConfigLoaderInterface::class,
+            true
+        );
+        $objectManager->get(PluginListInterface::class)->reset();
         $objectManager->configure(
-            $objectManager->get('Magento\App\ObjectManager\ConfigLoader')->load('global')
+            $objectManager->get(ConfigLoader::class)->load('global')
         );
-
-        /** @var \Magento\App\Dir\Verification $verification */
-        $verification = $objectManager->get('Magento\App\Dir\Verification');
-        $verification->createAndVerifyDirectories();
 
         return $objectManager;
     }
 
     /**
-     * Load primary config data
+     * Load primary config
      *
-     * @param Dir $directories
+     * @param DirectoryList $directoryList
+     * @param DriverPool $driverPool
+     * @param mixed $argumentMapper
      * @param string $appMode
      * @return array
-     * @throws \Magento\BootstrapException
      */
-    protected function _loadPrimaryConfig(Dir $directories, $appMode)
+    protected function _loadPrimaryConfig(DirectoryList $directoryList, $driverPool, $argumentMapper, $appMode)
     {
         if (null === $this->_primaryConfigData) {
-            $this->_primaryConfigData = parent::_loadPrimaryConfig($directories, $appMode);
+            $this->_primaryConfigData = array_replace(
+                parent::_loadPrimaryConfig($directoryList, $driverPool, $argumentMapper, $appMode),
+                [
+                    'default_setup' => ['type' => ConnectionAdapter::class]
+                ]
+            );
+            $diPreferences = [];
+            $diPreferencesPath = __DIR__ . '/../../../etc/di/preferences/';
+
+            $preferenceFiles = glob($diPreferencesPath . '*.php');
+
+            foreach ($preferenceFiles as $file) {
+                if (!is_readable($file)) {
+                    throw new LocalizedException(__("'%1' is not readable file.", $file));
+                }
+                $diPreferences = array_replace($diPreferences, include $file);
+            }
+
+            $this->_primaryConfigData['preferences'] = array_replace(
+                $this->_primaryConfigData['preferences'],
+                $diPreferences
+            );
         }
         return $this->_primaryConfigData;
     }
-
-    /**
-     * Create plugin list object
-     *
-     * @param \Magento\ObjectManager $locator
-     * @param \Magento\ObjectManager\Relations $relations
-     * @param \Magento\ObjectManager\DefinitionFactory $definitionFactory
-     * @param \Magento\ObjectManager\Config\Config $diConfig
-     * @param \Magento\ObjectManager\Definition $definitions
-     * @return \Magento\Interception\PluginList\PluginList
-     */
-    protected function _createPluginList(
-        \Magento\ObjectManager $locator,
-        \Magento\ObjectManager\Relations $relations,
-        \Magento\ObjectManager\DefinitionFactory $definitionFactory,
-        \Magento\ObjectManager\Config\Config $diConfig,
-        \Magento\ObjectManager\Definition $definitions
-    ) {
-        $locator->configure(array('preferences' =>
-            array('Magento\Interception\PluginList\PluginList' => 'Magento\TestFramework\Interception\PluginList')
-        ));
-        $this->_pluginList = parent::_createPluginList(
-            $locator, $relations, $definitionFactory, $diConfig, $definitions
-        );
-        return $this->_pluginList;
-    }
-
 }

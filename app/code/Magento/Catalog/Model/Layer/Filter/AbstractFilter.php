@@ -1,40 +1,20 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Model\Layer\Filter;
 
 /**
  * Layer category filter abstract model
  *
- * @category   Magento
- * @package    Magento_Catalog
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Model\Layer\Filter;
-
-abstract class AbstractFilter extends \Magento\Object
+abstract class AbstractFilter extends \Magento\Framework\DataObject implements FilterInterface
 {
+    const ATTRIBUTE_OPTIONS_ONLY_WITH_RESULTS = 1;
+
     /**
      * Request variable name with filter value
      *
@@ -59,7 +39,7 @@ abstract class AbstractFilter extends \Magento\Object
     /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
@@ -71,23 +51,37 @@ abstract class AbstractFilter extends \Magento\Object
     protected $_filterItemFactory;
 
     /**
+     * Item Data Builder
+     *
+     * @var \Magento\Catalog\Model\Layer\Filter\Item\DataBuilder
+     */
+    protected $itemDataBuilder;
+
+    /**
      * Constructor
      *
      * @param \Magento\Catalog\Model\Layer\Filter\ItemFactory $filterItemFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Catalog\Model\Layer $catalogLayer
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Catalog\Model\Layer $layer
+     * @param \Magento\Catalog\Model\Layer\Filter\Item\DataBuilder $itemDataBuilder
      * @param array $data
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function __construct(
         \Magento\Catalog\Model\Layer\Filter\ItemFactory $filterItemFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Catalog\Model\Layer $catalogLayer,
-        array $data = array()
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Catalog\Model\Layer $layer,
+        \Magento\Catalog\Model\Layer\Filter\Item\DataBuilder $itemDataBuilder,
+        array $data = []
     ) {
         $this->_filterItemFactory = $filterItemFactory;
         $this->_storeManager = $storeManager;
-        $this->_catalogLayer = $catalogLayer;
+        $this->_catalogLayer = $layer;
+        $this->itemDataBuilder = $itemDataBuilder;
         parent::__construct($data);
+        if ($this->hasAttributeModel()) {
+            $this->_requestVar = $this->getAttributeModel()->getAttributeCode();
+        }
     }
 
     /**
@@ -135,15 +129,17 @@ abstract class AbstractFilter extends \Magento\Object
     /**
      * Apply filter to collection
      *
-     * @param  \Zend_Controller_Request_Abstract $request
+     * @param \Magento\Framework\App\RequestInterface $request
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function apply(\Zend_Controller_Request_Abstract $request, $filterBlock)
+    public function apply(\Magento\Framework\App\RequestInterface $request)
     {
         return $this;
     }
 
     /**
-     * Get fiter items count
+     * Get filter items count
      *
      * @return int
      */
@@ -159,16 +155,28 @@ abstract class AbstractFilter extends \Magento\Object
      */
     public function getItems()
     {
-        if (is_null($this->_items)) {
+        if ($this->_items === null) {
             $this->_initItems();
         }
         return $this->_items;
     }
 
     /**
+     * Set all filter items
+     *
+     * @param array $items
+     * @return $this
+     */
+    public function setItems(array $items)
+    {
+        $this->_items = $items;
+        return $this;
+    }
+
+    /**
      * Get data array for building filter items
      *
-     * result array should have next structure:
+     * Result array should have next structure:
      * array(
      *      $index => array(
      *          'label' => $label,
@@ -181,7 +189,7 @@ abstract class AbstractFilter extends \Magento\Object
      */
     protected function _getItemsData()
     {
-        return array();
+        return [];
     }
 
     /**
@@ -192,18 +200,13 @@ abstract class AbstractFilter extends \Magento\Object
     protected function _initItems()
     {
         $data = $this->_getItemsData();
-        $items=array();
+        $items = [];
         foreach ($data as $itemData) {
-            $items[] = $this->_createItem(
-                $itemData['label'],
-                $itemData['value'],
-                $itemData['count']
-            );
+            $items[] = $this->_createItem($itemData['label'], $itemData['value'], $itemData['count']);
         }
         $this->_items = $items;
         return $this;
     }
-
 
     /**
      * Retrieve layer object
@@ -213,7 +216,7 @@ abstract class AbstractFilter extends \Magento\Object
     public function getLayer()
     {
         $layer = $this->_getData('layer');
-        if (is_null($layer)) {
+        if ($layer === null) {
             $layer = $this->_catalogLayer;
             $this->setData('layer', $layer);
         }
@@ -228,7 +231,7 @@ abstract class AbstractFilter extends \Magento\Object
      * @param   int $count
      * @return  \Magento\Catalog\Model\Layer\Filter\Item
      */
-    protected function _createItem($label, $value, $count=0)
+    protected function _createItem($label, $value, $count = 0)
     {
         return $this->_filterItemFactory->create()
             ->setFilter($this)
@@ -238,7 +241,7 @@ abstract class AbstractFilter extends \Magento\Object
     }
 
     /**
-     * Get all product ids from from collection with applied filters
+     * Get all product ids from collection with applied filters
      *
      * @return array
      */
@@ -250,7 +253,7 @@ abstract class AbstractFilter extends \Magento\Object
     /**
      * Get product collection select object with applied filters
      *
-     * @return \Magento\DB\Select
+     * @return \Magento\Framework\DB\Select
      */
     protected function _getBaseCollectionSql()
     {
@@ -273,14 +276,14 @@ abstract class AbstractFilter extends \Magento\Object
     /**
      * Get attribute model associated with filter
      *
-     * @return \Magento\Catalog\Model\Resource\Eav\Attribute
-     * @throws \Magento\Core\Exception
+     * @return \Magento\Catalog\Model\ResourceModel\Eav\Attribute
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getAttributeModel()
     {
         $attribute = $this->getData('attribute_model');
-        if (is_null($attribute)) {
-            throw new \Magento\Core\Exception(__('The attribute model is not defined.'));
+        if ($attribute === null) {
+            throw new \Magento\Framework\Exception\LocalizedException(__('The attribute model is not defined.'));
         }
         return $attribute;
     }
@@ -289,6 +292,7 @@ abstract class AbstractFilter extends \Magento\Object
      * Get filter text label
      *
      * @return string
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getName()
     {
@@ -303,7 +307,7 @@ abstract class AbstractFilter extends \Magento\Object
     public function getStoreId()
     {
         $storeId = $this->_getData('store_id');
-        if (is_null($storeId)) {
+        if ($storeId === null) {
             $storeId = $this->_storeManager->getStore()->getId();
         }
         return $storeId;
@@ -313,7 +317,7 @@ abstract class AbstractFilter extends \Magento\Object
      * Set store id scope
      *
      * @param int $storeId
-     * @return \Magento\Catalog\Model\Layer\Filter\AbstractFilter
+     * @return $this
      */
     public function setStoreId($storeId)
     {
@@ -328,7 +332,7 @@ abstract class AbstractFilter extends \Magento\Object
     public function getWebsiteId()
     {
         $websiteId = $this->_getData('website_id');
-        if (is_null($websiteId)) {
+        if ($websiteId === null) {
             $websiteId = $this->_storeManager->getStore()->getWebsiteId();
         }
         return $websiteId;
@@ -338,7 +342,7 @@ abstract class AbstractFilter extends \Magento\Object
      * Set Website ID scope
      *
      * @param int $websiteId
-     * @return \Magento\Catalog\Model\Layer\Filter\AbstractFilter
+     * @return $this
      */
     public function setWebsiteId($websiteId)
     {
@@ -353,5 +357,40 @@ abstract class AbstractFilter extends \Magento\Object
     public function getClearLinkText()
     {
         return false;
+    }
+
+    /**
+     * Get option text from frontend model by option id
+     *
+     * @param   int $optionId
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @return  string|bool
+     */
+    protected function getOptionText($optionId)
+    {
+        return $this->getAttributeModel()->getFrontend()->getOption($optionId);
+    }
+
+    /**
+     * Check whether specified attribute can be used in LN
+     *
+     * @param \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute
+     * @return int
+     */
+    protected function getAttributeIsFilterable($attribute)
+    {
+        return (int)$attribute->getIsFilterable();
+    }
+
+    /**
+     * Checks whether the option reduces the number of results
+     *
+     * @param int $optionCount Count of search results with this option
+     * @param int $totalSize Current search results count
+     * @return bool
+     */
+    protected function isOptionReducesResults($optionCount, $totalSize)
+    {
+        return $optionCount < $totalSize;
     }
 }

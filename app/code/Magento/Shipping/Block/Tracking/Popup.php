@@ -1,52 +1,48 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Shipping
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Shipping\Block\Tracking;
 
-class Popup extends \Magento\View\Element\Template
+use Magento\Framework\Stdlib\DateTime\DateTimeFormatterInterface;
+
+/**
+ * Tracking popup
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Popup extends \Magento\Framework\View\Element\Template
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_registry;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @var DateTimeFormatterInterface
+     */
+    protected $dateTimeFormatter;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param DateTimeFormatterInterface $dateTimeFormatter
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        DateTimeFormatterInterface $dateTimeFormatter,
+        array $data = []
     ) {
         $this->_registry = $registry;
         parent::__construct($context, $data);
+        $this->dateTimeFormatter = $dateTimeFormatter;
     }
 
     /**
@@ -82,9 +78,8 @@ class Popup extends \Magento\View\Element\Template
      */
     public function formatDeliveryDate($date)
     {
-        $format = $this->_locale->getDateFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_MEDIUM);
-        return $this->_locale->date(strtotime($date), \Zend_Date::TIMESTAMP, null, false)
-            ->toString($format);
+        $format = $this->_localeDate->getDateFormat(\IntlDateFormatter::MEDIUM);
+        return $this->dateTimeFormatter->formatObject($this->_localeDate->date(new \DateTime($date)), $format);
     }
 
     /**
@@ -100,29 +95,44 @@ class Popup extends \Magento\View\Element\Template
             $time = $date . ' ' . $time;
         }
 
-        $format = $this->_locale->getTimeFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT);
-        return $this->_locale->date(strtotime($time), \Zend_Date::TIMESTAMP, null, false)
-            ->toString($format);
+        $format = $this->_localeDate->getTimeFormat(\IntlDateFormatter::SHORT);
+        return $this->dateTimeFormatter->formatObject($this->_localeDate->date(new \DateTime($time)), $format);
     }
 
     /**
      * Is 'contact us' option enabled?
      *
      * @return boolean
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getContactUsEnabled()
     {
-        return (bool) $this->_storeConfig->getConfig('contacts/contacts/enabled');
+        return $this->_scopeConfig->isSetFlag(
+            'contact/contact/enabled',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
     }
 
+    /**
+     * Get support email
+     *
+     * @return string
+     */
     public function getStoreSupportEmail()
     {
-        return $this->_storeConfig->getConfig('trans_email/ident_support/email');
+        return $this->_scopeConfig->getValue(
+            'trans_email/ident_support/email',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
     }
 
+    /**
+     * Get contact us url
+     *
+     * @return string
+     */
     public function getContactUs()
     {
-        return $this->getUrl('contacts');
+        return $this->getUrl('contact');
     }
-
 }

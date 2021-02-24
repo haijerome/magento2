@@ -1,46 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * @method \Magento\Sales\Model\Resource\Order\Shipment\Comment _getResource()
- * @method \Magento\Sales\Model\Resource\Order\Shipment\Comment getResource()
- * @method int getParentId()
- * @method \Magento\Sales\Model\Order\Shipment\Comment setParentId(int $value)
- * @method int getIsCustomerNotified()
- * @method \Magento\Sales\Model\Order\Shipment\Comment setIsCustomerNotified(int $value)
- * @method int getIsVisibleOnFront()
- * @method \Magento\Sales\Model\Order\Shipment\Comment setIsVisibleOnFront(int $value)
- * @method string getComment()
- * @method \Magento\Sales\Model\Order\Shipment\Comment setComment(string $value)
- * @method string getCreatedAt()
- * @method \Magento\Sales\Model\Order\Shipment\Comment setCreatedAt(string $value)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Model\Order\Shipment;
 
-class Comment extends \Magento\Sales\Model\AbstractModel
+use Magento\Framework\Api\AttributeValueFactory;
+use Magento\Sales\Api\Data\ShipmentCommentInterface;
+use Magento\Sales\Model\AbstractModel;
+
+class Comment extends AbstractModel implements ShipmentCommentInterface
 {
     /**
      * Shipment instance
@@ -50,35 +19,36 @@ class Comment extends \Magento\Sales\Model\AbstractModel
     protected $_shipment;
 
     /**
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\LocaleInterface $coreLocale
-     * @param \Magento\Stdlib\DateTime $dateTime
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param AttributeValueFactory $customAttributeFactory
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\LocaleInterface $coreLocale,
-        \Magento\Stdlib\DateTime $dateTime,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        AttributeValueFactory $customAttributeFactory,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         parent::__construct(
             $context,
             $registry,
-            $coreLocale,
-            $dateTime,
+            $extensionFactory,
+            $customAttributeFactory,
             $resource,
             $resourceCollection,
             $data
@@ -88,17 +58,21 @@ class Comment extends \Magento\Sales\Model\AbstractModel
 
     /**
      * Initialize resource model
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Sales\Model\Resource\Order\Shipment\Comment');
+        $this->_init(\Magento\Sales\Model\ResourceModel\Order\Shipment\Comment::class);
     }
 
     /**
      * Declare Shipment instance
      *
-     * @param   \Magento\Sales\Model\Order\Shipment $shipment
-     * @return  \Magento\Sales\Model\Order\Shipment\Comment
+     * @codeCoverageIgnore
+     *
+     * @param \Magento\Sales\Model\Order\Shipment $shipment
+     * @return $this
      */
     public function setShipment(\Magento\Sales\Model\Order\Shipment $shipment)
     {
@@ -108,6 +82,8 @@ class Comment extends \Magento\Sales\Model\AbstractModel
 
     /**
      * Retrieve Shipment instance
+     *
+     * @codeCoverageIgnore
      *
      * @return \Magento\Sales\Model\Order\Shipment
      */
@@ -119,7 +95,7 @@ class Comment extends \Magento\Sales\Model\AbstractModel
     /**
      * Get store object
      *
-     * @return \Magento\Core\Model\Store
+     * @return \Magento\Store\Model\Store
      */
     public function getStore()
     {
@@ -129,19 +105,119 @@ class Comment extends \Magento\Sales\Model\AbstractModel
         return $this->_storeManager->getStore();
     }
 
+    //@codeCoverageIgnoreStart
+
     /**
-     * Before object save
+     * Returns comment
      *
-     * @return \Magento\Sales\Model\Order\Shipment\Comment
+     * @return string
      */
-    protected function _beforeSave()
+    public function getComment()
     {
-        parent::_beforeSave();
-
-        if (!$this->getParentId() && $this->getShipment()) {
-            $this->setParentId($this->getShipment()->getId());
-        }
-
-        return $this;
+        return $this->getData(ShipmentCommentInterface::COMMENT);
     }
+
+    /**
+     * Returns created_at
+     *
+     * @return string
+     */
+    public function getCreatedAt()
+    {
+        return $this->getData(ShipmentCommentInterface::CREATED_AT);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setCreatedAt($createdAt)
+    {
+        return $this->setData(ShipmentCommentInterface::CREATED_AT, $createdAt);
+    }
+
+    /**
+     * Returns is_customer_notified
+     *
+     * @return int
+     */
+    public function getIsCustomerNotified()
+    {
+        return $this->getData(ShipmentCommentInterface::IS_CUSTOMER_NOTIFIED);
+    }
+
+    /**
+     * Returns is_visible_on_front
+     *
+     * @return int
+     */
+    public function getIsVisibleOnFront()
+    {
+        return $this->getData(ShipmentCommentInterface::IS_VISIBLE_ON_FRONT);
+    }
+
+    /**
+     * Returns parent_id
+     *
+     * @return int
+     */
+    public function getParentId()
+    {
+        return $this->getData(ShipmentCommentInterface::PARENT_ID);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setParentId($id)
+    {
+        return $this->setData(ShipmentCommentInterface::PARENT_ID, $id);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setIsCustomerNotified($isCustomerNotified)
+    {
+        return $this->setData(ShipmentCommentInterface::IS_CUSTOMER_NOTIFIED, $isCustomerNotified);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setIsVisibleOnFront($isVisibleOnFront)
+    {
+        return $this->setData(ShipmentCommentInterface::IS_VISIBLE_ON_FRONT, $isVisibleOnFront);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setComment($comment)
+    {
+        return $this->setData(ShipmentCommentInterface::COMMENT, $comment);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return \Magento\Sales\Api\Data\ShipmentCommentExtensionInterface|null
+     */
+    public function getExtensionAttributes()
+    {
+        return $this->_getExtensionAttributes();
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @param \Magento\Sales\Api\Data\ShipmentCommentExtensionInterface $extensionAttributes
+     * @return $this
+     */
+    public function setExtensionAttributes(
+        \Magento\Sales\Api\Data\ShipmentCommentExtensionInterface $extensionAttributes
+    ) {
+        return $this->_setExtensionAttributes($extensionAttributes);
+    }
+
+    //@codeCoverageIgnoreEnd
 }

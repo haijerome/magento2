@@ -1,47 +1,42 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
-
 namespace Magento\Checkout\Model;
 
-class Session extends \Magento\Core\Model\Session\AbstractSession
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Quote\Api\Data\CartInterface;
+use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\QuoteIdMaskFactory;
+use Psr\Log\LoggerInterface;
+
+/**
+ * Represents the session data for the checkout process
+ *
+ * @api
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ * @SuppressWarnings(PHPMD.TooManyFields)
+ * @since 100.0.2
+ */
+class Session extends \Magento\Framework\Session\SessionManager
 {
     const CHECKOUT_STATE_BEGIN = 'begin';
 
     /**
      * Quote instance
      *
-     * @var null|\Magento\Sales\Model\Quote
+     * @var Quote
      */
     protected $_quote;
 
     /**
-     * Customer instance
+     * Customer Data Object
      *
-     * @var null|\Magento\Customer\Model\Customer
+     * @var CustomerInterface|null
      */
     protected $_customer;
 
@@ -51,6 +46,15 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
      * @var bool
      */
     protected $_loadInactive = false;
+
+    /**
+     * A flag to track when the quote is being loaded and attached to the session object.
+     *
+     * Used in trigger_recollect infinite loop detection.
+     *
+     * @var bool
+     */
+    private $isLoading = false;
 
     /**
      * Loaded order instance
@@ -70,52 +74,126 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
     protected $_customerSession;
 
     /**
-     * @var \Magento\Sales\Model\QuoteFactory
+     * @var \Magento\Quote\Api\CartRepositoryInterface
      */
-    protected $_quoteFactory;
+    protected $quoteRepository;
 
     /**
-     * @var \Magento\HTTP\PhpEnvironment\RemoteAddress
+     * @var \Magento\Framework\HTTP\PhpEnvironment\RemoteAddress
      */
     protected $_remoteAddress;
 
     /**
-     * @param \Magento\Core\Model\Session\Context $context
-     * @param \Magento\Session\SidResolverInterface $sidResolver
-     * @param \Magento\Session\Config\ConfigInterface $sessionConfig
+     * @var \Magento\Framework\Event\ManagerInterface
+     */
+    protected $_eventManager;
+
+    /**
+     * @var \Magento\Store\Model\StoreManagerInterface
+     */
+    protected $_storeManager;
+
+    /**
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
+     */
+    protected $customerRepository;
+
+    /**
+     * @param QuoteIdMaskFactory
+     */
+    protected $quoteIdMaskFactory;
+
+    /**
+     * @param bool
+     */
+    protected $isQuoteMasked;
+
+    /**
+     * @var \Magento\Quote\Model\QuoteFactory
+     */
+    protected $quoteFactory;
+
+    /**
+     * @var LoggerInterface|null
+     */
+    private $logger;
+
+    /**
+     * @param \Magento\Framework\App\Request\Http $request
+     * @param \Magento\Framework\Session\SidResolverInterface $sidResolver
+     * @param \Magento\Framework\Session\Config\ConfigInterface $sessionConfig
+     * @param \Magento\Framework\Session\SaveHandlerInterface $saveHandler
+     * @param \Magento\Framework\Session\ValidatorInterface $validator
+     * @param \Magento\Framework\Session\StorageInterface $storage
+     * @param \Magento\Framework\Stdlib\CookieManagerInterface $cookieManager
+     * @param \Magento\Framework\Stdlib\Cookie\CookieMetadataFactory $cookieMetadataFactory
+     * @param \Magento\Framework\App\State $appState
      * @param \Magento\Sales\Model\OrderFactory $orderFactory
      * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Sales\Model\QuoteFactory $quoteFactory
-     * @param \Magento\HTTP\PhpEnvironment\RemoteAddress $remoteAddress
-     * @param null $sessionName
-     * @param array $data
+     * @param \Magento\Quote\Api\CartRepositoryInterface $quoteRepository
+     * @param \Magento\Framework\HTTP\PhpEnvironment\RemoteAddress $remoteAddress
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository
+     * @param QuoteIdMaskFactory $quoteIdMaskFactory
+     * @param \Magento\Quote\Model\QuoteFactory $quoteFactory
+     * @param LoggerInterface|null $logger
+     * @throws \Magento\Framework\Exception\SessionException
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Session\Context $context,
-        \Magento\Session\SidResolverInterface $sidResolver,
-        \Magento\Session\Config\ConfigInterface $sessionConfig,
+        \Magento\Framework\App\Request\Http $request,
+        \Magento\Framework\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\Session\Config\ConfigInterface $sessionConfig,
+        \Magento\Framework\Session\SaveHandlerInterface $saveHandler,
+        \Magento\Framework\Session\ValidatorInterface $validator,
+        \Magento\Framework\Session\StorageInterface $storage,
+        \Magento\Framework\Stdlib\CookieManagerInterface $cookieManager,
+        \Magento\Framework\Stdlib\Cookie\CookieMetadataFactory $cookieMetadataFactory,
+        \Magento\Framework\App\State $appState,
         \Magento\Sales\Model\OrderFactory $orderFactory,
         \Magento\Customer\Model\Session $customerSession,
-        \Magento\Sales\Model\QuoteFactory $quoteFactory,
-        \Magento\HTTP\PhpEnvironment\RemoteAddress $remoteAddress,
-        $sessionName = null,
-        array $data = array()
+        \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
+        \Magento\Framework\HTTP\PhpEnvironment\RemoteAddress $remoteAddress,
+        \Magento\Framework\Event\ManagerInterface $eventManager,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository,
+        QuoteIdMaskFactory $quoteIdMaskFactory,
+        \Magento\Quote\Model\QuoteFactory $quoteFactory,
+        LoggerInterface $logger = null
     ) {
         $this->_orderFactory = $orderFactory;
         $this->_customerSession = $customerSession;
-        $this->_quoteFactory = $quoteFactory;
+        $this->quoteRepository = $quoteRepository;
         $this->_remoteAddress = $remoteAddress;
-        parent::__construct($context, $sidResolver, $sessionConfig, $data);
-        $this->start('checkout', $sessionName);
+        $this->_eventManager = $eventManager;
+        $this->_storeManager = $storeManager;
+        $this->customerRepository = $customerRepository;
+        $this->quoteIdMaskFactory = $quoteIdMaskFactory;
+        $this->quoteFactory = $quoteFactory;
+        parent::__construct(
+            $request,
+            $sidResolver,
+            $sessionConfig,
+            $saveHandler,
+            $validator,
+            $storage,
+            $cookieManager,
+            $cookieMetadataFactory,
+            $appState
+        );
+        $this->logger = $logger ?: ObjectManager::getInstance()
+            ->get(LoggerInterface::class);
     }
 
     /**
-     * Set customer instance
+     * Set customer data.
      *
-     * @param \Magento\Customer\Model\Customer|null $customer
+     * @param CustomerInterface|null $customer
      * @return \Magento\Checkout\Model\Session
+     * @codeCoverageIgnore
      */
-    public function setCustomer($customer)
+    public function setCustomerData($customer)
     {
         $this->_customer = $customer;
         return $this;
@@ -125,6 +203,7 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
      * Check whether current session has quote
      *
      * @return bool
+     * @codeCoverageIgnore
      */
     public function hasQuote()
     {
@@ -135,7 +214,8 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
      * Set quote to be loaded even if inactive
      *
      * @param bool $load
-     * @return \Magento\Checkout\Model\Session
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function setLoadInactive($load = true)
     {
@@ -146,22 +226,39 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
     /**
      * Get checkout quote instance by current session
      *
-     * @return \Magento\Sales\Model\Quote
+     * @return Quote
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws NoSuchEntityException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function getQuote()
     {
-        $this->_eventManager->dispatch('custom_quote_process', array('checkout_session' => $this));
+        $this->_eventManager->dispatch('custom_quote_process', ['checkout_session' => $this]);
 
         if ($this->_quote === null) {
-            /** @var $quote \Magento\Sales\Model\Quote */
-            $quote = $this->_quoteFactory->create()->setStoreId($this->_storeManager->getStore()->getId());
+            if ($this->isLoading) {
+                throw new \LogicException("Infinite loop detected, review the trace for the looping path");
+            }
+            $this->isLoading = true;
+            $quote = $this->quoteFactory->create();
             if ($this->getQuoteId()) {
-                if ($this->_loadInactive) {
-                    $quote->load($this->getQuoteId());
-                } else {
-                    $quote->loadActive($this->getQuoteId());
-                }
-                if ($quote->getId()) {
+                try {
+                    if ($this->_loadInactive) {
+                        $quote = $this->quoteRepository->get($this->getQuoteId());
+                    } else {
+                        $quote = $this->quoteRepository->getActive($this->getQuoteId());
+                    }
+
+                    $customerId = $this->_customer
+                        ? $this->_customer->getId()
+                        : $this->_customerSession->getCustomerId();
+
+                    if ($quote->getData('customer_id') && (int)$quote->getData('customer_id') !== (int)$customerId) {
+                        $quote = $this->quoteFactory->create();
+                        $this->setQuoteId(null);
+                    }
+
                     /**
                      * If current currency code of quote is not equal current currency code of store,
                      * need recalculate totals of quote. It is possible if customer use currency switcher or
@@ -169,59 +266,96 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
                      */
                     if ($quote->getQuoteCurrencyCode() != $this->_storeManager->getStore()->getCurrentCurrencyCode()) {
                         $quote->setStore($this->_storeManager->getStore());
-                        $quote->collectTotals()->save();
+                        $this->quoteRepository->save($quote->collectTotals());
                         /*
                          * We mast to create new quote object, because collectTotals()
                          * can to create links with other objects.
                          */
-                        $quote = $this->_quoteFactory->create()->setStoreId($this->_storeManager->getStore()->getId());
-                        $quote->load($this->getQuoteId());
+                        $quote = $this->quoteRepository->get($this->getQuoteId());
                     }
-                } else {
+
+                    if ($quote->getTotalsCollectedFlag() === false) {
+                        $quote->collectTotals();
+                    }
+                } catch (NoSuchEntityException $e) {
                     $this->setQuoteId(null);
                 }
             }
 
             if (!$this->getQuoteId()) {
                 if ($this->_customerSession->isLoggedIn() || $this->_customer) {
-                    $customer = ($this->_customer) ? $this->_customer : $this->_customerSession->getCustomer();
-                    $quote->loadByCustomer($customer);
-                    $this->setQuoteId($quote->getId());
+                    $quoteByCustomer = $this->getQuoteByCustomer();
+                    if ($quoteByCustomer !== null) {
+                        $this->setQuoteId($quoteByCustomer->getId());
+                        $quote = $quoteByCustomer;
+                    }
                 } else {
                     $quote->setIsCheckoutCart(true);
-                    $this->_eventManager->dispatch('checkout_quote_init', array('quote'=>$quote));
+                    $quote->setCustomerIsGuest(1);
+                    $this->_eventManager->dispatch('checkout_quote_init', ['quote' => $quote]);
                 }
             }
 
-            if ($this->getQuoteId()) {
-                if ($this->_customerSession->isLoggedIn() || $this->_customer) {
-                    $customer = ($this->_customer) ? $this->_customer : $this->_customerSession->getCustomer();
-                    $quote->setCustomer($customer);
-                }
+            if ($this->_customer) {
+                $quote->setCustomer($this->_customer);
+            } elseif ($this->_customerSession->isLoggedIn()) {
+                $quote->setCustomer($this->customerRepository->getById($this->_customerSession->getCustomerId()));
             }
 
             $quote->setStore($this->_storeManager->getStore());
             $this->_quote = $quote;
+            $this->isLoading = false;
         }
 
-        if ($remoteAddr = $this->_remoteAddress->getRemoteAddress()) {
-            $this->_quote->setRemoteIp($remoteAddr);
-            $xForwardIp = $this->_request->getServer('HTTP_X_FORWARDED_FOR');
+        if (!$this->isQuoteMasked() && !$this->_customerSession->isLoggedIn() && $this->getQuoteId()) {
+            $quoteId = $this->getQuoteId();
+            /** @var $quoteIdMask \Magento\Quote\Model\QuoteIdMask */
+            $quoteIdMask = $this->quoteIdMaskFactory->create()->load($quoteId, 'quote_id');
+            if ($quoteIdMask->getMaskedId() === null) {
+                $quoteIdMask->setQuoteId($quoteId)->save();
+            }
+            $this->setIsQuoteMasked(true);
+        }
+
+        $remoteAddress = $this->_remoteAddress->getRemoteAddress();
+        if ($remoteAddress) {
+            $this->_quote->setRemoteIp($remoteAddress);
+            $xForwardIp = $this->request->getServer('HTTP_X_FORWARDED_FOR');
             $this->_quote->setXForwardedFor($xForwardIp);
         }
+
         return $this->_quote;
     }
 
+    /**
+     * Return the quote's key
+     *
+     * @return string
+     * @codeCoverageIgnore
+     */
     protected function _getQuoteIdKey()
     {
         return 'quote_id_' . $this->_storeManager->getStore()->getWebsiteId();
     }
 
+    /**
+     * Set the current session's quote id
+     *
+     * @param int $quoteId
+     * @return void
+     * @codeCoverageIgnore
+     */
     public function setQuoteId($quoteId)
     {
-        $this->setData($this->_getQuoteIdKey(), $quoteId);
+        $this->storage->setData($this->_getQuoteIdKey(), $quoteId);
     }
 
+    /**
+     * Return the current quote's ID
+     *
+     * @return int
+     * @codeCoverageIgnore
+     */
     public function getQuoteId()
     {
         return $this->getData($this->_getQuoteIdKey());
@@ -230,7 +364,7 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
     /**
      * Load data for customer quote and merge with current quote
      *
-     * @return \Magento\Checkout\Model\Session
+     * @return $this
      */
     public function loadCustomerQuote()
     {
@@ -238,46 +372,65 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
             return $this;
         }
 
-        $this->_eventManager->dispatch('load_customer_quote_before', array('checkout_session' => $this));
+        $this->_eventManager->dispatch('load_customer_quote_before', ['checkout_session' => $this]);
 
-        $customerQuote = $this->_quoteFactory->create()
-            ->setStoreId($this->_storeManager->getStore()->getId())
-            ->loadByCustomer($this->_customerSession->getCustomerId());
+        try {
+            $customerQuote = $this->quoteRepository->getForCustomer($this->_customerSession->getCustomerId());
+        } catch (NoSuchEntityException $e) {
+            $customerQuote = $this->quoteFactory->create();
+        }
+        $customerQuote->setStoreId($this->_storeManager->getStore()->getId());
 
         if ($customerQuote->getId() && $this->getQuoteId() != $customerQuote->getId()) {
             if ($this->getQuoteId()) {
-                $customerQuote->merge($this->getQuote())
-                    ->collectTotals()
-                    ->save();
+                $quote = $this->getQuote();
+                $quote->setCustomerIsGuest(0);
+                $this->quoteRepository->save(
+                    $customerQuote->merge($quote)->collectTotals()
+                );
+                $newQuote = $this->quoteRepository->get($customerQuote->getId());
+                $this->quoteRepository->save(
+                    $newQuote->collectTotals()
+                );
+                $customerQuote = $newQuote;
             }
 
             $this->setQuoteId($customerQuote->getId());
 
             if ($this->_quote) {
-                $this->_quote->delete();
+                $this->quoteRepository->delete($this->_quote);
             }
             $this->_quote = $customerQuote;
         } else {
             $this->getQuote()->getBillingAddress();
             $this->getQuote()->getShippingAddress();
-            $this->getQuote()->setCustomer($this->_customerSession->getCustomer())
+            $this->getQuote()->setCustomer($this->_customerSession->getCustomerDataObject())
+                ->setCustomerIsGuest(0)
                 ->setTotalsCollectedFlag(false)
-                ->collectTotals()
-                ->save();
+                ->collectTotals();
+            $this->quoteRepository->save($this->getQuote());
         }
         return $this;
     }
 
-    public function setStepData($step, $data, $value=null)
+    /**
+     * Associate data to a specified step of the checkout process
+     *
+     * @param string $step
+     * @param array|string $data
+     * @param bool|string|null $value
+     * @return $this
+     */
+    public function setStepData($step, $data, $value = null)
     {
         $steps = $this->getSteps();
-        if (is_null($value)) {
+        if ($value === null) {
             if (is_array($data)) {
                 $steps[$step] = $data;
             }
         } else {
             if (!isset($steps[$step])) {
-                $steps[$step] = array();
+                $steps[$step] = [];
             }
             if (is_string($data)) {
                 $steps[$step][$data] = $value;
@@ -288,16 +441,23 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
         return $this;
     }
 
-    public function getStepData($step=null, $data=null)
+    /**
+     * Return the data associated to a specified step
+     *
+     * @param string|null $step
+     * @param string|null $data
+     * @return array|string|bool
+     */
+    public function getStepData($step = null, $data = null)
     {
         $steps = $this->getSteps();
-        if (is_null($step)) {
+        if ($step === null) {
             return $steps;
         }
         if (!isset($steps[$step])) {
             return false;
         }
-        if (is_null($data)) {
+        if ($data === null) {
             return $steps[$step];
         }
         if (!is_string($data) || !isset($steps[$step][$data])) {
@@ -307,105 +467,13 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
     }
 
     /**
-     * Retrieves list of all saved additional messages for different instances (e.g. quote items) in checkout session
-     * Returned: array(itemKey => messageCollection, ...)
-     * where itemKey is a unique hash (e.g 'quote_item17') to distinguish item messages among message collections
-     *
-     * @param bool $clear
-     *
-     * @return array
-     */
-    public function getAdditionalMessages($clear = false)
-    {
-        $additionalMessages = $this->getData('additional_messages');
-        if (!$additionalMessages) {
-            return array();
-        }
-        if ($clear) {
-            $this->setData('additional_messages', null);
-        }
-        return $additionalMessages;
-    }
-
-    /**
-     * Retrieves list of item additional messages
-     * itemKey is a unique hash (e.g 'quote_item17') to distinguish item messages among message collections
-     *
-     * @param string $itemKey
-     * @param bool $clear
-     *
-     * @return null|\Magento\Message\Collection
-     */
-    public function getItemAdditionalMessages($itemKey, $clear = false)
-    {
-        $allMessages = $this->getAdditionalMessages();
-        if (!isset($allMessages[$itemKey])) {
-            return null;
-        }
-
-        $messages = $allMessages[$itemKey];
-        if ($clear) {
-            unset($allMessages[$itemKey]);
-            $this->setAdditionalMessages($allMessages);
-        }
-        return $messages;
-    }
-
-    /**
-     * Adds new message in this session to a list of additional messages for some item
-     * itemKey is a unique hash (e.g 'quote_item17') to distinguish item messages among message collections
-     *
-     * @param string $itemKey
-     * @param \Magento\Message\AbstractMessage $message
-     *
-     * @return \Magento\Checkout\Model\Session
-     */
-    public function addItemAdditionalMessage($itemKey, $message)
-    {
-        $allMessages = $this->getAdditionalMessages();
-        if (!isset($allMessages[$itemKey])) {
-            $allMessages[$itemKey] = $this->messagesFactory->create();
-        }
-        $allMessages[$itemKey]->add($message);
-        $this->setAdditionalMessages($allMessages);
-
-        return $this;
-    }
-
-    /**
-     * Retrieves list of quote item messages
-     * @param int $itemId
-     * @param bool $clear
-     *
-     * @return null|\Magento\Message\Collection
-     */
-    public function getQuoteItemMessages($itemId, $clear = false)
-    {
-        return $this->getItemAdditionalMessages('quote_item' . $itemId, $clear);
-    }
-
-    /**
-     * Adds new message to a list of quote item messages, saved in this session
-     *
-     * @param int $itemId
-     * @param \Magento\Message\AbstractMessage $message
-     *
-     * @return \Magento\Checkout\Model\Session
-     */
-    public function addQuoteItemMessage($itemId, $message)
-    {
-        return $this->addItemAdditionalMessage('quote_item' . $itemId, $message);
-    }
-
-    /**
-     * Destroy/end a session
-     * Unset all data associated with object
+     * Destroy/end a session and unset all data associated with it
      *
      * @return $this
      */
     public function clearQuote()
     {
-        $this->_eventManager->dispatch('checkout_quote_destroy', array('quote' => $this->getQuote()));
+        $this->_eventManager->dispatch('checkout_quote_destroy', ['quote' => $this->getQuote()]);
         $this->_quote = null;
         $this->setQuoteId(null);
         $this->setLastSuccessQuoteId(null);
@@ -426,24 +494,32 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
 
     /**
      * Clear misc checkout parameters
+     *
+     * @return void
      */
     public function clearHelperData()
     {
-        $this->setLastBillingAgreementId(null)
-            ->setRedirectUrl(null)
-            ->setLastOrderId(null)
-            ->setLastRealOrderId(null)
-            ->setLastRecurringProfileIds(null)
-            ->setAdditionalMessages(null)
-        ;
+        $this->setRedirectUrl(null)->setLastOrderId(null)->setLastRealOrderId(null)->setAdditionalMessages(null);
     }
 
+    /**
+     * Revert the state of the checkout to the beginning
+     *
+     * @return $this
+     * @codeCoverageIgnore
+     */
     public function resetCheckout()
     {
         $this->setCheckoutState(self::CHECKOUT_STATE_BEGIN);
         return $this;
     }
 
+    /**
+     * Replace the quote in the session with a specified object
+     *
+     * @param Quote $quote
+     * @return $this
+     */
     public function replaceQuote($quote)
     {
         $this->_quote = $quote;
@@ -467,5 +543,71 @@ class Session extends \Magento\Core\Model\Session\AbstractSession
             $this->_order->loadByIncrementId($orderId);
         }
         return $this->_order;
+    }
+
+    /**
+     * Restore last active quote
+     *
+     * @return bool True if quote restored successfully, false otherwise
+     */
+    public function restoreQuote()
+    {
+        /** @var \Magento\Sales\Model\Order $order */
+        $order = $this->getLastRealOrder();
+        if ($order->getId()) {
+            try {
+                $quote = $this->quoteRepository->get($order->getQuoteId());
+                $quote->setIsActive(1)->setReservedOrderId(null);
+                $this->quoteRepository->save($quote);
+                $this->replaceQuote($quote)->unsLastRealOrderId();
+                $this->_eventManager->dispatch('restore_quote', ['order' => $order, 'quote' => $quote]);
+                return true;
+            } catch (NoSuchEntityException $e) {
+                $this->logger->critical($e);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Flag whether or not the quote uses a masked quote id
+     *
+     * @param bool $isQuoteMasked
+     * @return void
+     * @codeCoverageIgnore
+     */
+    protected function setIsQuoteMasked($isQuoteMasked)
+    {
+        $this->isQuoteMasked = $isQuoteMasked;
+    }
+
+    /**
+     * Return if the quote has a masked quote id
+     *
+     * @return bool|null
+     * @codeCoverageIgnore
+     */
+    protected function isQuoteMasked()
+    {
+        return $this->isQuoteMasked;
+    }
+
+    /**
+     * Returns quote for customer if there is any
+     */
+    private function getQuoteByCustomer(): ?CartInterface
+    {
+        $customerId = $this->_customer
+            ? $this->_customer->getId()
+            : $this->_customerSession->getCustomerId();
+
+        try {
+            $quote = $this->quoteRepository->getActiveForCustomer($customerId);
+        } catch (NoSuchEntityException $e) {
+            $quote = null;
+        }
+
+        return $quote;
     }
 }

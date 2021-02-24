@@ -1,69 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Block\Product\View;
 
 /**
  * Product view abstract block
  *
- * @category   Magento
- * @package    Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @deprecated 102.0.0
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Block\Product\View;
-
 abstract class AbstractView extends \Magento\Catalog\Block\Product\AbstractProduct
 {
     /**
-     * @var \Magento\Stdlib\ArrayUtils
+     * @var \Magento\Framework\Stdlib\ArrayUtils
      */
     protected $arrayUtils;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Stdlib\ArrayUtils $arrayUtils
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Framework\Stdlib\ArrayUtils $arrayUtils
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Stdlib\ArrayUtils $arrayUtils,
-        array $data = array()
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Framework\Stdlib\ArrayUtils $arrayUtils,
+        array $data = []
     ) {
         $this->arrayUtils = $arrayUtils;
-        parent::__construct($context, $catalogConfig, $registry, $taxData, $catalogData, $mathRandom, $data);
+        parent::__construct(
+            $context,
+            $data
+        );
     }
-
 
     /**
      * Retrieve product
@@ -73,7 +44,7 @@ abstract class AbstractView extends \Magento\Catalog\Block\Product\AbstractProdu
     public function getProduct()
     {
         $product = parent::getProduct();
-        if (is_null($product->getTypeInstance()->getStoreFilter($product))) {
+        if ($product && $product->getTypeInstance()->getStoreFilter($product) === null) {
             $product->getTypeInstance()->setStoreFilter($this->_storeManager->getStore(), $product);
         }
         return $product;
@@ -82,10 +53,10 @@ abstract class AbstractView extends \Magento\Catalog\Block\Product\AbstractProdu
     /**
      * Decorate a plain array of arrays or objects
      *
-     * @param mixed $array
+     * @param array $array
      * @param string $prefix
      * @param bool $forceSetAll
-     * @return mixed
+     * @return array
      */
     public function decorateArray($array, $prefix = 'decorated_', $forceSetAll = false)
     {

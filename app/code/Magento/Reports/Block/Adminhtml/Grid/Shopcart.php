@@ -1,55 +1,38 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Reports\Block\Adminhtml\Grid;
 
 /**
  * Adminhtml shopping carts report grid block
  *
- * @category   Magento
- * @package    Magento_Reports
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Reports\Block\Adminhtml\Grid;
-
 class Shopcart extends \Magento\Backend\Block\Widget\Grid\Extended
 {
     /**
-     * stores current currency code
+     * Stores current currency code
+     *
+     * @var array
      */
     protected $_currentCurrencyCode = null;
 
     /**
-     * ids of current stores
+     * Ids of current stores
+     *
+     * @var array
      */
-    protected $_storeIds            = array();
+    protected $_storeIds = [];
 
     /**
-     * storeIds setter
+     * StoreIds setter
      *
-     * @param  array $storeIds
-     * @return \Magento\Reports\Block\Adminhtml\Grid\Shopcart
+     * @codeCoverageIgnore
+     *
+     * @param array $storeIds
+     * @return $this
      */
     public function setStoreIds($storeIds)
     {
@@ -64,11 +47,17 @@ class Shopcart extends \Magento\Backend\Block\Widget\Grid\Extended
      */
     public function getCurrentCurrencyCode()
     {
-        if (is_null($this->_currentCurrencyCode)) {
+        if (empty($this->_storeIds)) {
+            $this->setStoreIds(array_keys($this->_storeManager->getStores()));
+        }
+
+        if ($this->_currentCurrencyCode === null) {
             reset($this->_storeIds);
-            $this->_currentCurrencyCode = (count($this->_storeIds) > 0)
-                ? $this->_storeManager->getStore(current($this->_storeIds))->getBaseCurrencyCode()
-                : $this->_storeManager->getStore()->getBaseCurrencyCode();
+            $this->_currentCurrencyCode = count(
+                $this->_storeIds
+            ) > 0 ? $this->_storeManager->getStore(
+                current($this->_storeIds)
+            )->getBaseCurrencyCode() : $this->_storeManager->getStore()->getBaseCurrencyCode();
         }
         return $this->_currentCurrencyCode;
     }
@@ -76,8 +65,8 @@ class Shopcart extends \Magento\Backend\Block\Widget\Grid\Extended
     /**
      * Get currency rate (base to given currency)
      *
-     * @param string|\Magento\Directory\Model\Currency $currencyCode
-     * @return double
+     * @param string|\Magento\Directory\Model\Currency $toCurrency
+     * @return float
      */
     public function getRate($toCurrency)
     {

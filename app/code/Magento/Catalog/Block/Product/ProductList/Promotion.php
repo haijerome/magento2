@@ -1,96 +1,68 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Block\Product\ProductList;
+
+use Magento\Catalog\Api\CategoryRepositoryInterface;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 
 class Promotion extends \Magento\Catalog\Block\Product\ListProduct
 {
     /**
      * Product collection factory
      *
-     * @var \Magento\Catalog\Model\Resource\Product\CollectionFactory
+     * @var CollectionFactory
      */
     protected $_productCollectionFactory;
 
     /**
-     * Layer factory
-     *
-     * @var \Magento\Catalog\Model\LayerFactory
+     * @var CategoryRepositoryInterface
      */
-    protected $_layerFactory;
+    protected $categoryRepository;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Catalog\Model\CategoryFactory $categoryFactory
-     * @param \Magento\Catalog\Model\Layer $catalogLayer
-     * @param \Magento\Catalog\Model\LayerFactory $layerFactory
-     * @param \Magento\Catalog\Model\Resource\Product\CollectionFactory $productCollectionFactory
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Framework\Data\Helper\PostHelper $postDataHelper
+     * @param \Magento\Catalog\Model\Layer\Resolver $layerResolver
+     * @param CategoryRepositoryInterface $categoryRepository
+     * @param \Magento\Framework\Url\Helper\Data $urlHelper
+     * @param CollectionFactory $productCollectionFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Catalog\Model\CategoryFactory $categoryFactory,
-        \Magento\Catalog\Model\Layer $catalogLayer,
-        \Magento\Catalog\Model\LayerFactory $layerFactory,
-        \Magento\Catalog\Model\Resource\Product\CollectionFactory $productCollectionFactory,
-        array $data = array()
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Framework\Data\Helper\PostHelper $postDataHelper,
+        \Magento\Catalog\Model\Layer\Resolver $layerResolver,
+        CategoryRepositoryInterface $categoryRepository,
+        \Magento\Framework\Url\Helper\Data $urlHelper,
+        CollectionFactory $productCollectionFactory,
+        array $data = []
     ) {
-        $this->_layerFactory = $layerFactory;
         $this->_productCollectionFactory = $productCollectionFactory;
         parent::__construct(
             $context,
-            $catalogConfig,
-            $registry,
-            $taxData,
-            $catalogData,
-            $mathRandom,
-            $categoryFactory,
-            $catalogLayer,
+            $postDataHelper,
+            $layerResolver,
+            $categoryRepository,
+            $urlHelper,
             $data
         );
     }
 
+    /**
+     * @return Collection
+     */
     protected function _getProductCollection()
     {
-        if (is_null($this->_productCollection)) {
-            /** @var \Magento\Catalog\Model\Resource\Product\Collection $collection */
+        if ($this->_productCollection === null) {
+            /** @var Collection $collection */
             $collection = $this->_productCollectionFactory->create();
-            $this->_layerFactory->create()->prepareProductCollection($collection);
+            $this->_catalogLayer->prepareProductCollection($collection);
 
-            $collection->addAttributeToFilter('promotion', 1)
-                ->addStoreFilter();
+            $collection->addAttributeToFilter('promotion', 1)->addStoreFilter();
 
             $this->_productCollection = $collection;
         }

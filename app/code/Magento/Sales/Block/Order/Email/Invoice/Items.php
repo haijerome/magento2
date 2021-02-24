@@ -1,50 +1,117 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
+namespace Magento\Sales\Block\Order\Email\Invoice;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Sales\Api\Data\InvoiceInterface;
+use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Api\InvoiceRepositoryInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
 
 /**
  * Sales Order Email Invoice items
  *
- * @category   Magento
- * @package    Magento_Sales
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Order\Email\Invoice;
-
 class Items extends \Magento\Sales\Block\Items\AbstractItems
 {
     /**
+     * @var OrderRepositoryInterface
+     */
+    private $orderRepository;
+
+    /**
+     * @var InvoiceRepositoryInterface
+     */
+    private $invoiceRepository;
+
+    /**
+     * @param Context $context
+     * @param array $data
+     * @param OrderRepositoryInterface|null $orderRepository
+     * @param InvoiceRepositoryInterface|null $invoiceRepository
+     */
+    public function __construct(
+        Context $context,
+        array $data = [],
+        ?OrderRepositoryInterface $orderRepository = null,
+        ?InvoiceRepositoryInterface $invoiceRepository = null
+    ) {
+        $this->orderRepository =
+            $orderRepository ?: ObjectManager::getInstance()->get(OrderRepositoryInterface::class);
+        $this->invoiceRepository =
+            $invoiceRepository ?: ObjectManager::getInstance()->get(InvoiceRepositoryInterface::class);
+
+        parent::__construct($context, $data);
+    }
+
+    /**
      * Prepare item before output
      *
-     * @param \Magento\View\Element\AbstractBlock $renderer
-     * @return \Magento\Sales\Block\Items\AbstractItems
+     * @param \Magento\Framework\View\Element\AbstractBlock $renderer
+     * @return void
      */
-    protected function _prepareItem(\Magento\View\Element\AbstractBlock $renderer)
+    protected function _prepareItem(\Magento\Framework\View\Element\AbstractBlock $renderer)
     {
         $renderer->getItem()->setOrder($this->getOrder());
         $renderer->getItem()->setSource($this->getInvoice());
+    }
+
+    /**
+     * Returns order.
+     *
+     * Custom email templates are only allowed to use scalar values for variable data.
+     * So order is loaded by order_id, that is passed to block from email template.
+     * For legacy custom email templates it can pass as an object.
+     *
+     * @return OrderInterface|null
+     * @since 102.1.0
+     */
+    public function getOrder()
+    {
+        $order = $this->getData('order');
+        if ($order !== null) {
+            return $order;
+        }
+
+        $orderId = (int)$this->getData('order_id');
+        if ($orderId) {
+            $order = $this->orderRepository->get($orderId);
+            $this->setData('order', $order);
+        }
+
+        return $this->getData('order');
+    }
+
+    /**
+     * Returns invoice.
+     *
+     * Custom email templates are only allowed to use scalar values for variable data.
+     * So invoice is loaded by invoice_id, that is passed to block from email template.
+     * For legacy custom email templates it can pass as an object.
+     *
+     * @return InvoiceInterface|null
+     * @since 102.1.0
+     */
+    public function getInvoice()
+    {
+        $invoice = $this->getData('invoice');
+        if ($invoice !== null) {
+            return $invoice;
+        }
+
+        $invoiceId = (int)$this->getData('invoice_id');
+        if ($invoiceId) {
+            $invoice = $this->invoiceRepository->get($invoiceId);
+            $this->setData('invoice', $invoice);
+        }
+
+        return $this->getData('invoice');
     }
 }

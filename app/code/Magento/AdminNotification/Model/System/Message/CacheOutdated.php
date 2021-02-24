@@ -1,55 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\AdminNotification\Model\System\Message;
 
-class CacheOutdated
-    implements \Magento\AdminNotification\Model\System\MessageInterface
+/**
+ * @api
+ * @since 100.0.2
+ */
+class CacheOutdated implements \Magento\Framework\Notification\MessageInterface
 {
     /**
-     * @var \Magento\UrlInterface
+     * @var \Magento\Framework\UrlInterface
      */
     protected $_urlBuilder;
 
     /**
-     * @var \Magento\AuthorizationInterface
+     * @var \Magento\Framework\AuthorizationInterface
      */
     protected $_authorization;
 
     /**
-     * @var \Magento\App\Cache\TypeListInterface
+     * @var \Magento\Framework\App\Cache\TypeListInterface
      */
     protected $_cacheTypeList;
 
     /**
-     * @param \Magento\AuthorizationInterface $authorization
-     * @param \Magento\UrlInterface $urlBuilder
-     * @param \Magento\App\Cache\TypeListInterface $cacheTypeList
+     * @param \Magento\Framework\AuthorizationInterface $authorization
+     * @param \Magento\Framework\UrlInterface $urlBuilder
+     * @param \Magento\Framework\App\Cache\TypeListInterface $cacheTypeList
      */
     public function __construct(
-        \Magento\AuthorizationInterface $authorization,
-        \Magento\UrlInterface $urlBuilder,
-        \Magento\App\Cache\TypeListInterface $cacheTypeList
+        \Magento\Framework\AuthorizationInterface $authorization,
+        \Magento\Framework\UrlInterface $urlBuilder,
+        \Magento\Framework\App\Cache\TypeListInterface $cacheTypeList
     ) {
         $this->_authorization = $authorization;
         $this->_urlBuilder = $urlBuilder;
@@ -63,7 +48,7 @@ class CacheOutdated
      */
     protected function _getCacheTypesForRefresh()
     {
-        $output = array();
+        $output = [];
         foreach ($this->_cacheTypeList->getInvalidated() as $type) {
             $output[] = $type->getCacheType();
         }
@@ -87,8 +72,11 @@ class CacheOutdated
      */
     public function isDisplayed()
     {
-        return $this->_authorization->isAllowed('Magento_Adminhtml::cache')
-            && count($this->_getCacheTypesForRefresh()) > 0;
+        return $this->_authorization->isAllowed(
+            'Magento_Backend::cache'
+        ) && count(
+            $this->_getCacheTypesForRefresh()
+        ) > 0;
     }
 
     /**
@@ -122,6 +110,6 @@ class CacheOutdated
      */
     public function getSeverity()
     {
-        return \Magento\AdminNotification\Model\System\MessageInterface::SEVERITY_CRITICAL;
+        return \Magento\Framework\Notification\MessageInterface::SEVERITY_CRITICAL;
     }
 }

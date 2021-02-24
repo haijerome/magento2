@@ -1,89 +1,77 @@
 <?php
-
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
 namespace Magento\Backend\Block;
 
+use Magento\Framework\Cache\LockGuardedCacheLoader;
+
 /**
- * Backend block context
+ * Constructor modification point for Magento\Backend\Block\AbstractBlock.
  *
- * Magento
+ * All context classes were introduced to allow for backwards compatible constructor modifications
+ * of classes that were supposed to be extended by extension developers.
  *
- * NOTICE OF LICENSE
+ * Do not call methods of this class directly.
  *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
+ * As Magento moves from inheritance-based APIs all such classes will be deprecated together with
+ * the classes they were introduced for.
  *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- *
- * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @api
+ * @SuppressWarnings(PHPMD)
+ * @since 100.0.2
  */
-class Context extends \Magento\View\Element\Context
+class Context extends \Magento\Framework\View\Element\Context
 {
     /**
-     * @var \Magento\AuthorizationInterface
+     * @var \Magento\Framework\AuthorizationInterface
      */
     protected $_authorization;
 
     /**
-     * @param \Magento\App\RequestInterface $request
-     * @param \Magento\View\LayoutInterface $layout
-     * @param \Magento\Event\ManagerInterface $eventManager
-     * @param \Magento\UrlInterface $urlBuilder
-     * @param \Magento\Core\Model\Translate $translator
-     * @param \Magento\App\CacheInterface $cache
-     * @param \Magento\View\DesignInterface $design
-     * @param \Magento\Core\Model\Session\AbstractSession $session
-     * @param \Magento\Session\SidResolverInterface $sidResolver
-     * @param \Magento\Core\Model\Store\Config $storeConfig
-     * @param \Magento\App\FrontController $frontController
-     * @param \Magento\App\Helper\HelperFactory $helperFactory
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\View\ConfigInterface $viewConfig
-     * @param \Magento\App\Cache\StateInterface $cacheState
-     * @param \Magento\Logger $logger
-     * @param \Magento\Core\Model\App $app
-     * @param \Magento\Escaper $escaper
-     * @param \Magento\Filter\FilterManager $filterManager
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\AuthorizationInterface $authorization
-     * @param array $data
-     * 
+     * @param \Magento\Framework\App\RequestInterface $request
+     * @param \Magento\Framework\View\LayoutInterface $layout
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
+     * @param \Magento\Framework\UrlInterface $urlBuilder
+     * @param \Magento\Framework\App\CacheInterface $cache
+     * @param \Magento\Framework\View\DesignInterface $design
+     * @param \Magento\Framework\Session\SessionManagerInterface $session
+     * @param \Magento\Framework\Session\SidResolverInterface $sidResolver
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\View\ConfigInterface $viewConfig
+     * @param \Magento\Framework\App\Cache\StateInterface $cacheState
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Escaper $escaper
+     * @param \Magento\Framework\Filter\FilterManager $filterManager
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Framework\Translate\Inline\StateInterface $inlineTranslation
+     * @param \Magento\Framework\AuthorizationInterface $authorization
+     * @param LockGuardedCacheLoader|null $lockQuery
+     *
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\App\RequestInterface $request,
-        \Magento\View\LayoutInterface $layout,
-        \Magento\Event\ManagerInterface $eventManager,
-        \Magento\UrlInterface $urlBuilder,
-        \Magento\Core\Model\Translate $translator,
-        \Magento\App\CacheInterface $cache,
-        \Magento\View\DesignInterface $design,
-        \Magento\Core\Model\Session\AbstractSession $session,
-        \Magento\Session\SidResolverInterface $sidResolver,
-        \Magento\Core\Model\Store\Config $storeConfig,
-        \Magento\App\FrontController $frontController,
-        \Magento\App\Helper\HelperFactory $helperFactory,
-        \Magento\View\Url $viewUrl,
-        \Magento\View\ConfigInterface $viewConfig,
-        \Magento\App\Cache\StateInterface $cacheState,
-        \Magento\Logger $logger,
-        \Magento\Core\Model\App $app,
-        \Magento\Escaper $escaper,
-        \Magento\Filter\FilterManager $filterManager,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\AuthorizationInterface $authorization,
-        array $data = array()
+        \Magento\Framework\App\RequestInterface $request,
+        \Magento\Framework\View\LayoutInterface $layout,
+        \Magento\Framework\Event\ManagerInterface $eventManager,
+        \Magento\Framework\UrlInterface $urlBuilder,
+        \Magento\Framework\App\CacheInterface $cache,
+        \Magento\Framework\View\DesignInterface $design,
+        \Magento\Framework\Session\SessionManagerInterface $session,
+        \Magento\Framework\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\View\ConfigInterface $viewConfig,
+        \Magento\Framework\App\Cache\StateInterface $cacheState,
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Escaper $escaper,
+        \Magento\Framework\Filter\FilterManager $filterManager,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Framework\Translate\Inline\StateInterface $inlineTranslation,
+        \Magento\Framework\AuthorizationInterface $authorization,
+        LockGuardedCacheLoader $lockQuery = null
     ) {
         $this->_authorization = $authorization;
         parent::__construct(
@@ -91,30 +79,27 @@ class Context extends \Magento\View\Element\Context
             $layout,
             $eventManager,
             $urlBuilder,
-            $translator,
             $cache,
             $design,
             $session,
             $sidResolver,
-            $storeConfig,
-            $frontController,
-            $helperFactory,
-            $viewUrl,
+            $scopeConfig,
+            $assetRepo,
             $viewConfig,
             $cacheState,
             $logger,
-            $app,
             $escaper,
             $filterManager,
-            $locale,
-            $data
+            $localeDate,
+            $inlineTranslation,
+            $lockQuery
         );
     }
 
     /**
      * Retrieve Authorization
      *
-     * @return \Magento\AuthorizationInterface
+     * @return \Magento\Framework\AuthorizationInterface
      */
     public function getAuthorization()
     {

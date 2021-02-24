@@ -1,60 +1,72 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\TestFramework\Interception;
 
-class PluginList extends \Magento\Interception\PluginList\PluginList
+use Magento\Framework\Interception\ConfigLoaderInterface;
+use Magento\Framework\Interception\PluginListGenerator;
+use Magento\Framework\Serialize\SerializerInterface;
+
+/**
+ * Provides plugin list configuration
+ */
+class PluginList extends \Magento\Framework\Interception\PluginList\PluginList
 {
     /**
      * @var array
      */
-    protected $_originScopeScheme = array();
+    protected $_originScopeScheme = [];
 
     /**
-     * @param \Magento\Config\ReaderInterface $reader
-     * @param \Magento\Config\ScopeInterface $configScope
-     * @param \Magento\Config\CacheInterface $cache
-     * @param \Magento\ObjectManager\Relations $relations
-     * @param \Magento\ObjectManager\Config $omConfig
-     * @param \Magento\Interception\Definition $definitions
+     * Constructor
+     *
+     * @param \Magento\Framework\Config\ReaderInterface $reader
+     * @param \Magento\Framework\Config\ScopeInterface $configScope
+     * @param \Magento\Framework\Config\CacheInterface $cache
+     * @param \Magento\Framework\ObjectManager\RelationsInterface $relations
+     * @param \Magento\Framework\ObjectManager\ConfigInterface $omConfig
+     * @param \Magento\Framework\Interception\DefinitionInterface $definitions
+     * @param \Magento\Framework\ObjectManagerInterface $objectManager
+     * @param \Magento\Framework\ObjectManager\DefinitionInterface $classDefinitions
      * @param array $scopePriorityScheme
-     * @param \Magento\ObjectManager\Definition\Compiled $classDefinitions
-     * @param string $cacheId
+     * @param string|null $cacheId
+     * @param SerializerInterface|null $serializer
+     * @param ConfigLoaderInterface|null $configLoader
+     * @param PluginListGenerator|null $pluginListGenerator
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Config\ReaderInterface $reader,
-        \Magento\Config\ScopeInterface $configScope,
-        \Magento\Config\CacheInterface $cache,
-        \Magento\ObjectManager\Relations $relations,
-        \Magento\ObjectManager\Config $omConfig,
-        \Magento\Interception\Definition $definitions,
+        \Magento\Framework\Config\ReaderInterface $reader,
+        \Magento\Framework\Config\ScopeInterface $configScope,
+        \Magento\Framework\Config\CacheInterface $cache,
+        \Magento\Framework\ObjectManager\RelationsInterface $relations,
+        \Magento\Framework\ObjectManager\ConfigInterface $omConfig,
+        \Magento\Framework\Interception\DefinitionInterface $definitions,
+        \Magento\Framework\ObjectManagerInterface $objectManager,
+        \Magento\Framework\ObjectManager\DefinitionInterface $classDefinitions,
         array $scopePriorityScheme,
         $cacheId = 'plugins',
-        \Magento\ObjectManager\Definition\Compiled $classDefinitions = null
+        SerializerInterface $serializer = null,
+        ConfigLoaderInterface $configLoader = null,
+        PluginListGenerator $pluginListGenerator = null
     ) {
-        parent::__construct($reader, $configScope, $cache, $relations, $omConfig,
-            $definitions, $scopePriorityScheme, $cacheId, $classDefinitions);
+        parent::__construct(
+            $reader,
+            $configScope,
+            $cache,
+            $relations,
+            $omConfig,
+            $definitions,
+            $objectManager,
+            $classDefinitions,
+            $scopePriorityScheme,
+            $cacheId,
+            $serializer,
+            $configLoader,
+            $pluginListGenerator
+        );
         $this->_originScopeScheme = $this->_scopePriorityScheme;
     }
 
@@ -64,7 +76,7 @@ class PluginList extends \Magento\Interception\PluginList\PluginList
     public function reset()
     {
         $this->_scopePriorityScheme = $this->_originScopeScheme;
-        $this->_data = array();
-        $this->_loadedScopes = array();
+        $this->_data = [];
+        $this->_loadedScopes = [];
     }
-} 
+}

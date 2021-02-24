@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -35,7 +14,7 @@ class Profiler
     /**
      * Profiler driver instance
      *
-     * @var \Magento\Profiler\Driver\Standard
+     * @var \Magento\Framework\Profiler\Driver\Standard
      */
     protected $_driver;
 
@@ -49,9 +28,9 @@ class Profiler
     /**
      * Constructor
      *
-     * @param \Magento\Profiler\Driver\Standard $driver
+     * @param \Magento\Framework\Profiler\Driver\Standard $driver
      */
-    public function __construct(\Magento\Profiler\Driver\Standard $driver)
+    public function __construct(\Magento\Framework\Profiler\Driver\Standard $driver)
     {
         $this->_driver = $driver;
     }
@@ -63,7 +42,7 @@ class Profiler
     {
         if (!$this->_isDriverRegistered) {
             $this->_isDriverRegistered = true;
-            \Magento\Profiler::add($this->_driver);
+            \Magento\Framework\Profiler::add($this->_driver);
         }
     }
 
@@ -75,9 +54,9 @@ class Profiler
     public function registerFileProfiler($profilerOutputFile)
     {
         $this->_registerDriver();
-        $this->_driver->registerOutput(new \Magento\Profiler\Driver\Standard\Output\Csvfile(array(
-            'filePath' => $profilerOutputFile
-        )));
+        $this->_driver->registerOutput(
+            new \Magento\Framework\Profiler\Driver\Standard\Output\Csvfile(['filePath' => $profilerOutputFile])
+        );
     }
 
     /**
@@ -89,9 +68,10 @@ class Profiler
     public function registerBambooProfiler($profilerOutputFile, $profilerMetricsFile)
     {
         $this->_registerDriver();
-        $this->_driver->registerOutput(new \Magento\TestFramework\Profiler\OutputBamboo(array(
-            'filePath' => $profilerOutputFile,
-            'metrics'  => require($profilerMetricsFile)
-        )));
+        $this->_driver->registerOutput(
+            new \Magento\TestFramework\Profiler\OutputBamboo(
+                ['filePath' => $profilerOutputFile, 'metrics' => require $profilerMetricsFile]
+            )
+        );
     }
 }

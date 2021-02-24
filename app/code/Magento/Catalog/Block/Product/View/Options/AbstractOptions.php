@@ -1,40 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Product options abstract type block
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
+
 namespace Magento\Catalog\Block\Product\View\Options;
 
-abstract class AbstractOptions extends \Magento\View\Element\Template
+use Magento\Catalog\Pricing\Price\CalculateCustomOptionCatalogRule;
+use Magento\Catalog\Pricing\Price\CustomOptionPriceInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Pricing\Adjustment\CalculatorInterface;
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+
+/**
+ * Product options section abstract block.
+ *
+ * phpcs:disable Magento2.Classes.AbstractApi
+ * @api
+ * @since 100.0.2
+ */
+abstract class AbstractOptions extends \Magento\Framework\View\Element\Template
 {
     /**
      * Product object
@@ -51,23 +42,56 @@ abstract class AbstractOptions extends \Magento\View\Element\Template
     protected $_option;
 
     /**
-     * Tax data
-     *
-     * @var \Magento\Tax\Helper\Data
+     * @var \Magento\Framework\Pricing\Helper\Data
      */
-    protected $_taxData = null;
+    protected $pricingHelper;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Tax\Helper\Data $taxData
+     * @var \Magento\Catalog\Helper\Data
+     */
+    protected $_catalogHelper;
+
+    /**
+     * @var CalculateCustomOptionCatalogRule
+     */
+    private $calculateCustomOptionCatalogRule;
+
+    /**
+     * @var CalculatorInterface
+     */
+    private $calculator;
+
+    /**
+     * @var PriceCurrencyInterface
+     */
+    private $priceCurrency;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Pricing\Helper\Data $pricingHelper
+     * @param \Magento\Catalog\Helper\Data $catalogData
      * @param array $data
+     * @param CalculateCustomOptionCatalogRule|null $calculateCustomOptionCatalogRule
+     * @param CalculatorInterface|null $calculator
+     * @param PriceCurrencyInterface|null $priceCurrency
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Tax\Helper\Data $taxData,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Pricing\Helper\Data $pricingHelper,
+        \Magento\Catalog\Helper\Data $catalogData,
+        array $data = [],
+        CalculateCustomOptionCatalogRule $calculateCustomOptionCatalogRule = null,
+        CalculatorInterface $calculator = null,
+        PriceCurrencyInterface $priceCurrency = null
     ) {
-        $this->_taxData = $taxData;
+        $this->pricingHelper = $pricingHelper;
+        $this->_catalogHelper = $catalogData;
+        $this->calculateCustomOptionCatalogRule = $calculateCustomOptionCatalogRule
+            ?? ObjectManager::getInstance()->get(CalculateCustomOptionCatalogRule::class);
+        $this->calculator = $calculator
+            ?? ObjectManager::getInstance()->get(CalculatorInterface::class);
+        $this->priceCurrency = $priceCurrency
+            ?? ObjectManager::getInstance()->get(PriceCurrencyInterface::class);
         parent::__construct($context, $data);
     }
 
@@ -115,30 +139,50 @@ abstract class AbstractOptions extends \Magento\View\Element\Template
         return $this->_option;
     }
 
-    public function getFormatedPrice()
+    /**
+     * Retrieve formatted price
+     *
+     * @return string
+     * @since 102.0.6
+     */
+    public function getFormattedPrice()
     {
         if ($option = $this->getOption()) {
-            return $this->_formatPrice(array(
-                'is_percent'    => ($option->getPriceType() == 'percent'),
-                'pricing_value' => $option->getPrice($option->getPriceType() == 'percent')
-            ));
+            return $this->_formatPrice(
+                [
+                    'is_percent' => $option->getPriceType() == 'percent',
+                    'pricing_value' => $option->getPrice($option->getPriceType() == 'percent'),
+                ]
+            );
         }
         return '';
     }
 
     /**
-     * Return formated price
+     * Retrieve formatted price.
+     *
+     * @return string
+     *
+     * @deprecated 102.0.6
+     * @see getFormattedPrice()
+     */
+    public function getFormatedPrice()
+    {
+        return $this->getFormattedPrice();
+    }
+
+    /**
+     * Return formatted price
      *
      * @param array $value
+     * @param bool $flag
      * @return string
      */
-    protected function _formatPrice($value, $flag=true)
+    protected function _formatPrice($value, $flag = true)
     {
         if ($value['pricing_value'] == 0) {
             return '';
         }
-
-        $store = $this->getProduct()->getStore();
 
         $sign = '+';
         if ($value['pricing_value'] < 0) {
@@ -147,22 +191,37 @@ abstract class AbstractOptions extends \Magento\View\Element\Template
         }
 
         $priceStr = $sign;
-        $_priceInclTax = $this->getPrice($value['pricing_value'], true);
-        $_priceExclTax = $this->getPrice($value['pricing_value']);
-        if ($this->_taxData->displayPriceIncludingTax()) {
-            $priceStr .= $this->helper('Magento\Core\Helper\Data')->currencyByStore($_priceInclTax, $store, true, $flag);
-        } elseif ($this->_taxData->displayPriceExcludingTax()) {
-            $priceStr .= $this->helper('Magento\Core\Helper\Data')->currencyByStore($_priceExclTax, $store, true, $flag);
-        } elseif ($this->_taxData->displayBothPrices()) {
-            $priceStr .= $this->helper('Magento\Core\Helper\Data')->currencyByStore($_priceExclTax, $store, true, $flag);
-            if ($_priceInclTax != $_priceExclTax) {
-                $priceStr .= ' ('.$sign.$this->helper('Magento\Core\Helper\Data')
-                    ->currencyByStore($_priceInclTax, $store, true, $flag).' '.__('Incl. Tax').')';
+
+        $customOptionPrice = $this->getProduct()->getPriceInfo()->getPrice('custom_option_price');
+        $isPercent = (bool) $value['is_percent'];
+
+        if (!$isPercent) {
+            $catalogPriceValue = $this->calculateCustomOptionCatalogRule->execute(
+                $this->getProduct(),
+                (float)$value['pricing_value'],
+                $isPercent
+            );
+            if ($catalogPriceValue !== null) {
+                $value['pricing_value'] = $catalogPriceValue;
             }
         }
 
+        $context = [CustomOptionPriceInterface::CONFIGURATION_OPTION_FLAG => true];
+        $optionAmount = $isPercent
+            ? $this->calculator->getAmount(
+                $this->priceCurrency->roundPrice($value['pricing_value']),
+                $this->getProduct(),
+                null,
+                $context
+            ) : $customOptionPrice->getCustomAmount($value['pricing_value'], null, $context);
+        $priceStr .= $this->getLayout()->getBlock('product.price.render.default')->renderAmount(
+            $optionAmount,
+            $customOptionPrice,
+            $this->getProduct()
+        );
+
         if ($flag) {
-            $priceStr = '<span class="price-notice">'.$priceStr.'</span>';
+            $priceStr = '<span class="price-notice">' . $priceStr . '</span>';
         }
 
         return $priceStr;
@@ -171,16 +230,16 @@ abstract class AbstractOptions extends \Magento\View\Element\Template
     /**
      * Get price with including/excluding tax
      *
-     * @param decimal $price
+     * @param float $price
      * @param bool $includingTax
-     * @return decimal
+     * @return float
      */
     public function getPrice($price, $includingTax = null)
     {
-        if (!is_null($includingTax)) {
-            $price = $this->_taxData->getPrice($this->getProduct(), $price, true);
+        if ($includingTax !== null) {
+            $price = $this->_catalogHelper->getTaxPrice($this->getProduct(), $price, true);
         } else {
-            $price = $this->_taxData->getPrice($this->getProduct(), $price);
+            $price = $this->_catalogHelper->getTaxPrice($this->getProduct(), $price);
         }
         return $price;
     }
@@ -189,11 +248,11 @@ abstract class AbstractOptions extends \Magento\View\Element\Template
      * Returns price converted to current currency rate
      *
      * @param float $price
-     * @return float
+     * @return float|string
      */
     public function getCurrencyPrice($price)
     {
         $store = $this->getProduct()->getStore();
-        return $this->helper('Magento\Core\Helper\Data')->currencyByStore($price, $store, false);
+        return $this->pricingHelper->currencyByStore($price, $store, false);
     }
 }

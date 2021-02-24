@@ -1,62 +1,131 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
 namespace Magento\Sales\Block\Order;
 
-class TotalsTest extends \PHPUnit_Framework_TestCase
+use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\View\Element\Context;
+use Magento\Framework\View\Element\Text;
+use Magento\Framework\View\Layout;
+use Magento\Framework\View\LayoutInterface;
+use Magento\Sales\Api\Data\OrderInterfaceFactory;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestFramework\Helper\Xpath;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Tests for order totals block.
+ *
+ * @magentoAppArea frontend
+ * @magentoDbIsolation enabled
+ */
+class TotalsTest extends TestCase
 {
-    public function testToHtmlChildrenInitialized()
+    /** @var ObjectManagerInterface */
+    private $objectManager;
+
+    /** @var Layout */
+    private $layout;
+
+    /** @var Totals */
+    private $block;
+
+    /** @var OrderInterfaceFactory */
+    private $orderFactory;
+
+    /**
+     * @inheritdoc
+     */
+    protected function setUp(): void
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\App\State')
-            ->setAreaCode('frontend');
+        parent::setUp();
 
-        /** @var $layout \Magento\Core\Model\Layout */
-        $layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\LayoutInterface');
-        $block = $layout->createBlock('Magento\Sales\Block\Order\Totals', 'block');
-        $block->setOrder(\Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Sales\Model\Order'))
-            ->setTemplate('order/totals.phtml');
+        $this->objectManager = Bootstrap::getObjectManager();
+        $this->layout = $this->objectManager->get(LayoutInterface::class);
+        $this->block = $this->layout->createBlock(Totals::class, 'block');
+        $this->orderFactory = $this->objectManager->get(OrderInterfaceFactory::class);
+    }
 
-        $context = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\Element\Context');
-        $childOne = $this->getMock('Magento\View\Element\Text', array('initTotals'), array($context));
-        $childOne->expects($this->once())
-            ->method('initTotals');
-        $layout->addBlock($childOne, 'child1', 'block');
+    /**
+     * @magentoAppIsolation enabled
+     *
+     * @return void
+     */
+    public function testToHtmlChildrenInitialized(): void
+    {
+        $this->block->setOrder($this->orderFactory->create())->setTemplate('order/totals.phtml');
+        $context = $this->objectManager->get(Context::class);
+        $childOne = $this->getMockBuilder(Text::class)
+            ->setMethods(['initTotals'])
+            ->setConstructorArgs([$context])
+            ->getMock();
+        $childOne->expects($this->once())->method('initTotals');
+        $this->layout->addBlock($childOne, 'child1', 'block');
+        $childTwo = $this->getMockBuilder(Text::class)
+            ->setMethods(['initTotals'])
+            ->setConstructorArgs([$context])
+            ->getMock();
+        $childTwo->expects($this->once())->method('initTotals');
+        $this->layout->addBlock($childTwo, 'child2', 'block');
+        $childThree = $this->getMockBuilder(Text::class)
+            ->setMethods(['initTotals'])
+            ->setConstructorArgs([$context])
+            ->getMock();
+        $childThree->expects($this->once())->method('initTotals');
+        $this->layout->addBlock($childThree, 'child3', 'block');
+        $this->block->toHtml();
+    }
 
-        $childTwo = $this->getMock('Magento\View\Element\Text', array('initTotals'), array($context));
-        $childTwo->expects($this->once())
-            ->method('initTotals');
-        $layout->addBlock($childTwo, 'child2', 'block');
-
-        $childThree = $this->getMock('Magento\View\Element\Text', array('initTotals'), array($context));
-        $childThree->expects($this->once())
-            ->method('initTotals');
-        $layout->addBlock($childThree, 'child3', 'block');
-
-        $block->toHtml();
+    /**
+     * @magentoDataFixture Magento/Sales/_files/customer_order_with_two_items.php
+     *
+     * @return void
+     */
+    public function testOrderTotalsBlock(): void
+    {
+        $order = $this->orderFactory->create()->loadByIncrementId('100000555');
+        $blockHtml = $this->block->setTemplate('Magento_Sales::order/totals.phtml')->setOrder($order)->toHtml();
+        $message = '"%s" for order wasn\'t found or not equals to %01.2f';
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(
+                    "//th[contains(text(), '%s')]/following-sibling::td/span[contains(text(), '%01.2f')]",
+                    __('Subtotal'),
+                    $order->getSubtotal()
+                ),
+                $blockHtml
+            ),
+            sprintf($message, __('Subtotal'), $order->getSubtotal())
+        );
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(
+                    "//th[contains(text(), '%s')]/following-sibling::td/span[contains(text(), '%01.2f')]",
+                    __('Shipping & Handling'),
+                    $order->getShippingAmount()
+                ),
+                $blockHtml
+            ),
+            sprintf($message, __('Shipping & Handling'), $order->getShippingAmount())
+        );
+        $this->assertEquals(
+            1,
+            Xpath::getElementsCountForXpath(
+                sprintf(
+                    "//tr[contains(@class, 'grand_total') and contains(.//strong, '%s')]"
+                    . "//span[contains(text(), '%01.2f')]",
+                    __('Grand Total'),
+                    $order->getGrandTotal()
+                ),
+                $blockHtml
+            ),
+            sprintf($message, __('Grand Total'), $order->getGrandTotal())
+        );
     }
 }

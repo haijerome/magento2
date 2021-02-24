@@ -1,53 +1,82 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-
-/**
- * Wishlist block customer items
- *
- * @category   Magento
- * @package    Magento_Wishlist
- * @author     Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Wishlist\Block\Share\Email;
 
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Configuration\Item\ItemResolverInterface;
+use Magento\Catalog\Model\Product\Image\UrlBuilder;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\ConfigInterface;
+use Magento\Wishlist\Model\Item;
+
+/**
+ * Wishlist share items
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Items extends \Magento\Wishlist\Block\AbstractBlock
 {
-    protected $_template = 'email/items.phtml';
+    /**
+     * @var ItemResolverInterface
+     */
+    private $itemResolver;
+
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Wishlist::email/items.phtml';
+
+    /**
+     * Items constructor.
+     *
+     * @param \Magento\Catalog\Block\Product\Context $context
+     * @param \Magento\Framework\App\Http\Context $httpContext
+     * @param array $data
+     * @param ConfigInterface|null $config
+     * @param UrlBuilder|null $urlBuilder
+     * @param ItemResolverInterface|null $itemResolver
+     */
+    public function __construct(
+        \Magento\Catalog\Block\Product\Context $context,
+        \Magento\Framework\App\Http\Context $httpContext,
+        array $data = [],
+        ConfigInterface $config = null,
+        UrlBuilder $urlBuilder = null,
+        ItemResolverInterface $itemResolver = null
+    ) {
+        parent::__construct($context, $httpContext, $data, $config, $urlBuilder);
+        $this->itemResolver = $itemResolver ?? ObjectManager::getInstance()->get(ItemResolverInterface::class);
+    }
+
+    /**
+     * Identify the product from which thumbnail should be taken.
+     *
+     * @param Item $item
+     *
+     * @return Product
+     * @since 101.2.0
+     */
+    public function getProductForThumbnail(Item $item): Product
+    {
+        return $this->itemResolver->getFinalProduct($item);
+    }
 
     /**
      * Retrieve Product View URL
      *
      * @param \Magento\Catalog\Model\Product $product
      * @param array $additional
+     *
      * @return string
      */
-    public function getProductUrl($product, $additional = array())
+    public function getProductUrl($product, $additional = [])
     {
-        $additional['_store_to_url'] = true;
+        $additional['_scope_to_url'] = true;
         return parent::getProductUrl($product, $additional);
     }
 
@@ -56,26 +85,28 @@ class Items extends \Magento\Wishlist\Block\AbstractBlock
      *
      * @param \Magento\Catalog\Model\Product $product
      * @param array $additional
+     *
      * @return string
      */
-    public function getAddToCartUrl($product, $additional = array())
+    public function getAddToCartUrl($product, $additional = [])
     {
         $additional['nocookie'] = 1;
-        $additional['_store_to_url'] = true;
+        $additional['_scope_to_url'] = true;
         return parent::getAddToCartUrl($product, $additional);
     }
 
     /**
-     * Check whether whishlist item has description
+     * Check whether wishlist item has description
      *
      * @param \Magento\Wishlist\Model\Item $item
+     *
      * @return bool
      */
     public function hasDescription($item)
     {
         $hasDescription = parent::hasDescription($item);
         if ($hasDescription) {
-            return ($item->getDescription() !== $this->_wishlistData->defaultCommentString());
+            return $item->getDescription() !== $this->_wishlistHelper->defaultCommentString();
         }
         return $hasDescription;
     }

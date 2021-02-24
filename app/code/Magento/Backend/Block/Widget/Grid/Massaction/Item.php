@@ -1,49 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
+namespace Magento\Backend\Block\Widget\Grid\Massaction;
 
 /**
  * Grid widget massaction single action item
  *
- * @category   Magento
- * @package    Magento_Backend
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Grid\Massaction;
-
 class Item extends \Magento\Backend\Block\Widget
 {
-
+    /**
+     * @var Extended
+     */
     protected $_massaction = null;
 
     /**
      * Set parent massaction block
      *
-     * @param  \Magento\Backend\Block\Widget\Grid\Massaction\Extended $massaction
-     * @return \Magento\Backend\Block\Widget\Grid\Massaction\Item
+     * @param  Extended $massaction
+     * @return $this
      */
     public function setMassaction($massaction)
     {
@@ -54,7 +34,7 @@ class Item extends \Magento\Backend\Block\Widget
     /**
      * Retrieve parent massaction block
      *
-     * @return \Magento\Backend\Block\Widget\Grid\Massaction\Extended
+     * @return Extended
      */
     public function getMassaction()
     {
@@ -64,9 +44,9 @@ class Item extends \Magento\Backend\Block\Widget
     /**
      * Set additional action block for this item
      *
-     * @param string|\Magento\View\Element\AbstractBlock $block
-     * @return \Magento\Backend\Block\Widget\Grid\Massaction\Item
-     * @throws \Magento\Core\Exception
+     * @param string|\Magento\Framework\View\Element\AbstractBlock $block
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function setAdditionalActionBlock($block)
     {
@@ -74,20 +54,24 @@ class Item extends \Magento\Backend\Block\Widget
             $block = $this->getLayout()->createBlock($block);
         } elseif (is_array($block)) {
             $block = $this->_createFromConfig($block);
-        } elseif (!($block instanceof \Magento\View\Element\AbstractBlock)) {
-            throw new \Magento\Core\Exception('Unknown block type');
+        } elseif (!$block instanceof \Magento\Framework\View\Element\AbstractBlock) {
+            throw new \Magento\Framework\Exception\LocalizedException(__('Unknown block type'));
         }
 
         $this->setChild('additional_action', $block);
         return $this;
     }
 
+    /**
+     * @param array $config
+     * @return \Magento\Framework\View\Element\BlockInterface
+     */
     protected function _createFromConfig(array $config)
     {
         $type = isset($config['type']) ? $config['type'] : 'default';
-        switch($type) {
+        switch ($type) {
             default:
-                $blockClass = 'Magento\Backend\Block\Widget\Grid\Massaction\Item\Additional\DefaultAdditional';
+                $blockClass = \Magento\Backend\Block\Widget\Grid\Massaction\Item\Additional\DefaultAdditional::class;
                 break;
         }
 
@@ -99,7 +83,7 @@ class Item extends \Magento\Backend\Block\Widget
     /**
      * Retrieve additional action block for this item
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return \Magento\Framework\View\Element\AbstractBlock
      */
     public function getAdditionalActionBlock()
     {
@@ -115,5 +99,4 @@ class Item extends \Magento\Backend\Block\Widget
     {
         return $this->getChildHtml('additional_action');
     }
-
 }

@@ -1,34 +1,24 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Adminhtml AdminNotification Severity Renderer
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_AdminNotification
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\AdminNotification\Block\Grid\Renderer;
 
-class Severity
-    extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+use Magento\AdminNotification\Model\Inbox;
+use Magento\Backend\Block\Context;
+use Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer;
+use Magento\Framework\DataObject;
+use Magento\Framework\Notification\MessageInterface;
+
+/**
+ * Renderer class for severity in the admin notifications grid
+ */
+class Severity extends AbstractRenderer
 {
     /**
      * @var \Magento\AdminNotification\Model\Inbox
@@ -40,11 +30,8 @@ class Severity
      * @param \Magento\AdminNotification\Model\Inbox $notice
      * @param array $data
      */
-    public function __construct(
-        \Magento\Backend\Block\Context $context,
-        \Magento\AdminNotification\Model\Inbox $notice,
-        array $data = array()
-    ) {
+    public function __construct(Context $context, Inbox $notice, array $data = [])
+    {
         parent::__construct($context, $data);
         $this->_notice = $notice;
     }
@@ -52,32 +39,35 @@ class Severity
     /**
      * Renders grid column
      *
-     * @param   \Magento\Object $row
+     * @param   \Magento\Framework\DataObject $row
      * @return  string
      */
-    public function render(\Magento\Object $row)
+    public function render(DataObject $row)
     {
         $class = '';
         $value = '';
 
-        switch ($row->getData($this->getColumn()->getIndex())) {
-            case \Magento\AdminNotification\Model\Inbox::SEVERITY_CRITICAL:
+        $column = $this->getColumn();
+        $index  = $column->getIndex();
+        switch ($row->getData($index)) {
+            case MessageInterface::SEVERITY_CRITICAL:
                 $class = 'critical';
-                $value = $this->_notice->getSeverities(\Magento\AdminNotification\Model\Inbox::SEVERITY_CRITICAL);
+                $value = $this->_notice->getSeverities(MessageInterface::SEVERITY_CRITICAL);
                 break;
-            case \Magento\AdminNotification\Model\Inbox::SEVERITY_MAJOR:
+            case MessageInterface::SEVERITY_MAJOR:
                 $class = 'major';
-                $value = $this->_notice->getSeverities(\Magento\AdminNotification\Model\Inbox::SEVERITY_MAJOR);
+                $value = $this->_notice->getSeverities(MessageInterface::SEVERITY_MAJOR);
                 break;
-            case \Magento\AdminNotification\Model\Inbox::SEVERITY_MINOR:
+            case MessageInterface::SEVERITY_MINOR:
                 $class = 'minor';
-                $value = $this->_notice->getSeverities(\Magento\AdminNotification\Model\Inbox::SEVERITY_MINOR);
+                $value = $this->_notice->getSeverities(MessageInterface::SEVERITY_MINOR);
                 break;
-            case \Magento\AdminNotification\Model\Inbox::SEVERITY_NOTICE:
+            case MessageInterface::SEVERITY_NOTICE:
                 $class = 'notice';
-                $value = $this->_notice->getSeverities(\Magento\AdminNotification\Model\Inbox::SEVERITY_NOTICE);
+                $value = $this->_notice->getSeverities(MessageInterface::SEVERITY_NOTICE);
                 break;
         }
+
         return '<span class="grid-severity-' . $class . '"><span>' . $value . '</span></span>';
     }
 }

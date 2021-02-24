@@ -1,45 +1,25 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Widget\Model\Widget;
 
 /**
  * @magentoAppArea adminhtml
  */
-class ConfigTest extends \PHPUnit_Framework_TestCase
+class ConfigTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Widget\Model\Widget\Config
      */
     protected $_model;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Widget\Model\Widget\Config');
+        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
+            \Magento\Widget\Model\Widget\Config::class
+        );
     }
 
     /**
@@ -49,31 +29,38 @@ class ConfigTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetPluginSettings()
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\DesignInterface')
-            ->setDesignTheme('magento_backend');
+        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get(
+            \Magento\Framework\View\DesignInterface::class
+        )->setDesignTheme(
+            'Magento/backend'
+        );
 
-        $config = new \Magento\Object();
+        $config = new \Magento\Framework\DataObject();
         $settings = $this->_model->getPluginSettings($config);
 
-        $this->assertArrayHasKey('widget_plugin_src', $settings);
-        $this->assertArrayHasKey('widget_placeholders', $settings);
-        $this->assertArrayHasKey('widget_window_url', $settings);
+        $this->assertArrayHasKey('plugins', $settings);
+        $plugins = array_shift($settings['plugins']);
+        $this->assertArrayHasKey('options', $plugins);
+        $this->assertArrayHasKey('window_url', $plugins['options']);
+        $this->assertArrayHasKey('placeholders', $plugins['options']);
 
-        $jsFilename = $settings['widget_plugin_src'];
-        $this->assertStringStartsWith('http://localhost/pub/lib/', $jsFilename);
-        $this->assertStringEndsWith('editor_plugin.js', $jsFilename);
+        $jsFilename = $plugins['src'];
+        $this->assertStringMatchesFormat(
+            'http://localhost/static/%s/adminhtml/Magento/backend/en_US/%s/editor_plugin.js',
+            $jsFilename
+        );
 
-        $this->assertInternalType('array', $settings['widget_placeholders']);
+        $this->assertIsArray($plugins['options']['placeholders']);
 
         $this->assertStringStartsWith(
             'http://localhost/index.php/backend/admin/widget/index/key',
-            $settings['widget_window_url']
+            $plugins['options']['window_url']
         );
     }
 
     public function testGetWidgetWindowUrl()
     {
-        $config = new \Magento\Object(array('widget_filters' =>  array('is_email_compatible' => 1)));
+        $config = new \Magento\Framework\DataObject(['widget_filters' => ['is_email_compatible' => 1]]);
 
         $url = $this->_model->getWidgetWindowUrl($config);
 

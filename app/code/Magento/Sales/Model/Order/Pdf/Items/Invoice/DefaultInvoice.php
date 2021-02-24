@@ -1,178 +1,179 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Sales\Model\Order\Pdf\Items\Invoice;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Sales\Model\RtlTextHandler;
 
 /**
  * Sales Order Invoice Pdf default items renderer
  */
-namespace Magento\Sales\Model\Order\Pdf\Items\Invoice;
-
 class DefaultInvoice extends \Magento\Sales\Model\Order\Pdf\Items\AbstractItems
 {
     /**
      * Core string
      *
-     * @var \Magento\Core\Helper\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @var RtlTextHandler
+     */
+    private $rtlTextHandler;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\App\Dir $coreDir
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Filter\FilterManager $filterManager
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @param RtlTextHandler|null $rtlTextHandler
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
         \Magento\Tax\Helper\Data $taxData,
-        \Magento\App\Dir $coreDir,
-        \Magento\Stdlib\String $string,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\Filter\FilterManager $filterManager,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = [],
+        ?RtlTextHandler $rtlTextHandler = null
     ) {
         $this->string = $string;
-        parent::__construct($context, $registry, $taxData, $coreDir, $resource, $resourceCollection, $data);
+        parent::__construct(
+            $context,
+            $registry,
+            $taxData,
+            $filesystem,
+            $filterManager,
+            $resource,
+            $resourceCollection,
+            $data
+        );
+        $this->rtlTextHandler = $rtlTextHandler  ?: ObjectManager::getInstance()->get(RtlTextHandler::class);
     }
 
     /**
      * Draw item line
+     *
+     * @return void
      */
     public function draw()
     {
-        $order  = $this->getOrder();
-        $item   = $this->getItem();
-        $pdf    = $this->getPdf();
-        $page   = $this->getPage();
-        $lines  = array();
+        $order = $this->getOrder();
+        $item = $this->getItem();
+        $pdf = $this->getPdf();
+        $page = $this->getPage();
+        $lines = [];
 
         // draw Product name
-        $lines[0] = array(array(
-            'text' => $this->string->split($item->getName(), 35, true, true),
-            'feed' => 35,
-        ));
+        $lines[0][] = [
+                'text' => $this->string->split($this->prepareText((string)$item->getName()), 35, true, true),
+                'feed' => 35
+        ];
 
         // draw SKU
-        $lines[0][] = array(
-            'text'  => $this->string->split($this->getSku($item), 17),
-            'feed'  => 290,
-            'align' => 'right'
-        );
+        $lines[0][] = [
+            'text' => $this->string->split($this->prepareText((string)$this->getSku($item)), 17),
+            'feed' => 290,
+            'align' => 'right',
+        ];
 
         // draw QTY
-        $lines[0][] = array(
-            'text'  => $item->getQty() * 1,
-            'feed'  => 435,
-            'align' => 'right'
-        );
+        $lines[0][] = ['text' => $item->getQty() * 1, 'feed' => 435, 'align' => 'right'];
 
         // draw item Prices
         $i = 0;
         $prices = $this->getItemPricesForDisplay();
         $feedPrice = 395;
         $feedSubtotal = $feedPrice + 170;
-        foreach ($prices as $priceData){
+        foreach ($prices as $priceData) {
             if (isset($priceData['label'])) {
                 // draw Price label
-                $lines[$i][] = array(
-                    'text'  => $priceData['label'],
-                    'feed'  => $feedPrice,
-                    'align' => 'right'
-                );
+                $lines[$i][] = ['text' => $priceData['label'], 'feed' => $feedPrice, 'align' => 'right'];
                 // draw Subtotal label
-                $lines[$i][] = array(
-                    'text'  => $priceData['label'],
-                    'feed'  => $feedSubtotal,
-                    'align' => 'right'
-                );
+                $lines[$i][] = ['text' => $priceData['label'], 'feed' => $feedSubtotal, 'align' => 'right'];
                 $i++;
             }
             // draw Price
-            $lines[$i][] = array(
-                'text'  => $priceData['price'],
-                'feed'  => $feedPrice,
-                'font'  => 'bold',
-                'align' => 'right'
-            );
+            $lines[$i][] = [
+                'text' => $priceData['price'],
+                'feed' => $feedPrice,
+                'font' => 'bold',
+                'align' => 'right',
+            ];
             // draw Subtotal
-            $lines[$i][] = array(
-                'text'  => $priceData['subtotal'],
-                'feed'  => $feedSubtotal,
-                'font'  => 'bold',
-                'align' => 'right'
-            );
+            $lines[$i][] = [
+                'text' => $priceData['subtotal'],
+                'feed' => $feedSubtotal,
+                'font' => 'bold',
+                'align' => 'right',
+            ];
             $i++;
         }
 
         // draw Tax
-        $lines[0][] = array(
-            'text'  => $order->formatPriceTxt($item->getTaxAmount()),
-            'feed'  => 495,
-            'font'  => 'bold',
-            'align' => 'right'
-        );
+        $lines[0][] = [
+            'text' => $order->formatPriceTxt($item->getTaxAmount()),
+            'feed' => 495,
+            'font' => 'bold',
+            'align' => 'right',
+        ];
 
         // custom options
         $options = $this->getItemOptions();
         if ($options) {
             foreach ($options as $option) {
                 // draw options label
-                $lines[][] = array(
-                    'text' => $this->string->split(strip_tags($option['label']), 40, true, true),
+                $lines[][] = [
+                    'text' => $this->string->split($this->filterManager->stripTags($option['label']), 40, true, true),
                     'font' => 'italic',
-                    'feed' => 35
-                );
+                    'feed' => 35,
+                ];
 
-                if ($option['value']) {
+                // Checking whether option value is not null
+                if ($option['value'] !== null) {
                     if (isset($option['print_value'])) {
-                        $_printValue = $option['print_value'];
+                        $printValue = $option['print_value'];
                     } else {
-                        $_printValue = strip_tags($option['value']);
+                        $printValue = $this->filterManager->stripTags($option['value']);
                     }
-                    $values = explode(', ', $_printValue);
+                    $values = explode(', ', $printValue);
                     foreach ($values as $value) {
-                        $lines[][] = array(
-                            'text' => $this->string->split($value, 30, true, true),
-                            'feed' => 40
-                        );
+                        $lines[][] = ['text' => $this->string->split($value, 30, true, true), 'feed' => 40];
                     }
                 }
             }
         }
 
-        $lineBlock = array(
-            'lines'  => $lines,
-            'height' => 20
-        );
+        $lineBlock = ['lines' => $lines, 'height' => 20];
 
-        $page = $pdf->drawLineBlocks($page, array($lineBlock), array('table_header' => true));
+        $page = $pdf->drawLineBlocks($page, [$lineBlock], ['table_header' => true]);
         $this->setPage($page);
+    }
+
+    /**
+     * Returns prepared for PDF text, reversed in case of RTL text
+     *
+     * @param string $string
+     * @return string
+     */
+    private function prepareText(string $string): string
+    {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        return $this->rtlTextHandler->reverseRtlText(html_entity_decode($string));
     }
 }

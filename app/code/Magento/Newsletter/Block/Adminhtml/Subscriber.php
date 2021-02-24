@@ -1,89 +1,72 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Newsletter
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Newsletter subscriber grid block
  *
- * @category   Magento
- * @package    Magento_Newsletter
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
 namespace Magento\Newsletter\Block\Adminhtml;
 
-class Subscriber extends \Magento\Backend\Block\Template
+use Magento\Backend\Block\Template;
+use Magento\Backend\Block\Template\Context;
+use Magento\Newsletter\Model\ResourceModel\Queue\Collection;
+use Magento\Newsletter\Model\ResourceModel\Queue\CollectionFactory;
+
+/**
+ * Newsletter Subscriber block
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Subscriber extends Template
 {
     /**
      * Queue collection
      *
-     * @var \Magento\Newsletter\Model\Resource\Queue\Collection
+     * @var Collection
      */
     protected $_queueCollection = null;
 
-    protected $_template = 'subscriber/list.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Newsletter::subscriber/list.phtml';
 
     /**
-     * @var \Magento\Newsletter\Model\Resource\Queue\CollectionFactory
+     * @var CollectionFactory
      */
     protected $_collectionFactory;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Newsletter\Model\Resource\Queue\CollectionFactory $collectionFactory
+     * @param Context $context
+     * @param CollectionFactory $collectionFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Newsletter\Model\Resource\Queue\CollectionFactory $collectionFactory,
-        array $data = array()
+        Context $context,
+        CollectionFactory $collectionFactory,
+        array $data = []
     ) {
         $this->_collectionFactory = $collectionFactory;
         parent::__construct($context, $data);
     }
 
     /**
-     * Prepares block to render
-     *
-     * @return \Magento\Newsletter\Block\Adminhtml\Subscriber
-     */
-    protected function _beforeToHtml()
-    {
-        return parent::_beforeToHtml();
-    }
-
-    /**
      * Return queue collection with loaded neversent queues
      *
-     * @return \Magento\Newsletter\Model\Resource\Queue\Collection
+     * @return Collection
      */
     public function getQueueCollection()
     {
-        if (is_null($this->_queueCollection)) {
-            /** @var $this->_queueCollection \Magento\Newsletter\Model\Resource\Queue\Collection */
-            $this->_queueCollection = $this->_collectionFactory->create()
+        if ($this->_queueCollection === null) {
+            /** @var $this->_queueCollection Collection */
+            $this->_queueCollection = $this
+                ->_collectionFactory
+                ->create()
                 ->addTemplateInfo()
                 ->addOnlyUnsentFilter()
                 ->load();
@@ -92,6 +75,11 @@ class Subscriber extends \Magento\Backend\Block\Template
         return $this->_queueCollection;
     }
 
+    /**
+     * Get add option for queue
+     *
+     * @return mixed
+     */
     public function getShowQueueAdd()
     {
         return $this->getChildBlock('grid')->getShowQueueAdd();

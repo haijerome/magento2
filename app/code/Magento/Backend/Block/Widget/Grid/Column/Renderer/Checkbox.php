@@ -1,42 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Widget\Grid\Column\Renderer;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Math\Random;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Grid checkbox column renderer
  *
- * @category   Magento
- * @package    Magento_Backend
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Grid\Column\Renderer;
-
-class Checkbox
-    extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+class Checkbox extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
+    /**
+     * @var int
+     */
     protected $_defaultWidth = 55;
+
+    /**
+     * @var array
+     */
     protected $_values;
 
     /**
@@ -45,17 +34,33 @@ class Checkbox
     protected $_converter;
 
     /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
+     * @var Random
+     */
+    private $random;
+
+    /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Backend\Block\Widget\Grid\Column\Renderer\Options\Converter $converter
+     * @param Options\Converter $converter
      * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
+     * @param Random|null $random
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
         \Magento\Backend\Block\Widget\Grid\Column\Renderer\Options\Converter $converter,
-        array $data = array()
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null,
+        ?Random $random = null
     ) {
         parent::__construct($context, $data);
         $this->_converter = $converter;
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+        $this->random = $random ?? ObjectManager::getInstance()->get(Random::class);
     }
 
     /**
@@ -65,8 +70,8 @@ class Checkbox
      */
     public function getValues()
     {
-        if (is_null($this->_values)) {
-            $this->_values = $this->getColumn()->getData('values') ? $this->getColumn()->getData('values') : array();
+        if ($this->_values === null) {
+            $this->_values = $this->getColumn()->getData('values') ? $this->getColumn()->getData('values') : [];
         }
         return $this->_values;
     }
@@ -85,24 +90,34 @@ class Checkbox
     /**
      * Renders grid column
      *
-     * @param   \Magento\Object $row
+     * @param   \Magento\Framework\DataObject $row
      * @return  string
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    public function render(\Magento\Object $row)
+    public function render(\Magento\Framework\DataObject $row)
     {
         $values = $this->_getValues();
-        $value  = $row->getData($this->getColumn()->getIndex());
+        $value = $row->getData($this->getColumn()->getIndex());
+        $checked = '';
         if (is_array($values)) {
             $checked = in_array($value, $values) ? ' checked="checked"' : '';
         } else {
-            $checked = ($value === $this->getColumn()->getValue()) ? ' checked="checked"' : '';
+            $checkedValue = $this->getColumn()->getValue();
+            if ($checkedValue !== null) {
+                $checked = $value === $checkedValue ? ' checked="checked"' : '';
+            }
         }
 
+        $disabled = '';
         $disabledValues = $this->getColumn()->getDisabledValues();
         if (is_array($disabledValues)) {
             $disabled = in_array($value, $disabledValues) ? ' disabled="disabled"' : '';
         } else {
-            $disabled = ($value === $this->getColumn()->getDisabledValue()) ? ' disabled="disabled"' : '';
+            $disabledValue = $this->getColumn()->getDisabledValue();
+            if ($disabledValue !== null) {
+                $disabled = $value === $disabledValue ? ' disabled="disabled"' : '';
+            }
         }
 
         $this->setDisabled($disabled);
@@ -110,24 +125,34 @@ class Checkbox
         if ($this->getNoObjectId() || $this->getColumn()->getUseIndex()) {
             $v = $value;
         } else {
-            $v = ($row->getId() != "") ? $row->getId():$value;
+            $v = $row->getId() != "" ? $row->getId() : $value;
         }
 
         return $this->_getCheckboxHtml($v, $checked);
     }
 
     /**
+     * Render checkbox HTML.
+     *
      * @param string $value   Value of the element
      * @param bool   $checked Whether it is checked
      * @return string
      */
     protected function _getCheckboxHtml($value, $checked)
     {
-        $html = '<input type="checkbox" ';
+        $html = '<label class="data-grid-checkbox-cell-inner" ';
+        $html .= ' for="id_' . $this->escapeHtml($value) . '">';
+        $html .= '<input type="checkbox" ';
         $html .= 'name="' . $this->getColumn()->getFieldName() . '" ';
         $html .= 'value="' . $this->escapeHtml($value) . '" ';
-        $html .= 'class="'. ($this->getColumn()->getInlineCss() ? $this->getColumn()->getInlineCss() : 'checkbox') .'"';
+        $html .= 'id="id_' . $this->escapeHtml($value) . '" ';
+        $html .= 'class="' .
+            ($this->getColumn()->getInlineCss() ? $this->getColumn()->getInlineCss() : 'checkbox') .
+            ' admin__control-checkbox' . '"';
         $html .= $checked . $this->getDisabled() . '/>';
+        $html .= '<label for="id_' . $this->escapeHtml($value) . '"></label>';
+        $html .= '</label>';
+        /* ToDo UI: add class="admin__field-label" after some refactoring _fields.less */
         return $html;
     }
 
@@ -151,11 +176,18 @@ class Checkbox
         if ($this->getColumn()->getDisabled()) {
             $disabled = ' disabled="disabled"';
         }
-        $html = '<input type="checkbox" ';
+        $id = 'id' .$this->random->getRandomString(10);
+        $html = '<th class="data-grid-th data-grid-actions-cell"><input type="checkbox" ';
+        $html .= 'id="' .$id .'" ';
         $html .= 'name="' . $this->getColumn()->getFieldName() . '" ';
-        $html .= 'onclick="' . $this->getColumn()->getGrid()->getJsObjectName() . '.checkCheckboxes(this)" ';
-        $html .= 'class="checkbox"' . $checked . $disabled . ' ';
-        $html .= 'title="'.__('Select All') . '"/>';
+        $html .= 'class="admin__control-checkbox"' . $checked . $disabled . ' ';
+        $html .= 'title="' . __('Select All') . '"/><label></label></th>';
+        $html .= $this->secureRenderer->renderEventListenerAsTag(
+            'onclick',
+            $this->getColumn()->getGrid()->getJsObjectName() . '.checkCheckboxes(this)',
+            "#$id"
+        );
+
         return $html;
     }
 }

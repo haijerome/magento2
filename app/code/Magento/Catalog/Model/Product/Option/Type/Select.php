@@ -1,78 +1,87 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Model\Product\Option\Type;
 
+use Magento\Catalog\Model\Product\Option\Value;
+use Magento\Catalog\Pricing\Price\CalculateCustomOptionCatalogRule;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Catalog\Model\Product\Option;
+
 /**
  * Catalog product option select type
+ *
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
  */
 class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
 {
     /**
-     * @var mixed
+     * @var string|array
      */
     protected $_formattedOptionValue;
 
     /**
-     * @var \Magento\Escaper
+     * @var \Magento\Framework\Escaper
      */
     protected $_escaper;
 
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
+     * @var array
+     */
+    private $singleSelectionTypes;
+
+    /**
+     * @var CalculateCustomOptionCatalogRule
+     */
+    private $calculateCustomOptionCatalogRule;
+
+    /**
      * @param \Magento\Checkout\Model\Session $checkoutSession
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Escaper $escaper
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param \Magento\Framework\Escaper $escaper
      * @param array $data
+     * @param array $singleSelectionTypes
+     * @param CalculateCustomOptionCatalogRule|null $calculateCustomOptionCatalogRule
      */
     public function __construct(
         \Magento\Checkout\Model\Session $checkoutSession,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Stdlib\String $string,
-        \Magento\Escaper $escaper,
-        array $data = array()
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        \Magento\Framework\Escaper $escaper,
+        array $data = [],
+        array $singleSelectionTypes = [],
+        CalculateCustomOptionCatalogRule $calculateCustomOptionCatalogRule = null
     ) {
         $this->string = $string;
         $this->_escaper = $escaper;
-        parent::__construct($checkoutSession, $coreStoreConfig, $data);
+        parent::__construct($checkoutSession, $scopeConfig, $data);
+
+        $this->singleSelectionTypes = $singleSelectionTypes ?: [
+            'drop_down' => \Magento\Catalog\Api\Data\ProductCustomOptionInterface::OPTION_TYPE_DROP_DOWN,
+            'radio' => \Magento\Catalog\Api\Data\ProductCustomOptionInterface::OPTION_TYPE_RADIO,
+        ];
+        $this->calculateCustomOptionCatalogRule = $calculateCustomOptionCatalogRule ?? ObjectManager::getInstance()
+                ->get(CalculateCustomOptionCatalogRule::class);
     }
 
     /**
      * Validate user input for option
      *
-     * @throws \Magento\Core\Exception
      * @param array $values All product option values, i.e. array (option_id => mixed, option_id => mixed...)
-     * @return \Magento\Catalog\Model\Product\Option\Type\DefaultType
+     * @return $this
+     * @throws LocalizedException
      */
     public function validateUserValue($values)
     {
@@ -83,14 +92,24 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
 
         if (empty($value) && $option->getIsRequire() && !$this->getSkipCheckRequiredOption()) {
             $this->setIsValid(false);
-            throw new \Magento\Core\Exception(__('Please specify the product required option(s).'));
+            throw new LocalizedException(
+                __("The product's required option(s) weren't entered. Make sure the options are entered and try again.")
+            );
         }
         if (!$this->_isSingleSelection()) {
-            $valuesCollection = $option->getOptionValuesByOptionId($value, $this->getProduct()->getStoreId())
-                ->load();
-            if ($valuesCollection->count() != count($value)) {
+            if (is_string($value)) {
+                $value = explode(',', $value);
+            }
+            $valuesCollection = $option->getOptionValuesByOptionId($value, $this->getProduct()->getStoreId())->load();
+            $valueCount = is_array($value) ? count($value) : 0;
+            if ($valuesCollection->count() != $valueCount) {
                 $this->setIsValid(false);
-                throw new \Magento\Core\Exception(__('Please specify the product required option(s).'));
+                throw new LocalizedException(
+                    __(
+                        "The product's required option(s) weren't entered. "
+                        . "Make sure the options are entered and try again."
+                    )
+                );
             }
         }
         return $this;
@@ -99,8 +118,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
     /**
      * Prepare option value for cart
      *
-     * @throws \Magento\Core\Exception
-     * @return mixed Prepared option value
+     * @return string|null Prepared option value
      */
     public function prepareForCart()
     {
@@ -120,9 +138,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
     public function getFormattedOptionValue($optionValue)
     {
         if ($this->_formattedOptionValue === null) {
-            $this->_formattedOptionValue = $this->_escaper->escapeHtml(
-                $this->getEditableOptionValue($optionValue)
-            );
+            $this->_formattedOptionValue = $this->_escaper->escapeHtml($this->getEditableOptionValue($optionValue));
         }
         return $this->_formattedOptionValue;
     }
@@ -141,7 +157,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
     /**
      * Return currently unavailable product configuration message
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     protected function _getWrongConfigurationMessage()
     {
@@ -165,9 +181,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
                     $result .= $_result->getTitle() . ', ';
                 } else {
                     if ($this->getListener()) {
-                        $this->getListener()->setHasError(true)->setMessage(
-                            $this->_getWrongConfigurationMessage()
-                        );
+                        $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                         $result = '';
                         break;
                     }
@@ -180,9 +194,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
                 $result = $_result->getTitle();
             } else {
                 if ($this->getListener()) {
-                    $this->getListener()->setHasError(true)->setMessage(
-                        $this->_getWrongConfigurationMessage()
-                    );
+                    $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                 }
                 $result = '';
             }
@@ -201,7 +213,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
      */
     public function parseOptionValue($optionValue, $productOptionValues)
     {
-        $values = array();
+        $values = [];
         if (!$this->_isSingleSelection()) {
             foreach (explode(',', $optionValue) as $value) {
                 $value = trim($value);
@@ -223,7 +235,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
      * Prepare option value for info buy request
      *
      * @param string $optionValue
-     * @return mixed
+     * @return string
      */
     public function prepareOptionValueForRequest($optionValue)
     {
@@ -246,21 +258,13 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
         $result = 0;
 
         if (!$this->_isSingleSelection()) {
-            foreach(explode(',', $optionValue) as $value) {
+            foreach (explode(',', $optionValue) as $value) {
                 $_result = $option->getValueById($value);
                 if ($_result) {
-                    $result += $this->_getChargableOptionPrice(
-                        $_result->getPrice(),
-                        $_result->getPriceType() == 'percent',
-                        $basePrice
-                    );
+                    $result += $this->getCalculatedOptionValue($option, $_result, $basePrice);
                 } else {
                     if ($this->getListener()) {
-                        $this->getListener()
-                                ->setHasError(true)
-                                ->setMessage(
-                                    $this->_getWrongConfigurationMessage()
-                                );
+                        $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                         break;
                     }
                 }
@@ -268,16 +272,23 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
         } elseif ($this->_isSingleSelection()) {
             $_result = $option->getValueById($optionValue);
             if ($_result) {
-                $result = $this->_getChargableOptionPrice(
-                    $_result->getPrice(),
-                    $_result->getPriceType() == 'percent',
-                    $basePrice
+                $catalogPriceValue = $this->calculateCustomOptionCatalogRule->execute(
+                    $option->getProduct(),
+                    (float)$_result->getPrice(),
+                    $_result->getPriceType() === Value::TYPE_PERCENT
                 );
+                if ($catalogPriceValue !== null) {
+                    $result = $catalogPriceValue;
+                } else {
+                    $result = $this->_getChargeableOptionPrice(
+                        $_result->getPrice(),
+                        $_result->getPriceType() == 'percent',
+                        $basePrice
+                    );
+                }
             } else {
                 if ($this->getListener()) {
-                    $this->getListener()->setHasError(true)->setMessage(
-                        $this->_getWrongConfigurationMessage()
-                    );
+                    $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                 }
             }
         }
@@ -297,16 +308,14 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
         $option = $this->getOption();
 
         if (!$this->_isSingleSelection()) {
-            $skus = array();
-            foreach(explode(',', $optionValue) as $value) {
+            $skus = [];
+            foreach (explode(',', $optionValue) as $value) {
                 $optionSku = $option->getValueById($value);
                 if ($optionSku) {
                     $skus[] = $optionSku->getSku();
                 } else {
                     if ($this->getListener()) {
-                        $this->getListener()->setHasError(true)->setMessage(
-                            $this->_getWrongConfigurationMessage()
-                        );
+                        $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                         break;
                     }
                 }
@@ -318,9 +327,7 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
                 return $result->getSku();
             } else {
                 if ($this->getListener()) {
-                    $this->getListener()->setHasError(true)->setMessage(
-                        $this->_getWrongConfigurationMessage()
-                    );
+                    $this->getListener()->setHasError(true)->setMessage($this->_getWrongConfigurationMessage());
                 }
                 return '';
             }
@@ -338,10 +345,33 @@ class Select extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
      */
     protected function _isSingleSelection()
     {
-        $single = array(
-            \Magento\Catalog\Model\Product\Option::OPTION_TYPE_DROP_DOWN,
-            \Magento\Catalog\Model\Product\Option::OPTION_TYPE_RADIO
+        return in_array($this->getOption()->getType(), $this->singleSelectionTypes, true);
+    }
+
+    /**
+     * Returns calculated price of option
+     *
+     * @param Option $option
+     * @param Option\Value $result
+     * @param float $basePrice
+     * @return float
+     */
+    protected function getCalculatedOptionValue(Option $option, Value $result, float $basePrice) : float
+    {
+        $catalogPriceValue = $this->calculateCustomOptionCatalogRule->execute(
+            $option->getProduct(),
+            (float)$result->getPrice(),
+            $result->getPriceType() === Value::TYPE_PERCENT
         );
-        return in_array($this->getOption()->getType(), $single);
+        if ($catalogPriceValue !== null) {
+            $optionCalculatedValue = $catalogPriceValue;
+        } else {
+            $optionCalculatedValue = $this->_getChargeableOptionPrice(
+                $result->getPrice(),
+                $result->getPriceType() === Value::TYPE_PERCENT,
+                $basePrice
+            );
+        }
+        return $optionCalculatedValue;
     }
 }

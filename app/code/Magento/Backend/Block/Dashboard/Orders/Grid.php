@@ -1,95 +1,88 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Dashboard\Orders;
+
+use Magento\Backend\Block\Template\Context;
+use Magento\Backend\Helper\Data;
+use Magento\Framework\Module\Manager;
+use Magento\Reports\Model\ResourceModel\Order\CollectionFactory;
 
 /**
  * Adminhtml dashboard recent orders grid
  *
- * @category   Magento
- * @package    Magento_Backend
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.DepthOfInheritance)
+ * @since 100.0.2
  */
-
-namespace Magento\Backend\Block\Dashboard\Orders;
-
 class Grid extends \Magento\Backend\Block\Dashboard\Grid
 {
     /**
-     * @var \Magento\Reports\Model\Resource\Order\CollectionFactory
+     * @var CollectionFactory
      */
     protected $_collectionFactory;
 
     /**
-     * @var \Magento\Module\Manager
+     * @var Manager
      */
     protected $_moduleManager;
 
     /**
-     * @param \Magento\Module\Manager $moduleManager
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Reports\Model\Resource\Order\CollectionFactory $collectionFactory
+     * @param Context $context
+     * @param Data $backendHelper
+     * @param Manager $moduleManager
+     * @param CollectionFactory $collectionFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Module\Manager $moduleManager,
-        \Magento\Reports\Model\Resource\Order\CollectionFactory $collectionFactory,
-        array $data = array()
+        Context $context,
+        Data $backendHelper,
+        Manager $moduleManager,
+        CollectionFactory $collectionFactory,
+        array $data = []
     ) {
         $this->_moduleManager = $moduleManager;
         $this->_collectionFactory = $collectionFactory;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Construct.
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
         $this->setId('lastOrdersGrid');
     }
 
+    /**
+     * Prepare collection.
+     *
+     * @return $this
+     */
     protected function _prepareCollection()
     {
         if (!$this->_moduleManager->isEnabled('Magento_Reports')) {
             return $this;
         }
-        $collection = $this->_collectionFactory->create()
-            ->addItemCountExpr()
-            ->joinCustomerName('customer')
-            ->orderByCreatedAt();
+        $collection = $this->_collectionFactory->create()->addItemCountExpr()->joinCustomerName(
+            'customer'
+        )->orderByCreatedAt();
 
         if ($this->getParam('store') || $this->getParam('website') || $this->getParam('group')) {
             if ($this->getParam('store')) {
                 $collection->addAttributeToFilter('store_id', $this->getParam('store'));
-            } else if ($this->getParam('website')) {
+            } elseif ($this->getParam('website')) {
                 $storeIds = $this->_storeManager->getWebsite($this->getParam('website'))->getStoreIds();
-                $collection->addAttributeToFilter('store_id', array('in' => $storeIds));
-            } else if ($this->getParam('group')) {
+                $collection->addAttributeToFilter('store_id', ['in' => $storeIds]);
+            } elseif ($this->getParam('group')) {
                 $storeIds = $this->_storeManager->getGroup($this->getParam('group'))->getStoreIds();
-                $collection->addAttributeToFilter('store_id', array('in' => $storeIds));
+                $collection->addAttributeToFilter('store_id', ['in' => $storeIds]);
             }
 
             $collection->addRevenueToSelect();
@@ -103,6 +96,19 @@ class Grid extends \Magento\Backend\Block\Dashboard\Grid
     }
 
     /**
+     * Process collection after loading
+     *
+     * @return $this
+     */
+    protected function _afterLoadCollection()
+    {
+        foreach ($this->getCollection() as $item) {
+            $item->getCustomer() ?: $item->setCustomer($item->getBillingAddress()->getName());
+        }
+        return $this;
+    }
+
+    /**
      * Prepares page sizes for dashboard grid with las 5 orders
      *
      * @return void
@@ -110,37 +116,46 @@ class Grid extends \Magento\Backend\Block\Dashboard\Grid
     protected function _preparePage()
     {
         $this->getCollection()->setPageSize($this->getParam($this->getVarNameLimit(), $this->_defaultLimit));
-//        Remove count of total orders
-//        $this->getCollection()->setCurPage($this->getParam($this->getVarNamePage(), $this->_defaultPage));
+        // Remove count of total orders
+        // $this->getCollection()->setCurPage($this->getParam($this->getVarNamePage(), $this->_defaultPage));
     }
 
+    /**
+     * Prepare columns.
+     *
+     * @return $this
+     */
     protected function _prepareColumns()
     {
-        $this->addColumn('customer', array(
-            'header'    => __('Customer'),
-            'sortable'  => false,
-            'index'     => 'customer',
-            'default'   => __('Guest'),
-        ));
+        $this->addColumn(
+            'customer',
+            ['header' => __('Customer'), 'sortable' => false, 'index' => 'customer', 'default' => __('Guest')]
+        );
 
-        $this->addColumn('items', array(
-            'header'    => __('Items'),
-            'align'     => 'right',
-            'type'      => 'number',
-            'sortable'  => false,
-            'index'     => 'items_count'
-        ));
+        $this->addColumn(
+            'items',
+            [
+                'header' => __('Items'),
+                'type' => 'number',
+                'sortable' => false,
+                'index' => 'items_count'
+            ]
+        );
 
-        $baseCurrencyCode = $this->_storeManager->getStore((int)$this->getParam('store'))->getBaseCurrencyCode();
+        $baseCurrencyCode = $this->_storeManager->getStore(
+            (int)$this->getParam('store')
+        )->getBaseCurrencyCode();
 
-        $this->addColumn('total', array(
-            'header'    => __('Grand Total'),
-            'align'     => 'right',
-            'sortable'  => false,
-            'type'      => 'currency',
-            'currency_code'  => $baseCurrencyCode,
-            'index'     => 'revenue'
-        ));
+        $this->addColumn(
+            'total',
+            [
+                'header' => __('Total'),
+                'sortable' => false,
+                'type' => 'currency',
+                'currency_code' => $baseCurrencyCode,
+                'index' => 'revenue'
+            ]
+        );
 
         $this->setFilterVisibility(false);
         $this->setPagerVisibility(false);
@@ -148,8 +163,11 @@ class Grid extends \Magento\Backend\Block\Dashboard\Grid
         return parent::_prepareColumns();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getRowUrl($row)
     {
-        return $this->getUrl('sales/order/view', array('order_id'=>$row->getId()));
+        return $this->getUrl('sales/order/view', ['order_id' => $row->getId()]);
     }
 }

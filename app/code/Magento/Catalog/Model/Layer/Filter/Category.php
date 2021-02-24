@@ -1,38 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Catalog\Model\Layer\Filter;
+
+use Magento\Catalog\Model\Layer\Filter\DataProvider\Category as CategoryDataProvider;
+use Magento\Catalog\Model\Layer\Filter\DataProvider\CategoryFactory;
 
 /**
  * Layer category filter
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Catalog\Model\Layer\Filter;
-
 class Category extends \Magento\Catalog\Model\Layer\Filter\AbstractFilter
 {
     /**
@@ -52,140 +31,90 @@ class Category extends \Magento\Catalog\Model\Layer\Filter\AbstractFilter
     /**
      * Core data
      *
-     * @var \Magento\Escaper
+     * @var \Magento\Framework\Escaper
      */
     protected $_escaper;
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry;
 
     /**
-     * Category factory
-     *
-     * @var \Magento\Catalog\Model\CategoryFactory
+     * @var CategoryDataProvider
      */
-    protected $_categoryFactory;
+    private $dataProvider;
 
     /**
      * Construct
      *
      * @param \Magento\Catalog\Model\Layer\Filter\ItemFactory $filterItemFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Catalog\Model\Layer $catalogLayer
-     * @param \Magento\Catalog\Model\CategoryFactory $categoryFactory
-     * @param \Magento\Escaper $escaper
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Catalog\Model\Layer $layer
+     * @param \Magento\Catalog\Model\Layer\Filter\Item\DataBuilder $itemDataBuilder
+     * @param \Magento\Framework\Escaper $escaper
+     * @param CategoryFactory $categoryDataProviderFactory
      * @param array $data
      */
     public function __construct(
         \Magento\Catalog\Model\Layer\Filter\ItemFactory $filterItemFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Catalog\Model\Layer $catalogLayer,
-        \Magento\Catalog\Model\CategoryFactory $categoryFactory,
-        \Magento\Escaper $escaper,
-        \Magento\Core\Model\Registry $coreRegistry,
-        array $data = array()
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Catalog\Model\Layer $layer,
+        \Magento\Catalog\Model\Layer\Filter\Item\DataBuilder $itemDataBuilder,
+        \Magento\Framework\Escaper $escaper,
+        CategoryFactory $categoryDataProviderFactory,
+        array $data = []
     ) {
-        $this->_categoryFactory = $categoryFactory;
+        parent::__construct($filterItemFactory, $storeManager, $layer, $itemDataBuilder, $data);
         $this->_escaper = $escaper;
-        $this->_coreRegistry = $coreRegistry;
-        parent::__construct($filterItemFactory, $storeManager, $catalogLayer, $data);
         $this->_requestVar = 'cat';
+        $this->dataProvider = $categoryDataProviderFactory->create(['layer' => $this->getLayer()]);
     }
 
     /**
      * Get filter value for reset current filter state
      *
-     * @return mixed
+     * @return mixed|null
      */
     public function getResetValue()
     {
-        if ($this->_appliedCategory) {
-            /**
-             * Revert path ids
-             */
-            $pathIds = array_reverse($this->_appliedCategory->getPathIds());
-            $curCategoryId = $this->getLayer()->getCurrentCategory()->getId();
-            if (isset($pathIds[1]) && $pathIds[1] != $curCategoryId) {
-                return $pathIds[1];
-            }
-        }
-        return null;
+        return $this->dataProvider->getResetValue();
     }
 
     /**
      * Apply category filter to layer
      *
-     * @param   \Zend_Controller_Request_Abstract $request
-     * @param   \Magento\View\Element\AbstractBlock $filterBlock
-     * @return  \Magento\Catalog\Model\Layer\Filter\Category
+     * @param   \Magento\Framework\App\RequestInterface $request
+     * @return  $this
      */
-    public function apply(\Zend_Controller_Request_Abstract $request, $filterBlock)
+    public function apply(\Magento\Framework\App\RequestInterface $request)
     {
-        $filter = (int)$request->getParam($this->getRequestVar());
-        if (!$filter) {
+        $categoryId = (int)$request->getParam($this->getRequestVar());
+        if (!$categoryId) {
             return $this;
         }
-        $this->_categoryId = $filter;
-        $this->_coreRegistry->register('current_category_filter', $this->getCategory(), true);
 
-        $this->_appliedCategory = $this->_categoryFactory->create()
-            ->setStoreId($this->_storeManager->getStore()->getId())
-            ->load($filter);
+        $this->dataProvider->setCategoryId($categoryId);
 
-        if ($this->_isValidCategory($this->_appliedCategory)) {
-            $this->getLayer()->getProductCollection()
-                ->addCategoryFilter($this->_appliedCategory);
-
-            $this->getLayer()->getState()->addFilter(
-                $this->_createItem($this->_appliedCategory->getName(), $filter)
-            );
+        if ($this->dataProvider->isValid()) {
+            $category = $this->dataProvider->getCategory();
+            $this->getLayer()->getProductCollection()->addCategoryFilter($category);
+            $this->getLayer()->getState()->addFilter($this->_createItem($category->getName(), $categoryId));
         }
 
         return $this;
     }
 
     /**
-     * Validate category for be using as filter
-     *
-     * @param   \Magento\Catalog\Model\Category $category
-     * @return unknown
-     */
-    protected function _isValidCategory($category)
-    {
-        return $category->getId();
-    }
-
-    /**
      * Get filter name
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getName()
     {
         return __('Category');
-    }
-
-    /**
-     * Get selected category object
-     *
-     * @return \Magento\Catalog\Model\Category
-     */
-    public function getCategory()
-    {
-        if (!is_null($this->_categoryId)) {
-            /** @var \Magento\Catalog\Model\Category $category */
-            $category = $this->_categoryFactory->create()
-                ->load($this->_categoryId);
-            if ($category->getId()) {
-                return $category;
-            }
-        }
-        return $this->getLayer()->getCurrentCategory();
     }
 
     /**
@@ -195,23 +124,22 @@ class Category extends \Magento\Catalog\Model\Layer\Filter\AbstractFilter
      */
     protected function _getItemsData()
     {
-        $categoty   = $this->getCategory();
-        /** @var $category \Magento\Catalog\Model\Categeory */
-        $categories = $categoty->getChildrenCategories();
+        $category = $this->dataProvider->getCategory();
+        $categories = $category->getChildrenCategories();
 
-        $this->getLayer()->getProductCollection()
-            ->addCountToCategories($categories);
+        $this->getLayer()->getProductCollection()->addCountToCategories($categories);
 
-        $data = array();
-        foreach ($categories as $category) {
-            if ($category->getIsActive() && $category->getProductCount()) {
-                $data[] = array(
-                    'label' => $this->_escaper->escapeHtml($category->getName()),
-                    'value' => $category->getId(),
-                    'count' => $category->getProductCount(),
-                );
+        if ($category->getIsActive()) {
+            foreach ($categories as $category) {
+                if ($category->getIsActive() && $category->getProductCount()) {
+                    $this->itemDataBuilder->addItemData(
+                        $this->_escaper->escapeHtml($category->getName()),
+                        $category->getId(),
+                        $category->getProductCount()
+                    );
+                }
             }
         }
-        return $data;
+        return $this->itemDataBuilder->build();
     }
 }

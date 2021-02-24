@@ -1,100 +1,104 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Customer register form block
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Block\Form;
 
+use Magento\Customer\Helper\Address;
+use Magento\Customer\Model\AccountManagement;
+use Magento\Framework\App\ObjectManager;
+use Magento\Newsletter\Model\Config;
+use Magento\Store\Model\ScopeInterface;
+
+/**
+ * Customer register form block
+ *
+ * @api
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
+ */
 class Register extends \Magento\Directory\Block\Data
 {
-    /**
-     * Address instance with data
-     *
-     * @var \Magento\Customer\Model\Address
-     */
-    protected $_address;
-
     /**
      * @var \Magento\Customer\Model\Session
      */
     protected $_customerSession;
 
     /**
-     * @var \Magento\Module\Manager
+     * @var \Magento\Framework\Module\Manager
      */
     protected $_moduleManager;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Module\Manager $moduleManager
-     * @param \Magento\App\Cache\Type\Config $configCacheType
-     * @param \Magento\Directory\Model\Resource\Region\CollectionFactory $regionCollFactory
-     * @param \Magento\Directory\Model\Resource\Country\CollectionFactory $countryCollFactory
+     * @var \Magento\Customer\Model\Url
+     */
+    protected $_customerUrl;
+
+    /**
+     * @var Config
+     */
+    private $newsLetterConfig;
+
+    /**
+     * Constructor
+     *
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Directory\Helper\Data $directoryHelper
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Framework\App\Cache\Type\Config $configCacheType
+     * @param \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
+     * @param \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory
+     * @param \Magento\Framework\Module\Manager $moduleManager
      * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Customer\Model\AddressFactory $addressFactory
+     * @param \Magento\Customer\Model\Url $customerUrl
      * @param array $data
+     * @param Config $newsLetterConfig
+     * @param Address|null $addressHelper
+     *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\App\Cache\Type\Config $configCacheType,
-        \Magento\Directory\Model\Resource\Region\CollectionFactory $regionCollFactory,
-        \Magento\Directory\Model\Resource\Country\CollectionFactory $countryCollFactory,
-        \Magento\Module\Manager $moduleManager,
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Directory\Helper\Data $directoryHelper,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Framework\App\Cache\Type\Config $configCacheType,
+        \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory,
+        \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory,
+        \Magento\Framework\Module\Manager $moduleManager,
         \Magento\Customer\Model\Session $customerSession,
-        \Magento\Customer\Model\AddressFactory $addressFactory,
-        array $data = array()
+        \Magento\Customer\Model\Url $customerUrl,
+        array $data = [],
+        Config $newsLetterConfig = null,
+        Address $addressHelper = null
     ) {
+        $data['addressHelper'] = $addressHelper ?: ObjectManager::getInstance()->get(Address::class);
+        $data['directoryHelper'] = $directoryHelper;
+        $this->_customerUrl = $customerUrl;
         $this->_moduleManager = $moduleManager;
         $this->_customerSession = $customerSession;
-        $this->_addressFactory = $addressFactory;
+        $this->newsLetterConfig = $newsLetterConfig ?: ObjectManager::getInstance()->get(Config::class);
         parent::__construct(
-            $context, $coreData, $jsonEncoder, $configCacheType, $regionCollFactory, $countryCollFactory, $data
+            $context,
+            $directoryHelper,
+            $jsonEncoder,
+            $configCacheType,
+            $regionCollectionFactory,
+            $countryCollectionFactory,
+            $data
         );
+        $this->_isScopePrivate = false;
     }
 
     /**
      * Get config
      *
      * @param string $path
-     * @return mixed
+     * @return string|null
      */
     public function getConfig($path)
     {
-        return $this->_storeConfig->getConfig($path);
-    }
-
-    protected function _prepareLayout()
-    {
-        $this->getLayout()->getBlock('head')->setTitle(__('Create New Customer Account'));
-        return parent::_prepareLayout();
+        return $this->_scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_STORE);
     }
 
     /**
@@ -104,7 +108,7 @@ class Register extends \Magento\Directory\Block\Data
      */
     public function getPostActionUrl()
     {
-        return $this->helper('Magento\Customer\Helper\Data')->getRegisterPostUrl();
+        return $this->_customerUrl->getRegisterPostUrl();
     }
 
     /**
@@ -115,8 +119,8 @@ class Register extends \Magento\Directory\Block\Data
     public function getBackUrl()
     {
         $url = $this->getData('back_url');
-        if (is_null($url)) {
-            $url = $this->helper('Magento\Customer\Helper\Data')->getLoginUrl();
+        if ($url === null) {
+            $url = $this->_customerUrl->getLoginUrl();
         }
         return $url;
     }
@@ -124,14 +128,14 @@ class Register extends \Magento\Directory\Block\Data
     /**
      * Retrieve form data
      *
-     * @return \Magento\Object
+     * @return mixed
      */
     public function getFormData()
     {
         $data = $this->getData('form_data');
-        if (is_null($data)) {
+        if ($data === null) {
             $formData = $this->_customerSession->getCustomerFormData(true);
-            $data = new \Magento\Object();
+            $data = new \Magento\Framework\DataObject();
             if ($formData) {
                 $data->addData($formData);
                 $data->setCustomerData(1);
@@ -161,55 +165,43 @@ class Register extends \Magento\Directory\Block\Data
     /**
      * Retrieve customer region identifier
      *
-     * @return int
+     * @return mixed
      */
     public function getRegion()
     {
-        if (false !== ($region = $this->getFormData()->getRegion())) {
+        if (null !== ($region = $this->getFormData()->getRegion())) {
             return $region;
-        } else if (false !== ($region = $this->getFormData()->getRegionId())) {
+        } elseif (null !== ($region = $this->getFormData()->getRegionId())) {
             return $region;
         }
         return null;
     }
 
     /**
-     *  Newsletter module availability
+     * Newsletter module availability
      *
-     *  @return boolean
+     * @return bool
      */
     public function isNewsletterEnabled()
     {
-        return $this->_moduleManager->isOutputEnabled('Magento_Newsletter');
-    }
-
-    /**
-     * Return customer address instance
-     *
-     * @return \Magento\Customer\Model\Address
-     */
-    public function getAddress()
-    {
-        if (is_null($this->_address)) {
-            $this->_address = $this->_createAddress();
-        }
-
-        return $this->_address;
+        return $this->_moduleManager->isOutputEnabled('Magento_Newsletter')
+            && $this->newsLetterConfig->isActive(ScopeInterface::SCOPE_STORE);
     }
 
     /**
      * Restore entity data from session
+     *
      * Entity and form code must be defined for the form
      *
-     * @param \Magento\Customer\Model\Form $form
-     * @param null $scope
-     * @return \Magento\Customer\Block\Form\Register
+     * @param \Magento\Customer\Model\Metadata\Form $form
+     * @param string|null $scope
+     * @return $this
      */
-    public function restoreSessionData(\Magento\Customer\Model\Form $form, $scope = null)
+    public function restoreSessionData(\Magento\Customer\Model\Metadata\Form $form, $scope = null)
     {
         if ($this->getFormData()->getCustomerData()) {
             $request = $form->prepareRequest($this->getFormData()->getData());
-            $data    = $form->extractData($request, $scope, false);
+            $data = $form->extractData($request, $scope, false);
             $form->restoreData($data);
         }
 
@@ -217,10 +209,24 @@ class Register extends \Magento\Directory\Block\Data
     }
 
     /**
-     * @return \Magento\Customer\Model\Address
+     * Get minimum password length
+     *
+     * @return string
+     * @since 100.1.0
      */
-    protected function _createAddress()
+    public function getMinimumPasswordLength()
     {
-        return $this->_addressFactory->create();
+        return $this->_scopeConfig->getValue(AccountManagement::XML_PATH_MINIMUM_PASSWORD_LENGTH);
+    }
+
+    /**
+     * Get number of password required character classes
+     *
+     * @return string
+     * @since 100.1.0
+     */
+    public function getRequiredCharacterClassesNumber()
+    {
+        return $this->_scopeConfig->getValue(AccountManagement::XML_PATH_REQUIRED_CHARACTER_CLASSES_NUMBER);
     }
 }

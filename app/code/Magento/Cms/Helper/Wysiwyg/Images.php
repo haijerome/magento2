@@ -1,36 +1,25 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Wysiwyg Images Helper
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Cms\Helper\Wysiwyg;
 
-class Images extends \Magento\App\Helper\AbstractHelper
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Exception\ValidatorException;
+
+/**
+ * Wysiwyg Images Helper.
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class Images extends \Magento\Framework\App\Helper\AbstractHelper
 {
+    /**
+     * Image directory subpath relative to media directory
+     *
+     * @var string
+     */
+    private $imageDirectorySubpath;
 
     /**
      * Current directory path
@@ -45,23 +34,16 @@ class Images extends \Magento\App\Helper\AbstractHelper
     protected $_currentUrl;
 
     /**
-     * Currenty selected store ID if applicable
+     * Currently selected store ID if applicable
      *
      * @var int
      */
-    protected $_storeId = null;
+    protected $_storeId;
 
     /**
-     * @var \Magento\Filesystem
+     * @var \Magento\Framework\Filesystem\Directory\Write
      */
-    protected $_filesystem;
-
-    /**
-     * Core data
-     *
-     * @var \Magento\Core\Helper\Data
-     */
-    protected $_coreData;
+    protected $_directory;
 
     /**
      * Adminhtml data
@@ -73,50 +55,53 @@ class Images extends \Magento\App\Helper\AbstractHelper
     /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * Dir
+     * String escaper
      *
-     * @var \Magento\App\Dir
+     * @var \Magento\Framework\Escaper
      */
-    protected $_dir;
+    protected $escaper;
 
     /**
-     * @param \Magento\App\Helper\Context $context
+     * @var \Magento\Framework\Filesystem\Directory\Read
+     */
+    private $_readDirectory;
+
+    /**
+     * Construct
+     *
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Backend\Helper\Data $backendData
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Filesystem $filesystem
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\App\Dir $dir
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\Escaper $escaper
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Backend\Helper\Data $backendData,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Filesystem $filesystem,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\App\Dir $dir
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\Escaper $escaper
     ) {
         parent::__construct($context);
         $this->_backendData = $backendData;
-        $this->_coreData = $coreData;
-        $this->_filesystem = $filesystem;
-        $this->_dir = $dir;
         $this->_storeManager = $storeManager;
+        $this->escaper = $escaper;
 
-        $this->_filesystem->setIsAllowCreateDirectories(true);
-        $this->_filesystem->ensureDirectoryExists($this->getStorageRoot());
-        $this->_filesystem->setWorkingDirectory($this->getStorageRoot());
+        $this->_directory = $filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $this->_directory->create($this->getStorageRoot());
+        $this->_readDirectory = $filesystem->getDirectoryReadByPath($this->getStorageRoot());
     }
-
 
     /**
      * Set a specified store ID value
      *
-     * @param <type> $store
+     * @param int $store
+     * @return $this
      */
     public function setStoreId($store)
     {
@@ -131,8 +116,17 @@ class Images extends \Magento\App\Helper\AbstractHelper
      */
     public function getStorageRoot()
     {
-        return $this->_dir->getDir(\Magento\App\Dir::MEDIA) . DS
-            . \Magento\Cms\Model\Wysiwyg\Config::IMAGE_DIRECTORY . DS;
+        return $this->_directory->getAbsolutePath($this->getStorageRootSubpath());
+    }
+
+    /**
+     * Get image storage root subpath.  User is unable to traverse outside of this subpath in media gallery
+     *
+     * @return string
+     */
+    public function getStorageRootSubpath()
+    {
+        return '';
     }
 
     /**
@@ -142,7 +136,7 @@ class Images extends \Magento\App\Helper\AbstractHelper
      */
     public function getBaseUrl()
     {
-        return $this->_storeManager->getStore()->getBaseUrl(\Magento\Core\Model\Store::URL_TYPE_MEDIA) . '/';
+        return $this->_storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA);
     }
 
     /**
@@ -168,60 +162,42 @@ class Images extends \Magento\App\Helper\AbstractHelper
     }
 
     /**
-     * Decode HTML element id
+     * Decode HTML element id.
      *
      * @param string $id
      * @return string
+     * @throws \InvalidArgumentException
      */
     public function convertIdToPath($id)
     {
-        $path = $this->idDecode($id);
-        if (!strstr($path, $this->getStorageRoot())) {
-            $path = $this->getStorageRoot() . $path;
-        }
-        return $path;
-    }
+        if ($id === \Magento\Theme\Helper\Storage::NODE_ROOT) {
+            return $this->getStorageRoot();
+        } else {
+            $path = $this->getStorageRoot() . $this->idDecode($id);
 
-    /**
-     * File system path correction
-     *
-     * @param string $path Original path
-     * @param boolean $trim Trim slashes or not
-     * @return string
-     */
-    public function correctPath($path, $trim = true)
-    {
-        $path = strtr($path, "\\\/", DS . DS);
-        if ($trim) {
-            $path = trim($path, DS);
-        }
-        return $path;
-    }
+            try {
+                $this->_readDirectory->getAbsolutePath($path);
+            } catch (\Exception $e) {
+                throw new \InvalidArgumentException('Path is invalid');
+            }
 
-    /**
-     * Return file system path as Url string
-     *
-     * @param string $path
-     * @return string
-     */
-    public function convertPathToUrl($path)
-    {
-        return str_replace(DS, '/', $path);
+            return $path;
+        }
     }
 
     /**
      * Check whether using static URLs is allowed
      *
-     * @return boolean
+     * @return bool
      */
     public function isUsingStaticUrlsAllowed()
     {
-        $checkResult = new \StdClass;
+        $checkResult = (object) [];
         $checkResult->isAllowed = false;
-        $this->_eventManager->dispatch('cms_wysiwyg_images_static_urls_allowed', array(
-            'result'   => $checkResult,
-            'store_id' => $this->_storeId
-        ));
+        $this->_eventManager->dispatch(
+            'cms_wysiwyg_images_static_urls_allowed',
+            ['result' => $checkResult, 'store_id' => $this->_storeId]
+        );
         return $checkResult->isAllowed;
     }
 
@@ -234,20 +210,24 @@ class Images extends \Magento\App\Helper\AbstractHelper
      */
     public function getImageHtmlDeclaration($filename, $renderAsTag = false)
     {
-        $fileurl = $this->getCurrentUrl() . $filename;
-        $mediaUrl = $this->_storeManager->getStore()->getBaseUrl(\Magento\Core\Model\Store::URL_TYPE_MEDIA);
-        $mediaPath = str_replace($mediaUrl, '', $fileurl);
+        $fileUrl = $this->getCurrentUrl() . $filename;
+        $mediaUrl = $this->_storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA);
+        $mediaPath = str_replace($mediaUrl, '', $fileUrl);
         $directive = sprintf('{{media url="%s"}}', $mediaPath);
         if ($renderAsTag) {
-            $html = sprintf('<img src="%s" alt="" />', $this->isUsingStaticUrlsAllowed() ? $fileurl : $directive);
+            $src = $this->isUsingStaticUrlsAllowed() ? $fileUrl : $this->escaper->escapeHtml($directive);
+            $html = sprintf('<img src="%s" alt="" />', $src);
         } else {
             if ($this->isUsingStaticUrlsAllowed()) {
-                $html = $fileurl; // $mediaPath;
+                $html = $fileUrl;
             } else {
-                $directive = $this->_coreData->urlEncode($directive);
+                $directive = $this->urlEncoder->encode($directive);
                 $html = $this->_backendData->getUrl(
                     'cms/wysiwyg/directive',
-                    array('___directive' => $directive)
+                    [
+                        '___directive' => $directive,
+                        '_escape_params' => false,
+                    ]
                 );
             }
         }
@@ -255,11 +235,10 @@ class Images extends \Magento\App\Helper\AbstractHelper
     }
 
     /**
-     * Return path of the current selected directory or root directory for startup
-     * Try to create target directory if it doesn't exist
+     * Return path of the root directory for startup. Also try to create target directory if it doesn't exist
      *
      * @return string
-     * @throws \Magento\Core\Exception
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getCurrentPath()
     {
@@ -268,21 +247,44 @@ class Images extends \Magento\App\Helper\AbstractHelper
             $path = $this->_getRequest()->getParam($this->getTreeNodeName());
             if ($path) {
                 $path = $this->convertIdToPath($path);
-                if ($this->_filesystem->isDirectory($path)) {
+                if ($this->_directory->isDirectory($this->_directory->getRelativePath($path))) {
                     $currentPath = $path;
                 }
             }
-            try {
-                if (!$this->_filesystem->isWritable($currentPath)) {
-                    $this->_filesystem->createDirectory($currentPath);
-                }
-            } catch (\Magento\Filesystem\FilesystemException $e) {
-                $message = __('The directory %1 is not writable by server.', $currentPath);
-                throw new \Magento\Core\Exception($message);
+
+            $currentTreePath = $this->_getRequest()->getParam('current_tree_path');
+            if ($currentTreePath) {
+                $currentTreePath = $this->convertIdToPath($currentTreePath);
+                $this->createSubDirIfNotExist($currentTreePath);
             }
+
             $this->_currentPath = $currentPath;
         }
+
         return $this->_currentPath;
+    }
+
+    /**
+     * Create subdirectory if doesn't exist
+     *
+     * @param string $absPath Path of subdirectory to create
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    private function createSubDirIfNotExist(string $absPath)
+    {
+        $relPath = $this->_directory->getRelativePath($absPath);
+        if (!$this->_directory->isExist($relPath)) {
+            try {
+                $this->_directory->create($relPath);
+            } catch (\Magento\Framework\Exception\FileSystemException $e) {
+                $message = __(
+                    'Can\'t create %1 as subdirectory of %2, you might have some permission issue.',
+                    $relPath,
+                    $this->_directory->getAbsolutePath()
+                );
+                throw new \Magento\Framework\Exception\LocalizedException($message);
+            }
+        }
     }
 
     /**
@@ -293,11 +295,13 @@ class Images extends \Magento\App\Helper\AbstractHelper
     public function getCurrentUrl()
     {
         if (!$this->_currentUrl) {
-            $path = str_replace($this->_dir->getDir(\Magento\App\Dir::MEDIA), '', $this->getCurrentPath());
-            $path = trim($path, DS);
-            $mediaUrl = $this->_storeManager->getStore($this->_storeId)
-                ->getBaseUrl(\Magento\Core\Model\Store::URL_TYPE_MEDIA);
-            $this->_currentUrl = $mediaUrl . $this->convertPathToUrl($path) . '/';
+            $path = $this->getCurrentPath();
+            $mediaUrl = $this->_storeManager->getStore(
+                $this->_storeId
+            )->getBaseUrl(
+                \Magento\Framework\UrlInterface::URL_TYPE_MEDIA
+            );
+            $this->_currentUrl = rtrim($mediaUrl . $this->_directory->getRelativePath($path), '/') . '/';
         }
         return $this->_currentUrl;
     }
@@ -314,7 +318,7 @@ class Images extends \Magento\App\Helper\AbstractHelper
     }
 
     /**
-     * Revert opration to idEncode
+     * Revert operation to idEncode
      *
      * @param string $string
      * @return string
@@ -322,6 +326,8 @@ class Images extends \Magento\App\Helper\AbstractHelper
     public function idDecode($string)
     {
         $string = strtr($string, ':_-', '+/=');
+
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
         return base64_decode($string);
     }
 
@@ -338,5 +344,16 @@ class Images extends \Magento\App\Helper\AbstractHelper
             return $filename;
         }
         return substr($filename, 0, $maxLength) . '...';
+    }
+
+    /**
+     * Set user-traversable image directory subpath relative to media directory and relative to nested storage root
+     *
+     * @param string $subpath
+     * @return void
+     */
+    public function setImageDirectorySubpath($subpath)
+    {
+        $this->imageDirectorySubpath = $subpath;
     }
 }

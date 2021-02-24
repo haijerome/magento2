@@ -1,51 +1,45 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Abstract class for the controller tests
  */
+
 namespace Magento\TestFramework\TestCase;
 
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ResponseInterface;
+use Magento\Framework\Data\Form\FormKey;
+use Magento\Framework\Message\MessageInterface;
+use Magento\Framework\Stdlib\CookieManagerInterface;
+use Magento\Framework\View\Element\Message\InterpretationStrategyInterface;
+use Magento\Theme\Controller\Result\MessagePlugin;
+use PHPUnit\Framework\TestCase;
+
 /**
+ * Set of methods useful for performing requests to Controllers.
+ *
  * @SuppressWarnings(PHPMD.NumberOfChildren)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-abstract class AbstractController extends \PHPUnit_Framework_TestCase
+abstract class AbstractController extends TestCase
 {
-    protected $_runCode     = '';
-    protected $_runScope    = 'store';
-    protected $_runOptions  = array();
+    protected $_runCode = '';
+
+    protected $_runScope = 'store';
+
+    protected $_runOptions = [];
 
     /**
-     * @var \Magento\TestFramework\Request
+     * @var RequestInterface
      */
     protected $_request;
 
     /**
-     * @var \Magento\TestFramework\Response
+     * @var ResponseInterface
      */
     protected $_response;
 
@@ -74,16 +68,18 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
     /**
      * Bootstrap application before any test
      */
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->_assertSessionErrors = false;
         $this->_objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
-        $this->_objectManager->removeSharedInstance('Magento\App\ResponseInterface');
-        $this->_objectManager->removeSharedInstance('Magento\App\RequestInterface');
-
+        $this->_objectManager->removeSharedInstance(\Magento\Framework\App\ResponseInterface::class);
+        $this->_objectManager->removeSharedInstance(\Magento\Framework\App\RequestInterface::class);
     }
 
-    protected function tearDown()
+    /**
+     * @inheritDoc
+     */
+    protected function tearDown(): void
     {
         $this->_request = null;
         $this->_response = null;
@@ -93,11 +89,14 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
     /**
      * Ensure that there were no error messages displayed on the admin panel
      */
-    protected function assertPostConditions()
+    protected function assertPostConditions(): void
     {
         if ($this->_assertSessionErrors) {
             // equalTo() is intentionally used instead of isEmpty() to provide the informative diff
-            $this->assertSessionMessages($this->equalTo(array()), \Magento\Message\Factory::ERROR);
+            $this->assertSessionMessages(
+                $this->equalTo([]),
+                \Magento\Framework\Message\MessageInterface::TYPE_ERROR
+            );
         }
     }
 
@@ -108,32 +107,53 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
      */
     public function dispatch($uri)
     {
-        $this->getRequest()->setRequestUri($uri);
+        $request = $this->getRequest();
+
+        $request->setDispatched(false);
+        $request->setRequestUri($uri);
+        if ($request->isPost()
+            && !property_exists($request->getPost(), 'form_key')
+        ) {
+            /** @var FormKey $formKey */
+            $formKey = $this->_objectManager->get(FormKey::class);
+            $request->setPostValue('form_key', $formKey->getFormKey());
+        }
         $this->_getBootstrap()->runApp();
     }
 
     /**
      * Request getter
      *
-     * @return \Magento\App\RequestInterface
+     * @return RequestInterface
      */
     public function getRequest()
     {
         if (!$this->_request) {
-            $this->_request = $this->_objectManager->get('Magento\App\RequestInterface');
+            $this->_request = $this->_objectManager->get(RequestInterface::class);
         }
         return $this->_request;
     }
 
     /**
+     * Reset Request parameters
+     *
+     * @return void
+     */
+    protected function resetRequest(): void
+    {
+        $this->_objectManager->removeSharedInstance(RequestInterface::class);
+        $this->_request = null;
+    }
+
+    /**
      * Response getter
      *
-     * @return \Magento\App\ResponseInterface
+     * @return ResponseInterface
      */
     public function getResponse()
     {
         if (!$this->_response) {
-            $this->_response = $this->_objectManager->get('Magento\App\ResponseInterface');
+            $this->_response = $this->_objectManager->get(ResponseInterface::class);
         }
         return $this->_response;
     }
@@ -144,7 +164,7 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
     public function assert404NotFound()
     {
         $this->assertEquals('noroute', $this->getRequest()->getControllerName());
-        $this->assertContains('404 Not Found', $this->getResponse()->getBody());
+        $this->assertStringContainsString('404 Not Found', $this->getResponse()->getBody());
     }
 
     /**
@@ -152,16 +172,16 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
      *
      * @param string $headerName
      * @param string $valueRegex
-     * @throws \PHPUnit_Framework_AssertionFailedError when header not found
+     * @throws \PHPUnit\Framework\AssertionFailedError when header not found
      */
     public function assertHeaderPcre($headerName, $valueRegex)
     {
         $headerFound = false;
         $headers = $this->getResponse()->getHeaders();
         foreach ($headers as $header) {
-            if ($header['name'] === $headerName) {
+            if ($header->getFieldName() === $headerName) {
                 $headerFound = true;
-                $this->assertRegExp($valueRegex, $header['value']);
+                $this->assertRegExp($valueRegex, $header->getFieldValue());
             }
         }
         if (!$headerFound) {
@@ -178,16 +198,16 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
      * $this->assertRedirect($this->stringEndsWith($expectedUrlSuffix));
      * $this->assertRedirect($this->stringContains($expectedUrlSubstring));
      *
-     * @param \PHPUnit_Framework_Constraint|null $urlConstraint
+     * @param \PHPUnit\Framework\Constraint\Constraint|null $urlConstraint
      */
-    public function assertRedirect(\PHPUnit_Framework_Constraint $urlConstraint = null)
+    public function assertRedirect(\PHPUnit\Framework\Constraint\Constraint $urlConstraint = null)
     {
         $this->assertTrue($this->getResponse()->isRedirect(), 'Redirect was expected, but none was performed.');
         if ($urlConstraint) {
             $actualUrl = '';
             foreach ($this->getResponse()->getHeaders() as $header) {
-                if ($header['name'] == 'Location') {
-                    $actualUrl = $header['value'];
+                if ($header->getFieldName() == 'Location') {
+                    $actualUrl = $header->getFieldValue();
                     break;
                 }
             }
@@ -198,29 +218,122 @@ abstract class AbstractController extends \PHPUnit_Framework_TestCase
     /**
      * Assert that actual session messages meet expectations:
      * Usage examples:
-     * $this->assertSessionMessages($this->isEmpty(), \Magento\Message\Factory::ERROR);
-     * $this->assertSessionMessages($this->equalTo(array('Entity has been saved.')),
-     * \Magento\Message\Factory::SUCCESS);
+     * $this->assertSessionMessages($this->isEmpty(), \Magento\Framework\Message\MessageInterface::TYPE_ERROR);
+     * $this->assertSessionMessages($this->equalTo(['Entity has been saved.'],
+     * \Magento\Framework\Message\MessageInterface::TYPE_SUCCESS);
      *
-     * @param \PHPUnit_Framework_Constraint $constraint Constraint to compare actual messages against
-     * @param string|null $messageType Message type filter, one of the constants \Magento\Message\Factory::*
-     * @param string $sessionModel Class of the session model that manages messages
+     * @param \PHPUnit\Framework\Constraint\Constraint $constraint Constraint to compare actual messages against
+     * @param string|null $messageType Message type filter,
+     *        one of the constants \Magento\Framework\Message\MessageInterface::*
+     * @param string $messageManagerClass Class of the session model that manages messages
      */
     public function assertSessionMessages(
-        \PHPUnit_Framework_Constraint $constraint, $messageType = null, $sessionModel = 'Magento\Core\Model\Session'
+        \PHPUnit\Framework\Constraint\Constraint $constraint,
+        $messageType = null,
+        $messageManagerClass = \Magento\Framework\Message\Manager::class
     ) {
         $this->_assertSessionErrors = false;
-        /** @var $session \Magento\Core\Model\Session\AbstractSession */
-        $session = $this->_objectManager->get($sessionModel);
-        $actualMessages = array();
-        /** @var $message \Magento\Message\AbstractMessage */
-        foreach ($session->getMessages()->getItems($messageType) as $message) {
-            $actualMessages[] = $message->getText();
-        }
-        $this->assertThat(
-            $actualMessages,
-            $constraint,
-            'Session messages do not meet expectations' . var_export($actualMessages, true)
+        /** @var MessageInterface[]|string[] $messageObjects */
+        $messages = $this->getMessages($messageType, $messageManagerClass);
+        /** @var string[] $messages */
+        $messagesFiltered = array_map(
+            function ($message) {
+                /** @var MessageInterface|string $message */
+                return ($message instanceof MessageInterface) ? $message->toString() : $message;
+            },
+            $messages
         );
+
+        $this->assertThat(
+            $messagesFiltered,
+            $constraint,
+            'Session messages do not meet expectations ' . var_export($messagesFiltered, true)
+        );
+    }
+
+    /**
+     * Return all stored messages
+     *
+     * @param string|null $messageType
+     * @param string $messageManagerClass
+     * @return array
+     */
+    protected function getMessages(
+        $messageType = null,
+        $messageManagerClass = \Magento\Framework\Message\Manager::class
+    ) {
+        return array_merge(
+            $this->getSessionMessages($messageType, $messageManagerClass),
+            $this->getCookieMessages($messageType)
+        );
+    }
+
+    /**
+     * Return messages stored in session
+     *
+     * @param string|null $messageType
+     * @param string $messageManagerClass
+     * @return array
+     */
+    protected function getSessionMessages(
+        $messageType = null,
+        $messageManagerClass = \Magento\Framework\Message\Manager::class
+    ) {
+        /** @var $messageManager \Magento\Framework\Message\ManagerInterface */
+        $messageManager = $this->_objectManager->get($messageManagerClass);
+        /** @var $messages \Magento\Framework\Message\AbstractMessage[] */
+        if ($messageType === null) {
+            $messages = $messageManager->getMessages()->getItems();
+        } else {
+            $messages = $messageManager->getMessages()->getItemsByType($messageType);
+        }
+
+        /** @var $messageManager InterpretationStrategyInterface */
+        $interpretationStrategy = $this->_objectManager->get(InterpretationStrategyInterface::class);
+
+        $actualMessages = [];
+        foreach ($messages as $message) {
+            $actualMessages[] = $interpretationStrategy->interpret($message);
+        }
+
+        return $actualMessages;
+    }
+
+    /**
+     * Return messages stored in cookies by type
+     *
+     * @param string|null $messageType
+     * @return array
+     */
+    protected function getCookieMessages($messageType = null)
+    {
+        /** @var $cookieManager CookieManagerInterface */
+        $cookieManager = $this->_objectManager->get(CookieManagerInterface::class);
+
+        /** @var $jsonSerializer \Magento\Framework\Serialize\Serializer\Json */
+        $jsonSerializer = $this->_objectManager->get(\Magento\Framework\Serialize\Serializer\Json::class);
+        try {
+            $messages = $jsonSerializer->unserialize(
+                $cookieManager->getCookie(
+                    MessagePlugin::MESSAGES_COOKIES_NAME,
+                    $jsonSerializer->serialize([])
+                )
+            );
+
+            if (!is_array($messages)) {
+                $messages = [];
+            }
+        } catch (\InvalidArgumentException $e) {
+            $messages = [];
+        }
+
+        $actualMessages = [];
+        foreach ($messages as $message) {
+            if ($messageType === null || $message['type'] == $messageType) {
+                $actualMessages[] = $message['text'];
+            }
+        }
+
+        return $actualMessages;
     }
 }

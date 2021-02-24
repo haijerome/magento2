@@ -1,51 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Helper\Product;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Escaper;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Catalog\Helper\Product\Configuration\ConfigurationInterface;
+use Magento\Framework\App\Helper\AbstractHelper;
 
 /**
  * Helper for fetching properties by product configurational item
  *
  * @SuppressWarnings(PHPMD.LongVariable)
  */
-class Configuration extends \Magento\App\Helper\AbstractHelper
-    implements \Magento\Catalog\Helper\Product\Configuration\ConfigurationInterface
+class Configuration extends AbstractHelper implements ConfigurationInterface
 {
-    /**
-     * @var \Magento\Catalog\Model\ProductTypes\ConfigInterface
-     */
-    protected $_config;
-
     /**
      * Filter manager
      *
-     * @var \Magento\Filter\FilterManager
+     * @var \Magento\Framework\Filter\FilterManager
      */
     protected $filter;
-
 
     /**
      * Product option factory
@@ -57,28 +35,41 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\App\Helper\Context $context
+     * @var Json
+     */
+    private $serializer;
+
+    /**
+     * @var Escaper
+     */
+    private $escaper;
+
+    /**
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory
-     * @param \Magento\Filter\FilterManager $filter
-     * @param \Magento\Catalog\Model\ProductTypes\ConfigInterface $config
-     * @param \Magento\Stdlib\String $string
+     * @param \Magento\Framework\Filter\FilterManager $filter
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param Json $serializer
+     * @param Escaper $escaper
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory,
-        \Magento\Filter\FilterManager $filter,
-        \Magento\Catalog\Model\ProductTypes\ConfigInterface $config,
-        \Magento\Stdlib\String $string
+        \Magento\Framework\Filter\FilterManager $filter,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        Json $serializer = null,
+        Escaper $escaper = null
     ) {
         $this->_productOptionFactory = $productOptionFactory;
         $this->filter = $filter;
-        $this->_config = $config;
         $this->string = $string;
+        $this->serializer = $serializer ?: ObjectManager::getInstance()->get(Json::class);
+        $this->escaper = $escaper ?: ObjectManager::getInstance()->get(Escaper::class);
         parent::__construct($context);
     }
 
@@ -91,14 +82,15 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
     public function getCustomOptions(\Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item)
     {
         $product = $item->getProduct();
-        $options = array();
+        $options = [];
         $optionIds = $item->getOptionByCode('option_ids');
         if ($optionIds) {
-            $options = array();
+            $options = [];
             foreach (explode(',', $optionIds->getValue()) as $optionId) {
                 $option = $product->getOptionById($optionId);
                 if ($option) {
                     $itemOption = $item->getOptionByCode('option_' . $option->getId());
+                    /** @var $group \Magento\Catalog\Model\Product\Option\Type\DefaultType */
                     $group = $option->groupFactory($option->getType())
                         ->setOption($option)
                         ->setConfigurationItem($item)
@@ -118,88 +110,24 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
                         }
                     }
 
-                    $options[] = array(
+                    $options[] = [
                         'label' => $option->getTitle(),
                         'value' => $group->getFormattedOptionValue($itemOption->getValue()),
                         'print_value' => $group->getPrintableOptionValue($itemOption->getValue()),
                         'option_id' => $option->getId(),
                         'option_type' => $option->getType(),
-                        'custom_view' => $group->isCustomizedView()
-                    );
+                        'custom_view' => $group->isCustomizedView(),
+                    ];
                 }
             }
         }
 
         $addOptions = $item->getOptionByCode('additional_options');
         if ($addOptions) {
-            $options = array_merge($options, unserialize($addOptions->getValue()));
+            $options = array_merge($options, $this->serializer->unserialize($addOptions->getValue()));
         }
 
         return $options;
-    }
-
-    /**
-     * Retrieves configuration options for configurable product
-     *
-     * @param \Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item
-     * @return array
-     * @throws \Magento\Core\Exception
-     */
-    public function getConfigurableOptions(\Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item)
-    {
-        $product = $item->getProduct();
-        $typeId = $product->getTypeId();
-        if ($typeId != \Magento\Catalog\Model\Product\Type\Configurable::TYPE_CODE) {
-             throw new \Magento\Core\Exception(__('The product type to extract configurable options is incorrect.'));
-        }
-        $attributes = $product->getTypeInstance()
-            ->getSelectedAttributesInfo($product);
-        return array_merge($attributes, $this->getCustomOptions($item));
-    }
-
-    /**
-     * Retrieves configuration options for grouped product
-     *
-     * @param \Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item
-     * @return array
-     * @throws \Magento\Core\Exception
-     */
-    public function getGroupedOptions(\Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item)
-    {
-        $product = $item->getProduct();
-        $typeId = $product->getTypeId();
-        if ($typeId != \Magento\Catalog\Model\Product\Type\Grouped::TYPE_CODE) {
-             throw new \Magento\Core\Exception(__('The product type to extract configurable options is incorrect.'));
-        }
-
-        $options = array();
-        /**
-         * @var \Magento\Catalog\Model\Product\Type\Grouped
-         */
-        $typeInstance = $product->getTypeInstance();
-        $associatedProducts = $typeInstance->getAssociatedProducts($product);
-
-        if ($associatedProducts) {
-            foreach ($associatedProducts as $associatedProduct) {
-                $qty = $item->getOptionByCode('associated_product_' . $associatedProduct->getId());
-                $option = array(
-                    'label' => $associatedProduct->getName(),
-                    'value' => ($qty && $qty->getValue()) ? $qty->getValue() : 0
-                );
-
-                $options[] = $option;
-            }
-        }
-
-        $options = array_merge($options, $this->getCustomOptions($item));
-        $isUnConfigured = true;
-        foreach ($options as &$option) {
-            if ($option['value']) {
-                $isUnConfigured = false;
-                break;
-            }
-        }
-        return $isUnConfigured ? array() : $options;
     }
 
     /**
@@ -210,22 +138,13 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
      */
     public function getOptions(\Magento\Catalog\Model\Product\Configuration\Item\ItemInterface $item)
     {
-        $typeId = $item->getProduct()->getTypeId();
-        switch ($typeId) {
-            case \Magento\Catalog\Model\Product\Type\Configurable::TYPE_CODE:
-                return $this->getConfigurableOptions($item);
-            case \Magento\Catalog\Model\Product\Type\Grouped::TYPE_CODE:
-                return $this->getGroupedOptions($item);
-            default:
-                break;
-        }
         return $this->getCustomOptions($item);
     }
 
     /**
      * Accept option value and return its formatted view
      *
-     * @param mixed $optionValue
+     * @param string|array $optionValue
      * Method works well with these $optionValue format:
      *      1. String
      *      2. Indexed array e.g. array(val1, val2, ...)
@@ -245,38 +164,40 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
      *  - 'cutReplacer': replacer for cut off value part when option value exceeds maxLength
      *
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function getFormattedOptionValue($optionValue, $params = null)
     {
         // Init params
         if (!$params) {
-            $params = array();
+            $params = [];
         }
         $maxLength = isset($params['max_length']) ? $params['max_length'] : null;
         $cutReplacer = isset($params['cut_replacer']) ? $params['cut_replacer'] : '...';
 
         // Proceed with option
-        $optionInfo = array();
+        $optionInfo = [];
 
         // Define input data format
         if (is_array($optionValue)) {
             if (isset($optionValue['option_id'])) {
                 $optionInfo = $optionValue;
                 if (isset($optionInfo['value'])) {
-                    $optionValue = $optionInfo['value'];
+                    $optionValue = $this->escaper->escapeHtml($optionInfo['value']);
                 }
-            } else if (isset($optionValue['value'])) {
+            } elseif (isset($optionValue['value'])) {
                 $optionValue = $optionValue['value'];
             }
         }
 
         // Render customized option view
         if (isset($optionInfo['custom_view']) && $optionInfo['custom_view']) {
-            $_default = array('value' => $optionValue);
+            $_default = ['value' => $optionValue];
             if (isset($optionInfo['option_type'])) {
                 try {
                     $group = $this->_productOptionFactory->create()->groupFactory($optionInfo['option_type']);
-                    return array('value' => $group->getCustomizedView($optionInfo));
+                    return ['value' => $group->getCustomizedView($optionInfo)];
                 } catch (\Exception $e) {
                     return $_default;
                 }
@@ -288,35 +209,24 @@ class Configuration extends \Magento\App\Helper\AbstractHelper
         if (is_array($optionValue)) {
             $truncatedValue = implode("\n", $optionValue);
             $truncatedValue = nl2br($truncatedValue);
-            return array('value' => $truncatedValue);
+            return ['value' => $truncatedValue];
         } else {
             if ($maxLength) {
-                $truncatedValue = $this->filter->truncate($optionValue, array('length' => $maxLength, 'etc' => ''));
+                $truncatedValue = $this->filter->truncate($optionValue, ['length' => $maxLength, 'etc' => '']);
             } else {
                 $truncatedValue = $optionValue;
             }
             $truncatedValue = nl2br($truncatedValue);
         }
 
-        $result = array('value' => $truncatedValue);
+        $result = ['value' => $truncatedValue];
 
-        if ($maxLength && ($this->string->strlen($optionValue) > $maxLength)) {
+        if ($maxLength && $this->string->strlen($optionValue) > $maxLength) {
             $result['value'] = $result['value'] . $cutReplacer;
             $optionValue = nl2br($optionValue);
             $result['full_view'] = $optionValue;
         }
 
         return $result;
-    }
-
-    /**
-     * Get allowed product types for configurable product
-     *
-     * @return \SimpleXMLElement
-     */
-    public function getConfigurableAllowedTypes()
-    {
-        $configData = $this->_config->getType('configurable');
-        return isset($configData['allow_product_types']) ? $configData['allow_product_types'] : array();
     }
 }

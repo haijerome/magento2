@@ -1,96 +1,120 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Account\Dashboard;
+
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Customer\Block\Form\Register;
+use Magento\Customer\Helper\Session\CurrentCustomer;
+use Magento\Customer\Helper\View;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Newsletter\Model\Subscriber;
+use Magento\Newsletter\Model\SubscriberFactory;
 
 /**
  * Dashboard Customer Info
  *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-
-namespace Magento\Customer\Block\Account\Dashboard;
-
-class Info extends \Magento\View\Element\Template
+class Info extends Template
 {
     /**
      * Cached subscription object
      *
-     * @var \Magento\Newsletter\Model\Subscriber
+     * @var Subscriber
      */
     protected $_subscription;
 
     /**
-     * @var \Magento\Customer\Model\Session
-     */
-    protected $_customerSession;
-
-    /**
-     * @var \Magento\Newsletter\Model\SubscriberFactory
+     * @var SubscriberFactory
      */
     protected $_subscriberFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
+     * @var View
+     */
+    protected $_helperView;
+
+    /**
+     * @var CurrentCustomer
+     */
+    protected $currentCustomer;
+
+    /**
+     * Constructor
+     *
+     * @param Context $context
+     * @param CurrentCustomer $currentCustomer
+     * @param SubscriberFactory $subscriberFactory
+     * @param View $helperView
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        array $data = array()
+        Context $context,
+        CurrentCustomer $currentCustomer,
+        SubscriberFactory $subscriberFactory,
+        View $helperView,
+        array $data = []
     ) {
-        $this->_customerSession = $customerSession;
+        $this->currentCustomer = $currentCustomer;
         $this->_subscriberFactory = $subscriberFactory;
+        $this->_helperView = $helperView;
         parent::__construct($context, $data);
     }
 
-
+    /**
+     * Returns the Magento Customer Model for this block
+     *
+     * @return CustomerInterface|null
+     */
     public function getCustomer()
     {
-        return $this->_customerSession->getCustomer();
+        try {
+            return $this->currentCustomer->getCustomer();
+        } catch (NoSuchEntityException $e) {
+            return null;
+        }
     }
 
+    /**
+     * Get the full name of a customer
+     *
+     * @return string full name
+     */
+    public function getName()
+    {
+        return $this->_helperView->getCustomerName($this->getCustomer());
+    }
+
+    /**
+     * Get the url to change password
+     *
+     * @return string
+     */
     public function getChangePasswordUrl()
     {
-        return $this->_urlBuilder->getUrl('*/account/edit/changepass/1');
+        return $this->_urlBuilder->getUrl('customer/account/edit/changepass/1');
     }
 
     /**
      * Get Customer Subscription Object Information
      *
-     * @return \Magento\Newsletter\Model\Subscriber
+     * @return Subscriber
      */
     public function getSubscriptionObject()
     {
         if (!$this->_subscription) {
             $this->_subscription = $this->_createSubscriber();
-            $this->_subscription->loadByCustomer($this->_customerSession->getCustomer());
+            $customer = $this->getCustomer();
+            if ($customer) {
+                $websiteId = (int)$this->_storeManager->getWebsite()->getId();
+                $this->_subscription->loadByCustomer((int)$customer->getId(), $websiteId);
+            }
         }
         return $this->_subscription;
     }
@@ -99,6 +123,8 @@ class Info extends \Magento\View\Element\Template
      * Gets Customer subscription status
      *
      * @return bool
+     *
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsSubscribed()
     {
@@ -106,20 +132,32 @@ class Info extends \Magento\View\Element\Template
     }
 
     /**
-     *  Newsletter module availability
+     * Newsletter module availability
      *
-     *  @return	  boolean
+     * @return bool
      */
     public function isNewsletterEnabled()
     {
-        return $this->getLayout()->getBlockSingleton('Magento\Customer\Block\Form\Register')->isNewsletterEnabled();
+        return $this->getLayout()
+            ->getBlockSingleton(Register::class)
+            ->isNewsletterEnabled();
     }
 
     /**
-     * @return \Magento\Newsletter\Model\Subscriber
+     * Create new instance of Subscriber
+     *
+     * @return Subscriber
      */
     protected function _createSubscriber()
     {
         return $this->_subscriberFactory->create();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function _toHtml()
+    {
+        return $this->currentCustomer->getCustomerId() ? parent::_toHtml() : '';
     }
 }

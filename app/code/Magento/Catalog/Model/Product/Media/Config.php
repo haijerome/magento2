@@ -1,83 +1,60 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-
-/**
- * Catalog product media config
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Catalog\Model\Product\Media;
 
+use Magento\Eav\Model\Entity\Attribute;
+use Magento\Framework\UrlInterface;
+use Magento\Store\Model\StoreManagerInterface;
+
+/**
+ * Catalog product media config.
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Config implements ConfigInterface
 {
     /**
-     * Dir
-     *
-     * @var \Magento\App\Dir
-     */
-    protected $_dir;
-
-    /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var StoreManagerInterface
      */
-    protected $_storeManager;
+    protected $storeManager;
 
     /**
-     * Construct
-     *
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\App\Dir $dir
+     * @var Attribute
      */
-    public function __construct(
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\App\Dir $dir
-    ) {
-        $this->_storeManager = $storeManager;
-        $this->_dir = $dir;
+    private $attributeHelper;
+
+    /**
+     * @var string[]
+     */
+    private $mediaAttributeCodes;
+
+    /**
+     * @param StoreManagerInterface $storeManager
+     */
+    public function __construct(StoreManagerInterface $storeManager)
+    {
+        $this->storeManager = $storeManager;
     }
 
     /**
-     * Filesystem directory path of product images
-     * relatively to media folder
+     * Get filesystem directory path for product images relative to the media directory.
      *
      * @return string
      */
     public function getBaseMediaPathAddition()
     {
-        return 'catalog' . DIRECTORY_SEPARATOR . 'product';
+        return 'catalog/product';
     }
 
     /**
-     * Web-based directory path of product images
-     * relatively to media folder
+     * Get web-based directory path for product images relative to the media directory.
      *
      * @return string
      */
@@ -87,135 +64,141 @@ class Config implements ConfigInterface
     }
 
     /**
-     * Filesystem directory path of temporary product images
-     * relatively to media folder
-     *
-     * @return string
+     * @inheritdoc
      */
-    public function getBaseTmpMediaPathAddition()
-    {
-        return 'tmp' . DIRECTORY_SEPARATOR . $this->getBaseMediaPathAddition();
-    }
-
-    /**
-     * Web-based directory path of temporary product images
-     * relatively to media folder
-     *
-     * @return string
-     */
-    public function getBaseTmpMediaUrlAddition()
-    {
-        return 'tmp/' . $this->getBaseMediaUrlAddition();
-    }
-
     public function getBaseMediaPath()
     {
-        return $this->_dir->getDir(\Magento\App\Dir::MEDIA) . DIRECTORY_SEPARATOR
-            . 'catalog' . DIRECTORY_SEPARATOR . 'product';
-    }
-
-    public function getBaseMediaUrl()
-    {
-        return $this->_storeManager->getStore()
-            ->getBaseUrl(\Magento\Core\Model\Store::URL_TYPE_MEDIA) . 'catalog/product';
-    }
-
-    public function getBaseTmpMediaPath()
-    {
-        return $this->_dir->getDir(\Magento\App\Dir::MEDIA) . DIRECTORY_SEPARATOR
-            . $this->getBaseTmpMediaPathAddition();
-    }
-
-    public function getBaseTmpMediaUrl()
-    {
-        return $this->_storeManager->getStore()
-            ->getBaseUrl(\Magento\Core\Model\Store::URL_TYPE_MEDIA) . $this->getBaseTmpMediaUrlAddition();
-    }
-
-    public function getMediaUrl($file)
-    {
-        $file = $this->_prepareFileForUrl($file);
-
-        if(substr($file, 0, 1) == '/') {
-            return $this->getBaseMediaUrl() . $file;
-        }
-
-        return $this->getBaseMediaUrl() . '/' . $file;
-    }
-
-    public function getMediaPath($file)
-    {
-        $file = $this->_prepareFileForPath($file);
-
-        if(substr($file, 0, 1) == DIRECTORY_SEPARATOR) {
-            return $this->getBaseMediaPath() . DIRECTORY_SEPARATOR . substr($file, 1);
-        }
-
-        return $this->getBaseMediaPath() . DIRECTORY_SEPARATOR . $file;
-    }
-
-    public function getTmpMediaUrl($file)
-    {
-        $file = $this->_prepareFileForUrl($file);
-
-        if(substr($file, 0, 1) == '/') {
-            $file = substr($file, 1);
-        }
-
-        return $this->getBaseTmpMediaUrl() . '/' . $file;
+        return 'catalog/product';
     }
 
     /**
-     * Part of URL of temporary product images
-     * relatively to media folder
+     * @inheritdoc
+     */
+    public function getBaseMediaUrl()
+    {
+        return $this->storeManager->getStore()
+                ->getBaseUrl(UrlInterface::URL_TYPE_MEDIA) . $this->getBaseMediaUrlAddition();
+    }
+
+    /**
+     * Filesystem directory path of temporary product images relative to the media directory.
      *
+     * @return string
+     */
+    public function getBaseTmpMediaPath()
+    {
+        return 'tmp/' . $this->getBaseMediaPathAddition();
+    }
+
+    /**
+     * Get temporary base media URL.
+     *
+     * @return string
+     */
+    public function getBaseTmpMediaUrl()
+    {
+        return $this->storeManager->getStore()->getBaseUrl(
+            UrlInterface::URL_TYPE_MEDIA
+        ) . 'tmp/' . $this->getBaseMediaUrlAddition();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getMediaUrl($file)
+    {
+        return $this->getBaseMediaUrl() . '/' . $this->_prepareFile($file);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getMediaPath($file)
+    {
+        return $this->getBaseMediaPath() . '/' . $this->_prepareFile($file);
+    }
+
+    /**
+     * Get temporary media URL.
+     *
+     * @param string $file
+     * @return string
+     */
+    public function getTmpMediaUrl($file)
+    {
+        return $this->getBaseTmpMediaUrl() . '/' . $this->_prepareFile($file);
+    }
+
+    /**
+     * Part of URL of temporary product images relative to the media directory.
+     *
+     * @param string $file
      * @return string
      */
     public function getTmpMediaShortUrl($file)
     {
-        $file = $this->_prepareFileForUrl($file);
-
-        if(substr($file, 0, 1) == '/') {
-            $file = substr($file, 1);
-        }
-
-        return $this->getBaseTmpMediaUrlAddition() . '/' . $file;
+        return 'tmp/' . $this->getBaseMediaUrlAddition() . '/' . $this->_prepareFile($file);
     }
 
     /**
-     * Part of URL of product images relatively to media folder
+     * Part of URL of product images relatively to media folder.
      *
+     * @param string $file
      * @return string
      */
     public function getMediaShortUrl($file)
     {
-        $file = $this->_prepareFileForUrl($file);
-
-        if(substr($file, 0, 1) == '/') {
-            $file = substr($file, 1);
-        }
-
-        return $this->getBaseMediaUrlAddition() . '/' . $file;
+        return $this->getBaseMediaUrlAddition() . '/' . $this->_prepareFile($file);
     }
 
+    /**
+     * Get path to the temporary media.
+     *
+     * @param string $file
+     * @return string
+     */
     public function getTmpMediaPath($file)
     {
-        $file = $this->_prepareFileForPath($file);
+        return $this->getBaseTmpMediaPath() . '/' . $this->_prepareFile($file);
+    }
 
-        if(substr($file, 0, 1) == DIRECTORY_SEPARATOR) {
-            return $this->getBaseTmpMediaPath() . DIRECTORY_SEPARATOR . substr($file, 1);
+    /**
+     * Process file path.
+     *
+     * @param string $file
+     * @return string
+     */
+    protected function _prepareFile($file)
+    {
+        return ltrim(str_replace('\\', '/', $file), '/');
+    }
+
+    /**
+     * Get codes of media attribute.
+     *
+     * @return array
+     * @since 100.0.4
+     */
+    public function getMediaAttributeCodes()
+    {
+        if (!isset($this->mediaAttributeCodes)) {
+            // the in-memory object-level caching allows to prevent unnecessary calls to the DB
+            $this->mediaAttributeCodes = $this->getAttributeHelper()->getAttributeCodesByFrontendType('media_image');
         }
-
-        return $this->getBaseTmpMediaPath() . DIRECTORY_SEPARATOR . $file;
+        return $this->mediaAttributeCodes;
     }
 
-    protected function _prepareFileForUrl($file)
+    /**
+     * Get attribute helper.
+     *
+     * @return Attribute
+     */
+    private function getAttributeHelper()
     {
-        return str_replace(DIRECTORY_SEPARATOR, '/', $file);
-    }
-
-    protected function _prepareFileForPath($file)
-    {
-        return str_replace('/', DIRECTORY_SEPARATOR, $file);
+        if (null === $this->attributeHelper) {
+            $this->attributeHelper = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Eav\Model\Entity\Attribute::class);
+        }
+        return $this->attributeHelper;
     }
 }

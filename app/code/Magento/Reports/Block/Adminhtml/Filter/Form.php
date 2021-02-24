@@ -1,60 +1,50 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Reports\Block\Adminhtml\Filter;
 
 /**
  * Adminhtml report filter form
  *
- * @category   Magento
- * @package    Magento_Reports
+ * @api
  * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Reports\Block\Adminhtml\Filter;
-
 class Form extends \Magento\Backend\Block\Widget\Form\Generic
 {
     /**
      * Report type options
+     *
+     * @var array
      */
-    protected $_reportTypeOptions = array();
+    protected $_reportTypeOptions = [];
 
     /**
      * Report field visibility
+     *
+     * @var array
      */
-    protected $_fieldVisibility = array();
+    protected $_fieldVisibility = [];
 
     /**
-     * Report field opions
+     * Report field options
+     *
+     * @var array
      */
-    protected $_fieldOptions = array();
+    protected $_fieldOptions = [];
 
     /**
      * Set field visibility
      *
-     * @param string Field id
-     * @param bool Field visibility
+     * @param string $fieldId
+     * @param bool $visibility
+     *
+     * @codeCoverageIgnore
+     * @return void
      */
     public function setFieldVisibility($fieldId, $visibility)
     {
@@ -64,9 +54,10 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     /**
      * Get field visibility
      *
-     * @param string Field id
-     * @param bool Default field visibility
+     * @param string $fieldId
+     * @param bool $defaultVisibility
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getFieldVisibility($fieldId, $defaultVisibility = true)
     {
@@ -81,17 +72,19 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
      *
      * @param string $fieldId Field id
      * @param mixed $option Field option name
-     * @param mixed $value Field option value
+     * @param mixed|null $value Field option value
+     *
+     * @return void
      */
     public function setFieldOption($fieldId, $option, $value = null)
     {
         if (is_array($option)) {
             $options = $option;
         } else {
-            $options = array($option => $value);
+            $options = [$option => $value];
         }
         if (!array_key_exists($fieldId, $this->_fieldOptions)) {
-            $this->_fieldOptions[$fieldId] = array();
+            $this->_fieldOptions[$fieldId] = [];
         }
         foreach ($options as $k => $v) {
             $this->_fieldOptions[$fieldId][$k] = $v;
@@ -103,7 +96,8 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
      *
      * @param string $key
      * @param string $value
-     * @return \Magento\Reports\Block\Adminhtml\Filter\Form
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function addReportTypeOption($key, $value)
     {
@@ -114,75 +108,90 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     /**
      * Add fieldset with general report fields
      *
-     * @return \Magento\Reports\Block\Adminhtml\Filter\Form
+     * @return $this
      */
     protected function _prepareForm()
     {
         $actionUrl = $this->getUrl('*/*/sales');
 
-        /** @var \Magento\Data\Form $form */
-        $form   = $this->_formFactory->create(array(
-            'data' => array(
-                'id' => 'filter_form',
-                'action' => $actionUrl,
-                'method' => 'get',
-            ))
+        /** @var \Magento\Framework\Data\Form $form */
+        $form = $this->_formFactory->create(
+            [
+                'data' => [
+                    'id' => 'filter_form',
+                    'action' => $actionUrl,
+                    'method' => 'get'
+                ]
+            ]
         );
 
         $htmlIdPrefix = 'sales_report_';
         $form->setHtmlIdPrefix($htmlIdPrefix);
-        $fieldset = $form->addFieldset('base_fieldset', array('legend'=>__('Filter')));
+        $fieldset = $form->addFieldset('base_fieldset', ['legend' => __('Filter')]);
 
-        $dateFormat = $this->_locale->getDateFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT);
+        $dateFormat = $this->_localeDate->getDateFormat(\IntlDateFormatter::SHORT);
 
-        $fieldset->addField('store_ids', 'hidden', array(
-            'name'  => 'store_ids'
-        ));
+        $fieldset->addField('store_ids', 'hidden', ['name' => 'store_ids']);
 
-        $fieldset->addField('report_type', 'select', array(
-            'name'      => 'report_type',
-            'options'   => $this->_reportTypeOptions,
-            'label'     => __('Match Period To'),
-        ));
+        $fieldset->addField(
+            'report_type',
+            'select',
+            [
+                'name' => 'report_type',
+                'options' => $this->_reportTypeOptions,
+                'label' => __('Date Used')
+            ]
+        );
 
-        $fieldset->addField('period_type', 'select', array(
-            'name' => 'period_type',
-            'options' => array(
-                'day'   => __('Day'),
-                'month' => __('Month'),
-                'year'  => __('Year')
-            ),
-            'label' => __('Period'),
-            'title' => __('Period')
-        ));
+        $fieldset->addField(
+            'period_type',
+            'select',
+            [
+                'name' => 'period_type',
+                'options' => ['day' => __('Day'), 'month' => __('Month'), 'year' => __('Year')],
+                'label' => __('Period'),
+                'title' => __('Period')
+            ]
+        );
 
-        $fieldset->addField('from', 'date', array(
-            'name'      => 'from',
-            'date_format' => $dateFormat,
-            'image'     => $this->getViewFileUrl('images/grid-cal.gif'),
-            'label'     => __('From'),
-            'title'     => __('From'),
-            'required'  => true
-        ));
+        $fieldset->addField(
+            'from',
+            'date',
+            [
+                'name' => 'from',
+                'date_format' => $dateFormat,
+                'label' => __('From'),
+                'title' => __('From'),
+                'required' => true,
+                'css_class' => 'admin__field-small',
+                'class' => 'admin__control-text'
+            ]
+        );
 
-        $fieldset->addField('to', 'date', array(
-            'name'      => 'to',
-            'date_format' => $dateFormat,
-            'image'     => $this->getViewFileUrl('images/grid-cal.gif'),
-            'label'     => __('To'),
-            'title'     => __('To'),
-            'required'  => true
-        ));
+        $fieldset->addField(
+            'to',
+            'date',
+            [
+                'name' => 'to',
+                'date_format' => $dateFormat,
+                'label' => __('To'),
+                'title' => __('To'),
+                'required' => true,
+                'css_class' => 'admin__field-small',
+                'class' => 'admin__control-text'
+            ]
+        );
 
-        $fieldset->addField('show_empty_rows', 'select', array(
-            'name'      => 'show_empty_rows',
-            'options'   => array(
-                '1' => __('Yes'),
-                '0' => __('No')
-            ),
-            'label'     => __('Empty Rows'),
-            'title'     => __('Empty Rows')
-        ));
+        $fieldset->addField(
+            'show_empty_rows',
+            'select',
+            [
+                'name' => 'show_empty_rows',
+                'options' => ['1' => __('Yes'), '0' => __('No')],
+                'label' => __('Empty Rows'),
+                'title' => __('Empty Rows')
+            ]
+        );
 
         $form->setUseContainer(true);
         $this->setForm($form);
@@ -191,10 +200,10 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     }
 
     /**
-     * Initialize form fileds values
+     * Initialize form fields values
      * Method will be called after prepareForm and can be used for field values initialization
      *
-     * @return \Magento\Adminhtml\Block\Widget\Form
+     * @return \Magento\Backend\Block\Widget\Form
      */
     protected function _initFormValues()
     {
@@ -211,16 +220,16 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     /**
      * This method is called before rendering HTML
      *
-     * @return \Magento\Adminhtml\Block\Widget\Form
+     * @return \Magento\Backend\Block\Widget\Form
      */
     protected function _beforeToHtml()
     {
         $result = parent::_beforeToHtml();
 
-        /** @var \Magento\Data\Form\Element\Fieldset $fieldset */
+        /** @var \Magento\Framework\Data\Form\Element\Fieldset $fieldset */
         $fieldset = $this->getForm()->getElement('base_fieldset');
 
-        if (is_object($fieldset) && $fieldset instanceof \Magento\Data\Form\Element\Fieldset) {
+        if (is_object($fieldset) && $fieldset instanceof \Magento\Framework\Data\Form\Element\Fieldset) {
             // apply field visibility
             foreach ($fieldset->getElements() as $field) {
                 if (!$this->getFieldVisibility($field->getId())) {
@@ -230,7 +239,7 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
             // apply field options
             foreach ($this->_fieldOptions as $fieldId => $fieldOptions) {
                 $field = $fieldset->getElements()->searchById($fieldId);
-                /** @var \Magento\Object $field */
+                /** @var \Magento\Framework\DataObject $field */
                 if ($field) {
                     foreach ($fieldOptions as $k => $v) {
                         $field->setDataUsingMethod($k, $v);

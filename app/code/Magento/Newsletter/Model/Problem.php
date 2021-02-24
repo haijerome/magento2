@@ -1,34 +1,13 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Newsletter
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Newsletter\Model;
 
 /**
  * Newsletter problem model
  *
- * @method \Magento\Newsletter\Model\Resource\Problem _getResource()
- * @method \Magento\Newsletter\Model\Resource\Problem getResource()
  * @method int getSubscriberId()
  * @method \Magento\Newsletter\Model\Problem setSubscriberId(int $value)
  * @method int getQueueId()
@@ -38,20 +17,19 @@
  * @method string getProblemErrorText()
  * @method \Magento\Newsletter\Model\Problem setProblemErrorText(string $value)
  *
- * @category    Magento
- * @package     Magento_Newsletter
  * @author     Magento Core Team <core@magentocommerce.com>
+ *
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Newsletter\Model;
-
-class Problem extends \Magento\Core\Model\AbstractModel
+class Problem extends \Magento\Framework\Model\AbstractModel
 {
     /**
      * Current Subscriber
      *
      * @var \Magento\Newsletter\Model\Subscriber
      */
-    protected  $_subscriber = null;
+    protected $_subscriber = null;
 
     /**
      * Subscriber factory
@@ -63,20 +41,20 @@ class Problem extends \Magento\Core\Model\AbstractModel
     /**
      * Construct
      *
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
         \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
         $this->_subscriberFactory = $subscriberFactory;
@@ -84,17 +62,19 @@ class Problem extends \Magento\Core\Model\AbstractModel
 
     /**
      * Initialize Newsletter Problem Model
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Newsletter\Model\Resource\Problem');
+        $this->_init(\Magento\Newsletter\Model\ResourceModel\Problem::class);
     }
 
     /**
      * Add Subscriber Data
      *
      * @param \Magento\Newsletter\Model\Subscriber $subscriber
-     * @return \Magento\Newsletter\Model\Problem
+     * @return $this
      */
     public function addSubscriberData(\Magento\Newsletter\Model\Subscriber $subscriber)
     {
@@ -106,7 +86,7 @@ class Problem extends \Magento\Core\Model\AbstractModel
      * Add Queue Data
      *
      * @param \Magento\Newsletter\Model\Queue $queue
-     * @return \Magento\Newsletter\Model\Problem
+     * @return $this
      */
     public function addQueueData(\Magento\Newsletter\Model\Queue $queue)
     {
@@ -118,7 +98,7 @@ class Problem extends \Magento\Core\Model\AbstractModel
      * Add Error Data
      *
      * @param \Exception $e
-     * @return \Magento\Newsletter\Model\Problem
+     * @return $this
      */
     public function addErrorData(\Exception $e)
     {
@@ -138,9 +118,8 @@ class Problem extends \Magento\Core\Model\AbstractModel
             return null;
         }
 
-        if (is_null($this->_subscriber)) {
-            $this->_subscriber = $this->_subscriberFactory->create()
-                ->load($this->getSubscriberId());
+        if ($this->_subscriber === null) {
+            $this->_subscriber = $this->_subscriberFactory->create()->load($this->getSubscriberId());
         }
 
         return $this->_subscriber;
@@ -149,16 +128,17 @@ class Problem extends \Magento\Core\Model\AbstractModel
     /**
      * Unsubscribe Subscriber
      *
-     * @return \Magento\Newsletter\Model\Problem
+     * @return $this
      */
     public function unsubscribe()
     {
         if ($this->getSubscriber()) {
-            $this->getSubscriber()->setSubscriberStatus(\Magento\Newsletter\Model\Subscriber::STATUS_UNSUBSCRIBED)
-                ->setIsStatusChanged(true)
-                ->save();
+            $this->getSubscriber()->setSubscriberStatus(
+                \Magento\Newsletter\Model\Subscriber::STATUS_UNSUBSCRIBED
+            )->setIsStatusChanged(
+                true
+            )->save();
         }
         return $this;
     }
-
 }

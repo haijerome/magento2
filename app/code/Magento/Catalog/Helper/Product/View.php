@@ -1,71 +1,43 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Catalog\Helper\Product;
+
+use Magento\Catalog\Model\Product\Attribute\LayoutUpdateManager;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Result\Page as ResultPage;
 
 /**
  * Catalog category helper
  *
- * @category    Magento
- * @package     Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
  */
-namespace Magento\Catalog\Helper\Product;
-
-class View extends \Magento\App\Helper\AbstractHelper
+class View extends \Magento\Framework\App\Helper\AbstractHelper
 {
-    // List of exceptions throwable during prepareAndRender() method
-    public $ERR_NO_PRODUCT_LOADED = 1;
-    public $ERR_BAD_CONTROLLER_INTERFACE = 2;
-
     /**
-     * List of catalog product session message models name
+     * List of catalog product session message groups
      *
      * @var array
      */
-    protected $_messageModels;
+    protected $messageGroups;
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
-    
+
     /**
      * Catalog product
      *
      * @var \Magento\Catalog\Helper\Product
      */
     protected $_catalogProduct = null;
-
-    /**
-     * Catalog product
-     *
-     * @var \Magento\Theme\Helper\Layout
-     */
-    protected $_pageLayout = null;
 
     /**
      * Catalog design
@@ -82,63 +54,158 @@ class View extends \Magento\App\Helper\AbstractHelper
     protected $_catalogSession;
 
     /**
-     * @var \Magento\App\ViewInterface
+     * @var \Magento\Framework\Message\ManagerInterface
      */
-    protected $_view;
+    protected $messageManager;
 
     /**
-     * @param \Magento\App\Helper\Context $context
+     * @var \Magento\CatalogUrlRewrite\Model\CategoryUrlPathGenerator
+     */
+    protected $categoryUrlPathGenerator;
+
+    /**
+     * @var \Magento\Framework\Stdlib\StringUtils
+     */
+    private $string;
+
+    /**
+     * @var LayoutUpdateManager
+     */
+    private $layoutUpdateManager;
+
+    /**
+     * Constructor
+     *
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Catalog\Model\Session $catalogSession
      * @param \Magento\Catalog\Model\Design $catalogDesign
      * @param \Magento\Catalog\Helper\Product $catalogProduct
-     * @param \Magento\Theme\Helper\Layout $pageLayout
-     * @param \Magento\Core\Model\Registry $coreRegistry
-     * @param \Magento\App\ViewInterface $view
-     * @param array $messageModels
+     * @param \Magento\Framework\Registry $coreRegistry
+     * @param \Magento\Framework\Message\ManagerInterface $messageManager
+     * @param \Magento\CatalogUrlRewrite\Model\CategoryUrlPathGenerator $categoryUrlPathGenerator
+     * @param array $messageGroups
+     * @param \Magento\Framework\Stdlib\StringUtils|null $string
+     * @param LayoutUpdateManager|null $layoutUpdateManager
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Catalog\Model\Session $catalogSession,
         \Magento\Catalog\Model\Design $catalogDesign,
         \Magento\Catalog\Helper\Product $catalogProduct,
-        \Magento\Theme\Helper\Layout $pageLayout,
-        \Magento\Core\Model\Registry $coreRegistry,
-        \Magento\App\ViewInterface $view,
-        array $messageModels = array()
+        \Magento\Framework\Registry $coreRegistry,
+        \Magento\Framework\Message\ManagerInterface $messageManager,
+        \Magento\CatalogUrlRewrite\Model\CategoryUrlPathGenerator $categoryUrlPathGenerator,
+        array $messageGroups = [],
+        \Magento\Framework\Stdlib\StringUtils $string = null,
+        ?LayoutUpdateManager $layoutUpdateManager = null
     ) {
         $this->_catalogSession = $catalogSession;
         $this->_catalogDesign = $catalogDesign;
         $this->_catalogProduct = $catalogProduct;
-        $this->_pageLayout = $pageLayout;
         $this->_coreRegistry = $coreRegistry;
-        $this->_view = $view;
+        $this->messageGroups = $messageGroups;
+        $this->messageManager = $messageManager;
+        $this->categoryUrlPathGenerator = $categoryUrlPathGenerator;
+        $this->string = $string ?: ObjectManager::getInstance()->get(\Magento\Framework\Stdlib\StringUtils::class);
+        $this->layoutUpdateManager = $layoutUpdateManager
+            ?? ObjectManager::getInstance()->get(LayoutUpdateManager::class);
         parent::__construct($context);
-        $this->_messageModels = $messageModels;
     }
 
     /**
-     * Inits layout for viewing product page
+     * Add meta information from product to layout
      *
+     * @param \Magento\Framework\View\Result\Page $resultPage
      * @param \Magento\Catalog\Model\Product $product
-     * @param \Magento\App\Action\Action $controller
-     *
-     * @return \Magento\Catalog\Helper\Product\View
+     * @return $this
      */
-    public function initProductLayout($product, $controller)
+    private function preparePageMetadata(ResultPage $resultPage, $product)
+    {
+        $pageLayout = $resultPage->getLayout();
+        $pageConfig = $resultPage->getConfig();
+
+        $metaTitle = $product->getMetaTitle();
+        $pageConfig->setMetaTitle($metaTitle);
+        $pageConfig->getTitle()->set($metaTitle ?: $product->getName());
+
+        $keyword = $product->getMetaKeyword();
+        $currentCategory = $this->_coreRegistry->registry('current_category');
+        if ($keyword) {
+            $pageConfig->setKeywords($keyword);
+        } elseif ($currentCategory) {
+            $pageConfig->setKeywords($product->getName());
+        }
+
+        $description = $product->getMetaDescription();
+        if ($description) {
+            $pageConfig->setDescription($description);
+        } else {
+            $pageConfig->setDescription($this->string->substr(strip_tags($product->getDescription()), 0, 255));
+        }
+
+        if ($this->_catalogProduct->canUseCanonicalTag()) {
+            $pageConfig->addRemotePageAsset(
+                $product->getUrlModel()->getUrl($product, ['_ignore_category' => true]),
+                'canonical',
+                ['attributes' => ['rel' => 'canonical']]
+            );
+        }
+
+        $pageMainTitle = $pageLayout->getBlock('page.main.title');
+        if ($pageMainTitle) {
+            $pageMainTitle->setPageTitle($product->getName());
+        }
+
+        return $this;
+    }
+
+    /**
+     * Init layout for viewing product page
+     *
+     * @param \Magento\Framework\View\Result\Page $resultPage
+     * @param \Magento\Catalog\Model\Product $product
+     * @param null|\Magento\Framework\DataObject $params
+     * @return \Magento\Catalog\Helper\Product\View
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     */
+    public function initProductLayout(ResultPage $resultPage, $product, $params = null)
     {
         $settings = $this->_catalogDesign->getDesignSettings($product);
+        $pageConfig = $resultPage->getConfig();
 
         if ($settings->getCustomDesign()) {
             $this->_catalogDesign->applyCustomDesign($settings->getCustomDesign());
         }
 
-        $update = $this->_view->getLayout()->getUpdate();
-        $update->addHandle('default');
-        $this->_view->addPageLayoutHandles(
-            array('id' => $product->getId(), 'sku' => $product->getSku(), 'type' => $product->getTypeId())
-        );
-        $this->_view->loadLayoutUpdates();
+        // Apply custom page layout
+        if ($settings->getPageLayout()) {
+            $pageConfig->setPageLayout($settings->getPageLayout());
+        }
+
+        $urlSafeSku = rawurlencode($product->getSku());
+
+        // Load default page handles and page configurations
+        if ($params && $params->getBeforeHandles()) {
+            foreach ($params->getBeforeHandles() as $handle) {
+                $resultPage->addPageLayoutHandles(['type' => $product->getTypeId()], $handle, false);
+                $resultPage->addPageLayoutHandles(['id' => $product->getId(), 'sku' => $urlSafeSku], $handle);
+            }
+        }
+
+        $resultPage->addPageLayoutHandles(['type' => $product->getTypeId()], null, false);
+        $resultPage->addPageLayoutHandles(['id' => $product->getId(), 'sku' => $urlSafeSku]);
+
+        if ($params && $params->getAfterHandles()) {
+            foreach ($params->getAfterHandles() as $handle) {
+                $resultPage->addPageLayoutHandles(['type' => $product->getTypeId()], $handle, false);
+                $resultPage->addPageLayoutHandles(['id' => $product->getId(), 'sku' => $urlSafeSku], $handle);
+            }
+        }
+
         // Apply custom layout update once layout is loaded
+        $update = $resultPage->getLayout()->getUpdate();
         $layoutUpdates = $settings->getLayoutUpdates();
         if ($layoutUpdates) {
             if (is_array($layoutUpdates)) {
@@ -147,27 +214,19 @@ class View extends \Magento\App\Helper\AbstractHelper
                 }
             }
         }
-
-        $this->_view->generateLayoutXml();
-        $this->_view->generateLayoutBlocks();
-
-        // Apply custom layout (page) template once the blocks are generated
-        if ($settings->getPageLayout()) {
-            $this->_pageLayout->applyTemplate($settings->getPageLayout());
+        if ($settings->getPageLayoutHandles()) {
+            $resultPage->addPageLayoutHandles($settings->getPageLayoutHandles());
         }
 
         $currentCategory = $this->_coreRegistry->registry('current_category');
-        $root = $this->_view->getLayout()->getBlock('root');
-        if ($root) {
-            $controllerClass = $this->_request->getFullActionName();
-            if ($controllerClass != 'catalog-product-view') {
-                $root->addBodyClass('catalog-product-view');
-            }
-            $root->addBodyClass('product-' . $product->getUrlKey());
-            if ($currentCategory instanceof \Magento\Catalog\Model\Category) {
-                $root->addBodyClass('categorypath-' . $currentCategory->getUrlPath())
-                    ->addBodyClass('category-' . $currentCategory->getUrlKey());
-            }
+        $controllerClass = $this->_request->getFullActionName();
+        if ($controllerClass != 'catalog-product-view') {
+            $pageConfig->addBodyClass('catalog-product-view');
+        }
+        $pageConfig->addBodyClass('product-' . $product->getUrlKey());
+        if ($currentCategory instanceof \Magento\Catalog\Model\Category) {
+            $pageConfig->addBodyClass('categorypath-' . $this->categoryUrlPathGenerator->getUrlPath($currentCategory))
+                ->addBodyClass('category-' . $currentCategory->getUrlKey());
         }
 
         return $this;
@@ -178,29 +237,46 @@ class View extends \Magento\App\Helper\AbstractHelper
      *
      * $params can have all values as $params in \Magento\Catalog\Helper\Product - initProduct().
      * Plus following keys:
-     *   - 'buy_request' - \Magento\Object holding buyRequest to configure product
+     *   - 'buy_request' - \Magento\Framework\DataObject holding buyRequest to configure product
      *   - 'specify_options' - boolean, whether to show 'Specify options' message
      *   - 'configure_mode' - boolean, whether we're in Configure-mode to edit product configuration
      *
+     * @param \Magento\Framework\View\Result\Page $resultPage
      * @param int $productId
-     * @param \Magento\App\Action\Action $controller
-     * @param null|\Magento\Object $params
-     *
+     * @param \Magento\Framework\App\Action\Action $controller
+     * @param null|\Magento\Framework\DataObject $params
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      * @return \Magento\Catalog\Helper\Product\View
-     * @throws \Magento\Core\Exception
      */
-    public function prepareAndRender($productId, $controller, $params = null)
+    public function prepareAndRender(ResultPage $resultPage, $productId, $controller, $params = null)
     {
+        /**
+         * Remove default action handle from layout update to avoid its usage during processing of another action,
+         * It is possible that forwarding to another action occurs, e.g. to 'noroute'.
+         * Default action handle is restored just before the end of current method.
+         */
+        $defaultActionHandle = $resultPage->getDefaultLayoutHandle();
+        $handles = $resultPage->getLayout()->getUpdate()->getHandles();
+        if (in_array($defaultActionHandle, $handles)) {
+            $resultPage->getLayout()->getUpdate()->removeHandle($resultPage->getDefaultLayoutHandle());
+        }
+
+        if (!$controller instanceof \Magento\Catalog\Controller\Product\View\ViewInterface) {
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('Bad controller interface for showing product')
+            );
+        }
         // Prepare data
         $productHelper = $this->_catalogProduct;
         if (!$params) {
-            $params = new \Magento\Object();
+            $params = new \Magento\Framework\DataObject();
         }
 
         // Standard algorithm to prepare and render product view page
         $product = $productHelper->initProduct($productId, $controller, $params);
         if (!$product) {
-            throw new \Magento\Core\Exception(__('Product is not loaded'), $this->ERR_NO_PRODUCT_LOADED);
+            throw new \Magento\Framework\Exception\NoSuchEntityException(__('Product is not loaded'));
         }
 
         $buyRequest = $params->getBuyRequest();
@@ -212,29 +288,16 @@ class View extends \Magento\App\Helper\AbstractHelper
             $product->setConfigureMode($params->getConfigureMode());
         }
 
-        $this->_eventManager->dispatch('catalog_controller_product_view', array('product' => $product));
-
-        if ($params->getSpecifyOptions()) {
-            $notice = $product->getTypeInstance()->getSpecifyOptionMessage();
-            $this->_catalogSession->addNotice($notice);
-        }
+        $this->_eventManager->dispatch('catalog_controller_product_view', ['product' => $product]);
 
         $this->_catalogSession->setLastViewedProductId($product->getId());
 
-        $this->initProductLayout($product, $controller);
-
-        if ($controller instanceof \Magento\Catalog\Controller\Product\View\ViewInterface) {
-            foreach ($this->_messageModels as $sessionModel) {
-                $this->_view->getLayout()->initMessages($sessionModel);
-            }
-        } else {
-            throw new \Magento\Core\Exception(
-                __('Bad controller interface for showing product'),
-                $this->ERR_BAD_CONTROLLER_INTERFACE
-            );
+        if (in_array($defaultActionHandle, $handles)) {
+            $resultPage->addDefaultHandle();
         }
-        $this->_view->renderLayout();
 
+        $this->initProductLayout($resultPage, $product, $params);
+        $this->preparePageMetadata($resultPage, $product);
         return $this;
     }
 }

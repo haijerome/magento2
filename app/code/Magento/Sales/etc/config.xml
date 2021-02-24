@@ -1,33 +1,16 @@
 <?xml version="1.0"?>
 <!--
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 -->
-<config>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
     <default>
         <sales>
+            <general>
+                <hide_customer_ip>0</hide_customer_ip>
+            </general>
             <totals_sort>
                 <discount>20</discount>
                 <grand_total>100</grand_total>
@@ -38,8 +21,23 @@
             <reorder>
                 <allow>1</allow>
             </reorder>
+            <zerograndtotal_creditmemo>
+                <allow_zero_grandtotal>1</allow_zero_grandtotal>
+            </zerograndtotal_creditmemo>
+            <minimum_order>
+                <include_discount_amount>1</include_discount_amount>
+                <tax_including>1</tax_including>
+            </minimum_order>
+            <orders>
+                <items_per_page>20</items_per_page>
+                <delete_pending_after>480</delete_pending_after>
+            </orders>
         </sales>
         <sales_email>
+            <general>
+                <async_sending>0</async_sending>
+                <sending_limit>50</sending_limit>
+            </general>
             <order>
                 <enabled>1</enabled>
                 <template>sales_email_order_template</template>
@@ -111,5 +109,15 @@
         <dashboard>
             <use_aggregated_data>0</use_aggregated_data>
         </dashboard>
+        <dev>
+            <grid>
+                <async_indexing>0</async_indexing>
+            </grid>
+        </dev>
+        <customer>
+          <create_account>
+              <email_required_create_order>1</email_required_create_order>
+          </create_account>
+        </customer>
     </default>
 </config>

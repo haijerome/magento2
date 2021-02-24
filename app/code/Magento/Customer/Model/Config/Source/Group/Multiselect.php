@@ -1,32 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Customer\Model\Config\Source\Group;
 
-class Multiselect implements \Magento\Core\Model\Option\ArrayInterface
+use Magento\Customer\Model\Customer\Attribute\Source\GroupSourceLoggedInOnlyInterface;
+use Magento\Customer\Api\GroupManagementInterface;
+use Magento\Framework\App\ObjectManager;
+
+class Multiselect implements \Magento\Framework\Option\ArrayInterface
 {
     /**
      * Customer groups options array
@@ -36,16 +19,36 @@ class Multiselect implements \Magento\Core\Model\Option\ArrayInterface
     protected $_options;
 
     /**
-     * @var \Magento\Customer\Model\Resource\Group\CollectionFactory
+     * @deprecated 101.0.0
+     * @var GroupManagementInterface
      */
-    protected $_groupsFactory;
+    protected $_groupManagement;
 
     /**
-     * @param \Magento\Customer\Model\Resource\Group\CollectionFactory $groupsFactory
+     * @deprecated 101.0.0
+     * @var \Magento\Framework\Convert\DataObject
      */
-    public function __construct(\Magento\Customer\Model\Resource\Group\CollectionFactory $groupsFactory)
-    {
-        $this->_groupsFactory = $groupsFactory;
+    protected $_converter;
+
+    /**
+     * @var GroupSourceLoggedInOnlyInterface
+     */
+    private $groupSourceLoggedInOnly;
+
+    /**
+     * @param GroupManagementInterface $groupManagement
+     * @param \Magento\Framework\Convert\DataObject $converter
+     * @param GroupSourceLoggedInOnlyInterface|null $groupSourceLoggedInOnly
+     */
+    public function __construct(
+        GroupManagementInterface $groupManagement,
+        \Magento\Framework\Convert\DataObject $converter,
+        GroupSourceLoggedInOnlyInterface $groupSourceLoggedInOnly = null
+    ) {
+        $this->_groupManagement = $groupManagement;
+        $this->_converter = $converter;
+        $this->groupSourceLoggedInOnly = $groupSourceLoggedInOnly
+            ?: ObjectManager::getInstance()->get(GroupSourceLoggedInOnlyInterface::class);
     }
 
     /**
@@ -56,16 +59,8 @@ class Multiselect implements \Magento\Core\Model\Option\ArrayInterface
     public function toOptionArray()
     {
         if (!$this->_options) {
-            $this->_options = $this->_getCustomerGroupsCollection()->setRealGroupsFilter()->loadData()->toOptionArray();
+            $this->_options = $this->groupSourceLoggedInOnly->toOptionArray();
         }
         return $this->_options;
-    }
-
-    /**
-     * @return \Magento\Customer\Model\Resource\Group\Collection
-     */
-    protected function _getCustomerGroupsCollection()
-    {
-        return $this->_groupsFactory->create();
     }
 }

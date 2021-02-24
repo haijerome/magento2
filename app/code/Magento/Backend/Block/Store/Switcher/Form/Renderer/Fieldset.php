@@ -1,50 +1,36 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Block\Store\Switcher\Form\Renderer;
+
+use \Magento\Framework\Data\Form\Element\Renderer\RendererInterface;
 
 /**
  * Form fieldset renderer
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Store\Switcher\Form\Renderer;
-
-class Fieldset
-    extends \Magento\Backend\Block\Template implements \Magento\Data\Form\Element\Renderer\RendererInterface
+class Fieldset extends \Magento\Backend\Block\Template implements RendererInterface
 {
     /**
      * Form element which re-rendering
      *
-     * @var \Magento\Data\Form\Element\Fieldset
+     * @var \Magento\Framework\Data\Form\Element\Fieldset
      */
     protected $_element;
 
-    protected $_template = 'store/switcher/form/renderer/fieldset.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Backend::store/switcher/form/renderer/fieldset.phtml';
 
     /**
      * Retrieve an element
      *
-     * @return \Magento\Data\Form\Element\Fieldset
+     * @return \Magento\Framework\Data\Form\Element\Fieldset
      */
     public function getElement()
     {
@@ -54,10 +40,10 @@ class Fieldset
     /**
      * Render element
      *
-     * @param \Magento\Data\Form\Element\AbstractElement $element
+     * @param \Magento\Framework\Data\Form\Element\AbstractElement $element
      * @return string
      */
-    public function render(\Magento\Data\Form\Element\AbstractElement $element)
+    public function render(\Magento\Framework\Data\Form\Element\AbstractElement $element)
     {
         $this->_element = $element;
         return $this->toHtml();
@@ -71,7 +57,7 @@ class Fieldset
     public function getHintHtml()
     {
         /** @var $storeSwitcher \Magento\Backend\Block\Store\Switcher */
-        $storeSwitcher = $this->_layout->getBlockSingleton('Magento\Backend\Block\Store\Switcher');
+        $storeSwitcher = $this->_layout->getBlockSingleton(\Magento\Backend\Block\Store\Switcher::class);
         return $storeSwitcher->getHintHtml();
     }
 }

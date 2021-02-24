@@ -1,68 +1,61 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Review\Block\Customer;
+
+use Magento\Review\Model\ResourceModel\Review\Product\Collection;
 
 /**
  * Recent Customer Reviews Block
+ *
+ * @api
+ * @since 100.0.2
  */
-class Recent extends \Magento\View\Element\Template
+class Recent extends \Magento\Framework\View\Element\Template
 {
     /**
+     * Customer list template name
+     *
      * @var string
      */
-    protected $_template = 'customer/list.phtml';
+    protected $_template = 'Magento_Review::customer/list.phtml';
 
     /**
      * Product reviews collection
      *
-     * @var \Magento\Review\Model\Resource\Review\Product\Collection
+     * @var Collection
      */
     protected $_collection;
 
     /**
-     * @var \Magento\Customer\Model\Session
+     * Review resource model
+     *
+     * @var \Magento\Review\Model\ResourceModel\Review\Product\CollectionFactory
      */
-    protected $_customerSession;
+    protected $_collectionFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Review\Model\Resource\Review\Product\CollectionFactory $collectionFactory
-     * @param \Magento\Customer\Model\Session $customerSession
+     * @var \Magento\Customer\Helper\Session\CurrentCustomer
+     */
+    protected $currentCustomer;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Review\Model\ResourceModel\Review\Product\CollectionFactory $collectionFactory
+     * @param \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Review\Model\Resource\Review\Product\CollectionFactory $collectionFactory,
-        \Magento\Customer\Model\Session $customerSession,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Review\Model\ResourceModel\Review\Product\CollectionFactory $collectionFactory,
+        \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer,
+        array $data = []
     ) {
-        $this->_collection = $collectionFactory->create();
-        $this->_customerSession = $customerSession;
+        $this->_collectionFactory = $collectionFactory;
         parent::__construct($context, $data);
+        $this->currentCustomer = $currentCustomer;
     }
 
     /**
@@ -77,66 +70,84 @@ class Recent extends \Magento\View\Element\Template
      */
     public function truncateString($value, $length = 80, $etc = '...', &$remainder = '', $breakWords = true)
     {
-        return $this->filterManager->truncate($value, array(
-            'length' => $length,
-            'etc' => $etc,
-            'remainder' => $remainder,
-            'breakWords' => $breakWords
-        ));
+        return $this->filterManager->truncate(
+            $value,
+            ['length' => $length, 'etc' => $etc, 'remainder' => $remainder, 'breakWords' => $breakWords]
+        );
     }
 
-    protected function _initCollection()
+    /**
+     * Return collection of reviews
+     *
+     * @return array|\Magento\Review\Model\ResourceModel\Review\Product\Collection
+     */
+    public function getReviews()
     {
-        $this->_collection
-            ->addStoreFilter($this->_storeManager->getStore()->getId())
-            ->addCustomerFilter($this->_customerSession->getCustomerId())
-            ->setDateOrder()
-            ->setPageSize(5)
-            ->load()
-            ->addReviewSummary();
-        return $this;
-    }
-
-    public function count()
-    {
-        return $this->_getCollection()->getSize();
-    }
-
-    protected function _getCollection()
-    {
+        if (!($customerId = $this->currentCustomer->getCustomerId())) {
+            return [];
+        }
         if (!$this->_collection) {
-            $this->_initCollection();
+            $this->_collection = $this->_collectionFactory->create();
+            $this->_collection
+                ->addStoreFilter($this->_storeManager->getStore()->getId())
+                ->addCustomerFilter($customerId)
+                ->setDateOrder()
+                ->setPageSize(5)
+                ->load()
+                ->addReviewSummary();
         }
         return $this->_collection;
     }
 
-    public function getCollection()
-    {
-        return $this->_getCollection();
-    }
-
+    /**
+     * Return review customer view url
+     *
+     * @return string
+     */
     public function getReviewLink()
     {
         return $this->getUrl('review/customer/view/');
     }
 
+    /**
+     * Return catalog product view url
+     *
+     * @return string
+     */
     public function getProductLink()
     {
         return $this->getUrl('catalog/product/view/');
     }
 
+    /**
+     * Format review date
+     *
+     * @param string $date
+     * @return string
+     */
     public function dateFormat($date)
     {
-        return $this->formatDate($date, \Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT);
+        return $this->formatDate($date, \IntlDateFormatter::SHORT);
     }
 
+    /**
+     * Return review customer url
+     *
+     * @return string
+     */
     public function getAllReviewsUrl()
     {
         return $this->getUrl('review/customer');
     }
 
+    /**
+     * Return review customer view url for a specific customer/review
+     *
+     * @param int $id
+     * @return string
+     */
     public function getReviewUrl($id)
     {
-        return $this->getUrl('review/customer/view', array('id' => $id));
+        return $this->getUrl('review/customer/view', ['id' => $id]);
     }
 }

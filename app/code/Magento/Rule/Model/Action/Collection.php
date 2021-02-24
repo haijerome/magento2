@@ -1,33 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Rule
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 namespace Magento\Rule\Model\Action;
 
-class Collection extends \Magento\Rule\Model\Action\AbstractAction
+/**
+ * Collections
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Collection extends AbstractAction
 {
     /**
      * @var \Magento\Rule\Model\ActionFactory
@@ -35,24 +20,24 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
     protected $_actionFactory;
 
     /**
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\View\LayoutInterface $layout
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\View\LayoutInterface $layout
      * @param \Magento\Rule\Model\ActionFactory $actionFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Url $viewUrl,
-        \Magento\View\LayoutInterface $layout,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\View\LayoutInterface $layout,
         \Magento\Rule\Model\ActionFactory $actionFactory,
-        array $data = array()
+        array $data = []
     ) {
         $this->_actionFactory = $actionFactory;
         $this->_layout = $layout;
 
-        parent::__construct($viewUrl, $layout, $data);
+        parent::__construct($assetRepo, $layout, $data);
 
-        $this->setActions(array());
-        $this->setType('Magento\Rule\Model\Action\Collection');
+        $this->setActions([]);
+        $this->setType(\Magento\Rule\Model\Action\Collection::class);
     }
 
     /**
@@ -68,7 +53,7 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
      * @return array
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function asArray(array $arrAttributes = array())
+    public function asArray(array $arrAttributes = [])
     {
         $out = parent::asArray();
 
@@ -78,6 +63,12 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
         return $out;
     }
 
+    /**
+     * Load array
+     *
+     * @param array $arr
+     * @return $this
+     */
     public function loadArray(array $arr)
     {
         if (!empty($arr['actions']) && is_array($arr['actions'])) {
@@ -93,7 +84,13 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
         return $this;
     }
 
-    public function addAction(\Magento\Rule\Model\Action\ActionInterface $action)
+    /**
+     * Add actions
+     *
+     * @param ActionInterface $action
+     * @return $this
+     */
+    public function addAction(ActionInterface $action)
     {
         $actions = $this->getActions();
 
@@ -101,32 +98,50 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
 
         $actions[] = $action;
         if (!$action->getId()) {
-            $action->setId($this->getId().'.'.sizeof($actions));
+            $action->setId($this->getId() . '.' . count($actions));
         }
 
         $this->setActions($actions);
         return $this;
     }
 
+    /**
+     * As html
+     *
+     * @return string
+     */
     public function asHtml()
     {
-        $html = $this->getTypeElement()->toHtml().'Perform following actions: ';
-        if ($this->getId()!='1') {
-            $html.= $this->getRemoveLinkHtml();
+        $html = $this->getTypeElement()->toHtml() . 'Perform following actions: ';
+        if ($this->getId() != '1') {
+            $html .= $this->getRemoveLinkHtml();
         }
         return $html;
     }
 
+    /**
+     * Return new child element
+     *
+     * @return $this
+     */
     public function getNewChildElement()
     {
-        return $this->getForm()->addField('action:' . $this->getId() . ':new_child', 'select', array(
-            'name' => 'rule[actions][' . $this->getId() . '][new_child]',
-            'values' => $this->getNewChildSelectOptions(),
-            'value_name' => $this->getNewChildName(),
-        ))->setRenderer($this->_layout->getBlockSingleton('Magento\Rule\Block\Newchild'));
+        return $this->getForm()->addField(
+            'action:' . $this->getId() . ':new_child',
+            'select',
+            [
+                'name' => $this->elementName . '[actions][' . $this->getId() . '][new_child]',
+                'values' => $this->getNewChildSelectOptions(),
+                'value_name' => $this->getNewChildName()
+            ]
+        )->setRenderer(
+            $this->_layout->getBlockSingleton(\Magento\Rule\Block\Newchild::class)
+        );
     }
 
     /**
+     * Return as html recursive
+     *
      * @return string
      */
     public function asHtmlRecursive()
@@ -140,6 +155,8 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
     }
 
     /**
+     * Add string
+     *
      * @param string $format
      * @return string
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
@@ -151,6 +168,8 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
     }
 
     /**
+     * Return string as recursive
+     *
      * @param int $level
      * @return string
      */
@@ -164,6 +183,8 @@ class Collection extends \Magento\Rule\Model\Action\AbstractAction
     }
 
     /**
+     * Process
+     *
      * @return $this
      */
     public function process()

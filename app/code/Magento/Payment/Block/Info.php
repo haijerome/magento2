@@ -1,56 +1,43 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Payment
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Base payment iformation block
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Payment\Block;
 
-class Info extends \Magento\View\Element\Template
+/**
+ * Base payment information block
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Info extends \Magento\Framework\View\Element\Template
 {
     /**
      * Payment rendered specific information
      *
-     * @var \Magento\Object
+     * @var \Magento\Framework\DataObject
      */
-    protected $_paymentSpecificInformation = null;
+    protected $_paymentSpecificInformation;
 
+    /**
+     * @var string
+     */
     protected $_template = 'Magento_Payment::info/default.phtml';
 
     /**
      * Retrieve info model
      *
-     * @return \Magento\Payment\Model\Info
-     * @throws \Magento\Core\Exception
+     * @return \Magento\Payment\Model\InfoInterface
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getInfo()
     {
         $info = $this->getData('info');
-        if (!($info instanceof \Magento\Payment\Model\Info)) {
-            throw new \Magento\Core\Exception(__('We cannot retrieve the payment info model object.'));
+        if (!$info instanceof \Magento\Payment\Model\InfoInterface) {
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('We cannot retrieve the payment info model object.')
+            );
         }
         return $info;
     }
@@ -58,7 +45,7 @@ class Info extends \Magento\View\Element\Template
     /**
      * Retrieve payment method model
      *
-     * @return \Magento\Payment\Model\Method\AbstractMethod
+     * @return \Magento\Payment\Model\MethodInterface
      */
     public function getMethod()
     {
@@ -84,9 +71,9 @@ class Info extends \Magento\View\Element\Template
      */
     public function getChildPdfAsArray()
     {
-        $result = array();
+        $result = [];
         foreach ($this->getLayout()->getChildBlocks($this->getNameInLayout()) as $child) {
-            if (method_exists($child, 'toPdf')) {
+            if (method_exists($child, 'toPdf') && is_callable([$child, 'toPdf'])) {
                 $result[] = $child->toPdf();
             }
         }
@@ -113,10 +100,10 @@ class Info extends \Magento\View\Element\Template
     public function getValueAsArray($value, $escapeHtml = false)
     {
         if (empty($value)) {
-            return array();
+            return [];
         }
         if (!is_array($value)) {
-            $value = array($value);
+            $value = [$value];
         }
         if ($escapeHtml) {
             foreach ($value as $_key => $_val) {
@@ -132,42 +119,42 @@ class Info extends \Magento\View\Element\Template
      * false => full information may be shown
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsSecureMode()
     {
         if ($this->hasIsSecureMode()) {
             return (bool)(int)$this->_getData('is_secure_mode');
         }
-        if (!$payment = $this->getInfo()) {
-            return true;
-        }
-        if (!$method = $payment->getMethodInstance()) {
+
+        $method = $this->getMethod();
+        if (!$method) {
             return true;
         }
 
-        $methodStore = $this->_storeManager->getStore($method->getStore());
-        return $methodStore->getId() != \Magento\Core\Model\Store::DEFAULT_STORE_ID;
+        $store = $method->getStore();
+        if (!$store) {
+            return false;
+        }
+
+        $methodStore = $this->_storeManager->getStore($store);
+        return $methodStore->getCode() != \Magento\Store\Model\Store::ADMIN_CODE;
     }
 
     /**
      * Prepare information specific to current payment method
      *
-     * @param \Magento\Object|array $transport
-     * @return \Magento\Object
+     * @param null|\Magento\Framework\DataObject|array $transport
+     * @return \Magento\Framework\DataObject
      */
     protected function _prepareSpecificInformation($transport = null)
     {
         if (null === $this->_paymentSpecificInformation) {
             if (null === $transport) {
-                $transport = new \Magento\Object;
+                $transport = new \Magento\Framework\DataObject();
             } elseif (is_array($transport)) {
-                $transport = new \Magento\Object($transport);
+                $transport = new \Magento\Framework\DataObject($transport);
             }
-            $this->_eventManager->dispatch('payment_info_block_prepare_specific_information', array(
-                'transport' => $transport,
-                'payment'   => $this->getInfo(),
-                'block'     => $this,
-            ));
             $this->_paymentSpecificInformation = $transport;
         }
         return $this->_paymentSpecificInformation;

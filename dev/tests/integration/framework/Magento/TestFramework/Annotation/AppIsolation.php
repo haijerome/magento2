@@ -1,34 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Implementation of the @magentoAppIsolation DocBlock annotation - isolation of global application objects in memory
  */
 namespace Magento\TestFramework\Annotation;
+
+use Magento\Framework\Exception\LocalizedException;
+use Magento\TestFramework\Application;
+use Magento\TestFramework\TestCase\AbstractController;
+use PHPUnit\Framework\TestCase;
 
 class AppIsolation
 {
@@ -37,21 +21,26 @@ class AppIsolation
      *
      * @var bool
      */
-    private $_hasNonIsolatedTests = true;
+    private $hasNonIsolatedTests = true;
 
     /**
-     * @var \Magento\TestFramework\Application
+     * @var Application
      */
-    private $_application;
+    private $application;
+
+    /**
+     * @var array
+     */
+    private $serverGlobalBackup;
 
     /**
      * Constructor
      *
-     * @param \Magento\TestFramework\Application $application
+     * @param Application $application
      */
-    public function __construct(\Magento\TestFramework\Application $application)
+    public function __construct(Application $application)
     {
-        $this->_application = $application;
+        $this->application = $application;
     }
 
     /**
@@ -59,9 +48,12 @@ class AppIsolation
      */
     protected function _isolateApp()
     {
-        if ($this->_hasNonIsolatedTests) {
-            $this->_application->reinitialize();
-            $this->_hasNonIsolatedTests = false;
+        if ($this->hasNonIsolatedTests) {
+            $this->application->reinitialize();
+            $_SESSION = [];
+            $_COOKIE = [];
+            session_write_close();
+            $this->hasNonIsolatedTests = false;
         }
     }
 
@@ -70,36 +62,59 @@ class AppIsolation
      */
     public function startTestSuite()
     {
+        $this->serverGlobalBackup = $_SERVER;
         $this->_isolateApp();
+    }
+
+    /**
+     * Isolate application after running test case
+     */
+    public function endTestSuite()
+    {
+        $_SERVER = $this->serverGlobalBackup;
     }
 
     /**
      * Handler for 'endTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
-     * @throws \Magento\Exception
+     * @param TestCase $test
+     * @throws LocalizedException
      */
-    public function endTest(\PHPUnit_Framework_TestCase $test)
+    public function endTest(TestCase $test)
     {
-        $this->_hasNonIsolatedTests = true;
+        $this->hasNonIsolatedTests = true;
 
         /* Determine an isolation from doc comment */
-        $annotations = $test->getAnnotations();
-        if (isset($annotations['method']['magentoAppIsolation'])) {
-            $isolation = $annotations['method']['magentoAppIsolation'];
-            if ($isolation !== array('enabled') && $isolation !== array('disabled')) {
-                throw new \Magento\Exception(
-                    'Invalid "@magentoAppIsolation" annotation, can be "enabled" or "disabled" only.'
+        $annotations = $this->getAnnotations($test);
+        if (isset($annotations['magentoAppIsolation'])) {
+            $isolation = $annotations['magentoAppIsolation'];
+            if ($isolation !== ['enabled'] && $isolation !== ['disabled']) {
+                throw new LocalizedException(
+                    __('Invalid "@magentoAppIsolation" annotation, can be "enabled" or "disabled" only.')
                 );
             }
-            $isIsolationEnabled = $isolation === array('enabled');
+            $isIsolationEnabled = $isolation === ['enabled'];
         } else {
             /* Controller tests should be isolated by default */
-            $isIsolationEnabled = $test instanceof \Magento\TestFramework\TestCase\AbstractController;
+            $isIsolationEnabled = $test instanceof AbstractController;
         }
 
         if ($isIsolationEnabled) {
             $this->_isolateApp();
         }
+    }
+
+    /**
+     * Get method annotations.
+     *
+     * Overwrites class-defined annotations.
+     *
+     * @param TestCase $test
+     * @return array
+     */
+    private function getAnnotations(TestCase $test): array
+    {
+        $annotations = $test->getAnnotations();
+        return array_replace((array)$annotations['class'], (array)$annotations['method']);
     }
 }

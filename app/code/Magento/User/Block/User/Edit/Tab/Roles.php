@@ -1,73 +1,64 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_User
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\User\Block\User\Edit\Tab;
 
+use Magento\Backend\Block\Widget\Grid\Column;
+
+/**
+ * Roles grid
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Roles extends \Magento\Backend\Block\Widget\Grid\Extended
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
-
     /**
-     * @var \Magento\User\Model\Resource\Role\CollectionFactory
+     * @var \Magento\Authorization\Model\ResourceModel\Role\CollectionFactory
      */
     protected $_userRolesFactory;
 
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\User\Model\Resource\Role\CollectionFactory $userRolesFactory
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * @param \Magento\Backend\Helper\Data $backendHelper
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Authorization\Model\ResourceModel\Role\CollectionFactory $userRolesFactory
+     * @param \Magento\Framework\Registry $coreRegistry
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\User\Model\Resource\Role\CollectionFactory $userRolesFactory,
-        \Magento\Core\Model\Registry $coreRegistry,
-        array $data = array()
+        \Magento\Backend\Helper\Data $backendHelper,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Authorization\Model\ResourceModel\Role\CollectionFactory $userRolesFactory,
+        \Magento\Framework\Registry $coreRegistry,
+        array $data = []
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_userRolesFactory = $userRolesFactory;
         $this->_coreRegistry = $coreRegistry;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Class constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -78,6 +69,12 @@ class Roles extends \Magento\Backend\Block\Widget\Grid\Extended
         $this->setUseAjax(true);
     }
 
+    /**
+     * Adds column filter to collection
+     *
+     * @param Column $column
+     * @return $this
+     */
     protected function _addColumnFilterToCollection($column)
     {
         if ($column->getId() == 'assigned_user_role') {
@@ -86,10 +83,10 @@ class Roles extends \Magento\Backend\Block\Widget\Grid\Extended
                 $userRoles = 0;
             }
             if ($column->getFilter()->getValue()) {
-                $this->getCollection()->addFieldToFilter('role_id', array('in'=>$userRoles));
+                $this->getCollection()->addFieldToFilter('role_id', ['in' => $userRoles]);
             } else {
                 if ($userRoles) {
-                    $this->getCollection()->addFieldToFilter('role_id', array('nin'=>$userRoles));
+                    $this->getCollection()->addFieldToFilter('role_id', ['nin' => $userRoles]);
                 }
             }
         } else {
@@ -98,6 +95,11 @@ class Roles extends \Magento\Backend\Block\Widget\Grid\Extended
         return $this;
     }
 
+    /**
+     * Prepares collection
+     *
+     * @return $this
+     */
     protected function _prepareCollection()
     {
         $collection = $this->_userRolesFactory->create();
@@ -106,57 +108,76 @@ class Roles extends \Magento\Backend\Block\Widget\Grid\Extended
         return parent::_prepareCollection();
     }
 
+    /**
+     * Prepares columns
+     *
+     * @return $this
+     */
     protected function _prepareColumns()
     {
+        $this->addColumn(
+            'assigned_user_role',
+            [
+                'header_css_class' => 'data-grid-actions-cell',
+                'header' => __('Assigned'),
+                'type' => 'radio',
+                'html_name' => 'roles[]',
+                'values' => $this->getSelectedRoles(),
+                'align' => 'center',
+                'index' => 'role_id'
+            ]
+        );
 
-        $this->addColumn('assigned_user_role', array(
-            'header_css_class' => 'a-center',
-            'header'    => __('Assigned'),
-            'type'      => 'radio',
-            'html_name' => 'roles[]',
-            'values'    => $this->getSelectedRoles(),
-            'align'     => 'center',
-            'index'     => 'role_id'
-        ));
-
-        $this->addColumn('role_name', array(
-            'header'    => __('Role'),
-            'index'     => 'role_name'
-        ));
+        $this->addColumn('role_name', ['header' => __('Role'), 'index' => 'role_name']);
 
         return parent::_prepareColumns();
     }
 
+    /**
+     * Get grid url
+     *
+     * @return string
+     */
     public function getGridUrl()
     {
         $userPermissions = $this->_coreRegistry->registry('permissions_user');
-        return $this->getUrl('*/*/rolesGrid', array('user_id' => $userPermissions->getUserId()));
+        return $this->getUrl('*/*/rolesGrid', ['user_id' => $userPermissions->getUserId()]);
     }
 
-    public function getSelectedRoles($json=false)
+    /**
+     * Gets selected roles
+     *
+     * @param bool $json
+     * @return array|string
+     */
+    public function getSelectedRoles($json = false)
     {
-        if ( $this->getRequest()->getParam('user_roles') != "" ) {
-            return $this->getRequest()->getParam('user_roles');
+        $userRoles = $this->getRequest()->getParam('user_roles');
+        if ($userRoles) {
+            if ($json) {
+                $result = json_decode($userRoles);
+                return $result ? $this->_jsonEncoder->encode($result) : '{}';
+            }
+            return $this->escapeJs($this->escapeHtml($userRoles));
         }
         /* @var $user \Magento\User\Model\User */
         $user = $this->_coreRegistry->registry('permissions_user');
         //checking if we have this data and we
         //don't need load it through resource model
         if ($user->hasData('roles')) {
-            $uRoles = $user->getData('roles');
+            $userRoles = $user->getData('roles');
         } else {
-            $uRoles = $user->getRoles();
+            $userRoles = $user->getRoles();
         }
 
         if ($json) {
-            $jsonRoles = Array();
-            foreach ($uRoles as $urid) {
-                $jsonRoles[$urid] = 0;
+            $jsonRoles = [];
+            foreach ($userRoles as $roleId) {
+                $jsonRoles[$roleId] = 0;
             }
             return $this->_jsonEncoder->encode((object)$jsonRoles);
         } else {
-            return $uRoles;
+            return $userRoles;
         }
     }
-
 }

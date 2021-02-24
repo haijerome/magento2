@@ -2,26 +2,8 @@
 /**
  * Test constructions of layout files
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -38,52 +20,72 @@
  */
 namespace Magento\Test\Integrity;
 
-class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
+use Magento\Framework\Component\ComponentRegistrar;
+
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class ViewFileReferenceTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * @var \Magento\View\Design\Fallback\Rule\RuleInterface
+     * @var \Magento\Framework\View\Design\Fallback\Rule\RuleInterface
      */
-    static protected $_fallbackRule;
+    protected static $_fallbackRule;
 
     /**
-     * @var \Magento\View\Design\FileResolution\Strategy\Fallback
+     * @var \Magento\Framework\View\Design\FileResolution\Fallback\StaticFile
      */
-    static protected $_fallback;
+    protected static $_viewFilesFallback;
+
+    /**
+     * @var \Magento\Framework\View\Design\FileResolution\Fallback\File
+     */
+    protected static $_filesFallback;
 
     /**
      * @var array
      */
-    static protected $_checkThemeLocales = array();
+    protected static $_checkThemeLocales = [];
 
     /**
-     * @var \Magento\Core\Model\Theme\Collection
+     * @var \Magento\Theme\Model\Theme\Collection
      */
-    static protected $_themeCollection;
+    protected static $_themeCollection;
 
-    public static function setUpBeforeClass()
+    /**
+     * @var \Magento\Framework\Component\ComponentRegistrar
+     */
+    protected static $_componentRegistrar;
+
+    public static function setUpBeforeClass(): void
     {
         $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
-        $objectManager->configure(array(
-            'preferences' => array(
-                'Magento\Core\Model\Theme' => 'Magento\Core\Model\Theme\Data'
-            )
-        ));
+        $objectManager->configure(
+            ['preferences' => [\Magento\Theme\Model\Theme::class => \Magento\Theme\Model\Theme\Data::class]]
+        );
 
-        /** @var $fallbackFactory \Magento\View\Design\Fallback\Factory */
-        $fallbackFactory = $objectManager->get('Magento\View\Design\Fallback\Factory');
-        self::$_fallbackRule = $fallbackFactory->createViewFileRule();
+        self::$_componentRegistrar = $objectManager->get(\Magento\Framework\Component\ComponentRegistrar::class);
 
-        self::$_fallback = $objectManager->get('Magento\View\Design\FileResolution\Strategy\Fallback');
+        /** @var $fallbackPool \Magento\Framework\View\Design\Fallback\RulePool */
+        $fallbackPool = $objectManager->get(\Magento\Framework\View\Design\Fallback\RulePool::class);
+        self::$_fallbackRule = $fallbackPool->getRule(
+            $fallbackPool::TYPE_STATIC_FILE
+        );
+
+        self::$_viewFilesFallback = $objectManager->get(
+            \Magento\Framework\View\Design\FileResolution\Fallback\StaticFile::class
+        );
+        self::$_filesFallback = $objectManager->get(\Magento\Framework\View\Design\FileResolution\Fallback\File::class);
 
         // Themes to be checked
-        self::$_themeCollection = $objectManager->get('Magento\Core\Model\Theme\Collection');
-        self::$_themeCollection->addDefaultPattern('*');
+        self::$_themeCollection = $objectManager->get(\Magento\Theme\Model\Theme\Collection::class);
 
         // Compose list of locales, needed to be checked for themes
-        self::$_checkThemeLocales = array();
+        self::$_checkThemeLocales = [];
         foreach (self::$_themeCollection as $theme) {
             $themeLocales = self::_getThemeLocales($theme);
-            $themeLocales[] = null; // Default non-localized file will need to be checked as well
+            $themeLocales[] = null;
+            // Default non-localized file will need to be checked as well
             self::$_checkThemeLocales[$theme->getFullPath()] = $themeLocales;
         }
     }
@@ -91,15 +93,14 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
     /**
      * Return array of locales, supported by the theme
      *
-     * @param \Magento\View\Design\ThemeInterface $theme
+     * @param \Magento\Framework\View\Design\ThemeInterface $theme
      * @return array
      */
-    static protected function _getThemeLocales(\Magento\View\Design\ThemeInterface $theme)
+    protected static function _getThemeLocales(\Magento\Framework\View\Design\ThemeInterface $theme)
     {
-        $result = array();
+        $result = [];
         $patternDir = self::_getLocalePatternDir($theme);
-        $localeModel = new \Zend_Locale;
-        foreach (array_keys($localeModel->getLocaleList()) as $locale) {
+        foreach (\ResourceBundle::getLocales('') as $locale) {
             $dir = str_replace('<locale_placeholder>', $locale, $patternDir);
             if (is_dir($dir)) {
                 $result[] = $locale;
@@ -111,20 +112,19 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
     /**
      * Return pattern for theme locale directories, where <locale_placeholder> is placed to mark a locale's location.
      *
-     * @param \Magento\View\Design\ThemeInterface $theme
+     * @param \Magento\Framework\View\Design\ThemeInterface $theme
      * @return string
      * @throws \Exception
      */
-    static protected function _getLocalePatternDir(\Magento\View\Design\ThemeInterface $theme)
+    protected static function _getLocalePatternDir(\Magento\Framework\View\Design\ThemeInterface $theme)
     {
         $localePlaceholder = '<locale_placeholder>';
-        $params = array(
-            'area' => $theme->getArea(),
-            'theme' => $theme,
-            'locale' => $localePlaceholder,
-        );
+        $params = ['area' => $theme->getArea(), 'theme' => $theme, 'locale' => $localePlaceholder];
         $patternDirs = self::$_fallbackRule->getPatternDirs($params);
-        $themePath = '/' . $theme->getFullPath() . '/';
+        $themePath =  self::$_componentRegistrar->getPath(
+            \Magento\Framework\Component\ComponentRegistrar::THEME,
+            $theme->getFullPath()
+        );
         foreach ($patternDirs as $patternDir) {
             $patternPath = $patternDir . '/';
             if ((strpos($patternPath, $themePath) !== false) // It is theme's directory
@@ -144,11 +144,11 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
      */
     public function testModularFallback($modularCall, array $usages, $area)
     {
-        list(, $file) = explode(\Magento\View\Service::SCOPE_SEPARATOR, $modularCall);
+        list(, $file) = explode(\Magento\Framework\View\Asset\Repository::FILE_ID_SEPARATOR, $modularCall);
 
-        $wrongResolutions = array();
+        $wrongResolutions = [];
         foreach (self::$_themeCollection as $theme) {
-            if ($area && ($theme->getArea() != $area)) {
+            if ($area && $theme->getArea() != $area) {
                 continue;
             }
 
@@ -171,20 +171,20 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
     /**
      * Resolves file to find its fallback'ed paths
      *
-     * @param \Magento\View\Design\ThemeInterface $theme
+     * @param \Magento\Framework\View\Design\ThemeInterface $theme
      * @param string $file
      * @return array
      */
-    protected function _getFileResolutions(\Magento\View\Design\ThemeInterface $theme, $file)
+    protected function _getFileResolutions(\Magento\Framework\View\Design\ThemeInterface $theme, $file)
     {
-        $found = array();
-        $fileResolved = self::$_fallback->getFile($theme->getArea(), $theme, $file);
+        $found = [];
+        $fileResolved = self::$_filesFallback->getFile($theme->getArea(), $theme, $file);
         if (file_exists($fileResolved)) {
             $found[$fileResolved] = $fileResolved;
         }
 
         foreach (self::$_checkThemeLocales[$theme->getFullPath()] as $locale) {
-            $fileResolved = self::$_fallback->getViewFile($theme->getArea(), $theme, $locale, $file);
+            $fileResolved = self::$_viewFilesFallback->getFile($theme->getArea(), $theme, $locale, $file);
             if (file_exists($fileResolved)) {
                 $found[$fileResolved] = $fileResolved;
             }
@@ -197,14 +197,14 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
      */
     public static function modularFallbackDataProvider()
     {
-        $result = array();
+        $result = [];
         foreach (self::_getFilesToProcess() as $file) {
-            $file = (string) $file;
+            $file = (string)$file;
 
             $modulePattern = '[A-Z][a-z]+_[A-Z][a-z]+';
             $filePattern = '[[:alnum:]_/-]+\\.[[:alnum:]_./-]+';
             $pattern = '#' . $modulePattern
-                . preg_quote(\Magento\View\Service::SCOPE_SEPARATOR)
+                . preg_quote(\Magento\Framework\View\Asset\Repository::FILE_ID_SEPARATOR)
                 . $filePattern . '#S';
             if (!preg_match_all($pattern, file_get_contents($file), $matches)) {
                 continue;
@@ -216,11 +216,7 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
                 $dataSetKey = $modularCall . ' @ ' . ($area ?: 'any area');
 
                 if (!isset($result[$dataSetKey])) {
-                    $result[$dataSetKey] = array(
-                        'modularCall' => $modularCall,
-                        'usages' => array(),
-                        'area' => $area
-                    );
+                    $result[$dataSetKey] = ['modularCall' => $modularCall, 'usages' => [], 'area' => $area];
                 }
                 $result[$dataSetKey]['usages'][$file] = $file;
             }
@@ -235,26 +231,20 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
      */
     protected static function _getFilesToProcess()
     {
-        $result = array();
-        $rootDir = self::_getRootDir();
-        foreach (array('app/code', 'app/design') as $subDir) {
+        $result = [];
+        $componentRegistrar = new \Magento\Framework\Component\ComponentRegistrar();
+        $dirs = array_merge(
+            $componentRegistrar->getPaths(ComponentRegistrar::MODULE),
+            $componentRegistrar->getPaths(ComponentRegistrar::THEME)
+        );
+        foreach ($dirs as $dir) {
             $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($rootDir . "/{$subDir}", \RecursiveDirectoryIterator::SKIP_DOTS)
+                new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS)
             );
             $result = array_merge($result, iterator_to_array($iterator));
         }
 
         return $result;
-    }
-
-    /**
-     * Return application root directory
-     *
-     * @return string
-     */
-    static protected function _getRootDir()
-    {
-        return realpath(__DIR__ . '/../../../../../../../');
     }
 
     /**
@@ -267,11 +257,15 @@ class ViewFileReferenceTest extends \PHPUnit_Framework_TestCase
      */
     protected static function _getArea($file)
     {
-        $file = str_replace(DIRECTORY_SEPARATOR, '/', $file);
-        $areaPatterns = array(
-            '#app/code/[^/]+/[^/]+/view/([^/]+)/#S',
-            '#app/design/([^/]+)/#S',
-        );
+        $file = str_replace('\\', '/', $file);
+        $areaPatterns = [];
+        $componentRegistrar = new ComponentRegistrar();
+        foreach ($componentRegistrar->getPaths(ComponentRegistrar::THEME) as $themeDir) {
+            $areaPatterns[] = '#' . $themeDir . '/([^/]+)/#S';
+        }
+        foreach ($componentRegistrar->getPaths(ComponentRegistrar::MODULE) as $moduleDir) {
+            $areaPatterns[] = '#' . $moduleDir . '/view/([^/]+)/#S';
+        }
         foreach ($areaPatterns as $pattern) {
             if (preg_match($pattern, $file, $matches)) {
                 return $matches[1];

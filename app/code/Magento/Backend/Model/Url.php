@@ -1,49 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Model;
 
-use Magento\Backend\Model\Auth;
-use Magento\Backend\Model\Menu;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\Url\HostChecker;
+use Magento\Framework\App\ObjectManager;
 
 /**
- * Class \Magento\Backend\Model\Url
+ * Class \Magento\Backend\Model\UrlInterface
  *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ * @api
+ * @since 100.0.2
  */
-class Url extends \Magento\Core\Model\Url
+class Url extends \Magento\Framework\Url implements \Magento\Backend\Model\UrlInterface
 {
     /**
-     * Secret key query param name
+     * Whether to use a security key in the backend
+     *
+     * @bug Currently, this constant is slightly misleading: it says "form key", but in fact it is used by URLs, too
      */
-    const SECRET_KEY_PARAM_NAME = 'key';
-
-    /**
-     * xpath to startup page in configuration
-     */
-    const XML_PATH_STARTUP_MENU_ITEM = 'admin/startup/menu_item_id';
+    const XML_PATH_USE_SECURE_KEY = 'admin/security/use_form_key';
 
     /**
      * Authentication session
@@ -77,101 +58,103 @@ class Url extends \Magento\Core\Model\Url
     protected $_menuConfig;
 
     /**
-     * @var \Magento\App\CacheInterface
+     * @var \Magento\Framework\App\CacheInterface
      */
     protected $_cache;
 
     /**
-     * @var \Magento\Encryption\EncryptorInterface
+     * @var \Magento\Framework\Encryption\EncryptorInterface
      */
     protected $_encryptor;
 
     /**
-     * @var \Magento\Backend\App\ConfigInterface
-     */
-    protected $_config;
-
-    /**
-     * @var \Magento\Core\Model\StoreFactory
+     * @var \Magento\Store\Model\StoreFactory
      */
     protected $_storeFactory;
 
     /**
-     * @var \Magento\Core\Model\ConfigInterface
-     */
-    protected $_coreConfig;
-
-    /**
-     * @var \Magento\Data\Form\FormKey
+     * @var \Magento\Framework\Data\Form\FormKey
      */
     protected $formKey;
 
     /**
-     * @param \Magento\App\Route\ConfigInterface $routeConfig
-     * @param \Magento\App\RequestInterface $request
-     * @param \Magento\Core\Model\Url\SecurityInfoInterface $urlSecurityInfo
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\App $app
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Session $session
-     * @param \Magento\Session\SidResolverInterface $sidResolver
+     * @var \Magento\Store\Model\Store
+     */
+    protected $_scope;
+
+    /**
+     * Constructor
+     *
+     * @param \Magento\Framework\App\Route\ConfigInterface $routeConfig
+     * @param \Magento\Framework\App\RequestInterface $request
+     * @param \Magento\Framework\Url\SecurityInfoInterface $urlSecurityInfo
+     * @param \Magento\Framework\Url\ScopeResolverInterface $scopeResolver
+     * @param \Magento\Framework\Session\Generic $session
+     * @param \Magento\Framework\Session\SidResolverInterface $sidResolver
+     * @param \Magento\Framework\Url\RouteParamsResolverFactory $routeParamsResolverFactory
+     * @param \Magento\Framework\Url\QueryParamsResolverInterface $queryParamsResolver
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\Url\RouteParamsPreprocessorInterface $routeParamsPreprocessor
+     * @param string $scopeType
      * @param \Magento\Backend\Helper\Data $backendHelper
      * @param Menu\Config $menuConfig
-     * @param \Magento\App\CacheInterface $cache
+     * @param \Magento\Framework\App\CacheInterface $cache
      * @param Auth\Session $authSession
-     * @param \Magento\Encryption\EncryptorInterface $encryptor
-     * @param \Magento\Backend\App\ConfigInterface $config
-     * @param \Magento\Core\Model\StoreFactory $storeFactory
-     * @param \Magento\Core\Model\ConfigInterface $coreConfig
-     * @param \Magento\Data\Form\FormKey $formKey
-     * @param null $areaCode
+     * @param \Magento\Framework\Encryption\EncryptorInterface $encryptor
+     * @param \Magento\Store\Model\StoreFactory $storeFactory
+     * @param \Magento\Framework\Data\Form\FormKey $formKey
      * @param array $data
-     * 
+     * @param HostChecker|null $hostChecker
+     * @param Json $serializer
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\App\Route\ConfigInterface $routeConfig,
-        \Magento\App\RequestInterface $request,
-        \Magento\Core\Model\Url\SecurityInfoInterface $urlSecurityInfo,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\App $app,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Session $session,
-        \Magento\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\App\Route\ConfigInterface $routeConfig,
+        \Magento\Framework\App\RequestInterface $request,
+        \Magento\Framework\Url\SecurityInfoInterface $urlSecurityInfo,
+        \Magento\Framework\Url\ScopeResolverInterface $scopeResolver,
+        \Magento\Framework\Session\Generic $session,
+        \Magento\Framework\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\Url\RouteParamsResolverFactory $routeParamsResolverFactory,
+        \Magento\Framework\Url\QueryParamsResolverInterface $queryParamsResolver,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\Url\RouteParamsPreprocessorInterface $routeParamsPreprocessor,
+        $scopeType,
         \Magento\Backend\Helper\Data $backendHelper,
         \Magento\Backend\Model\Menu\Config $menuConfig,
-        \Magento\App\CacheInterface $cache,
+        \Magento\Framework\App\CacheInterface $cache,
         \Magento\Backend\Model\Auth\Session $authSession,
-        \Magento\Encryption\EncryptorInterface $encryptor,
-        \Magento\Backend\App\ConfigInterface $config,
-        \Magento\Core\Model\StoreFactory $storeFactory,
-        \Magento\Core\Model\ConfigInterface $coreConfig,
-        \Magento\Data\Form\FormKey $formKey,
-        $areaCode = null,
-        array $data = array()
+        \Magento\Framework\Encryption\EncryptorInterface $encryptor,
+        \Magento\Store\Model\StoreFactory $storeFactory,
+        \Magento\Framework\Data\Form\FormKey $formKey,
+        array $data = [],
+        HostChecker $hostChecker = null,
+        Json $serializer = null
     ) {
         $this->_encryptor = $encryptor;
+        $hostChecker = $hostChecker ?: ObjectManager::getInstance()->get(HostChecker::class);
         parent::__construct(
             $routeConfig,
             $request,
             $urlSecurityInfo,
-            $coreStoreConfig,
-            $app,
-            $storeManager,
+            $scopeResolver,
             $session,
             $sidResolver,
-            $areaCode,
-            $data
+            $routeParamsResolverFactory,
+            $queryParamsResolver,
+            $scopeConfig,
+            $routeParamsPreprocessor,
+            $scopeType,
+            $data,
+            $hostChecker,
+            $serializer
         );
-        $this->_config = $config;
-        $this->_startupMenuItemId = $coreStoreConfig->getConfig(self::XML_PATH_STARTUP_MENU_ITEM);
         $this->_backendHelper = $backendHelper;
         $this->_menuConfig = $menuConfig;
         $this->_cache = $cache;
         $this->_session = $authSession;
         $this->formKey = $formKey;
         $this->_storeFactory = $storeFactory;
-        $this->_coreConfig = $coreConfig;
     }
 
     /**
@@ -179,12 +162,12 @@ class Url extends \Magento\Core\Model\Url
      *
      * @return bool
      */
-    public function isSecure()
+    protected function _isSecure()
     {
         if ($this->hasData('secure_is_forced')) {
             return $this->getData('secure');
         }
-        return $this->_config->getFlag('web/secure/use_in_adminhtml');
+        return $this->_scopeConfig->isSetFlag('web/secure/use_in_adminhtml');
     }
 
     /**
@@ -192,9 +175,9 @@ class Url extends \Magento\Core\Model\Url
      *
      * @param array $data
      * @param bool $unsetOldParams
-     * @return \Magento\Backend\Model\Url
+     * @return $this
      */
-    public function setRouteParams(array $data, $unsetOldParams = true)
+    protected function _setRouteParams(array $data, $unsetOldParams = true)
     {
         if (isset($data['_nosecret'])) {
             $this->setNoSecret(true);
@@ -202,8 +185,8 @@ class Url extends \Magento\Core\Model\Url
         } else {
             $this->setNoSecret(false);
         }
-        unset($data['_store_to_url']);
-        return parent::setRouteParams($data, $unsetOldParams);
+        unset($data['_scope_to_url']);
+        return parent::_setRouteParams($data, $unsetOldParams);
     }
 
     /**
@@ -215,8 +198,12 @@ class Url extends \Magento\Core\Model\Url
      */
     public function getUrl($routePath = null, $routeParams = null)
     {
+        if (filter_var($routePath, FILTER_VALIDATE_URL)) {
+            return $routePath;
+        }
+
         $cacheSecretKey = false;
-        if (is_array($routeParams) && isset($routeParams['_cache_secret_key'])) {
+        if (isset($routeParams['_cache_secret_key'])) {
             unset($routeParams['_cache_secret_key']);
             $cacheSecretKey = true;
         }
@@ -224,24 +211,28 @@ class Url extends \Magento\Core\Model\Url
         if (!$this->useSecretKey()) {
             return $result;
         }
-        $routeName = $this->getRouteName('*');
-        $controllerName = $this->getControllerName($this->getDefaultControllerName());
-        $actionName = $this->getActionName($this->getDefaultActionName());
-        if ($cacheSecretKey) {
-            $secret = array(self::SECRET_KEY_PARAM_NAME => "\${$routeName}/{$controllerName}/{$actionName}\$");
-        } else {
-            $secret = array(
-                self::SECRET_KEY_PARAM_NAME => $this->getSecretKey($routeName, $controllerName, $actionName)
-            );
+
+        $this->getRouteParamsResolver()->unsetData('route_params');
+        $this->_setRoutePath($routePath);
+        $extraParams = $this->getRouteParamsResolver()->getRouteParams();
+        $routeName = $this->_getRouteName('*');
+        $controllerName = $this->_getControllerName(self::DEFAULT_CONTROLLER_NAME);
+        $actionName = $this->_getActionName(self::DEFAULT_ACTION_NAME);
+
+        if (!isset($routeParams[self::SECRET_KEY_PARAM_NAME])) {
+            if (!is_array($routeParams)) {
+                $routeParams = [];
+            }
+            $secretKey = $cacheSecretKey
+                ? "\${$routeName}/{$controllerName}/{$actionName}\$"
+                : $this->getSecretKey($routeName, $controllerName, $actionName);
+            $routeParams[self::SECRET_KEY_PARAM_NAME] = $secretKey;
         }
-        if (is_array($routeParams)) {
-            $routeParams = array_merge($secret, $routeParams);
-        } else {
-            $routeParams = $secret;
+
+        if (!empty($extraParams)) {
+            $routeParams = array_merge($extraParams, $routeParams);
         }
-        if (is_array($this->getRouteParams())) {
-            $routeParams = array_merge($this->getRouteParams(), $routeParams);
-        }
+
         return parent::getUrl("{$routeName}/{$controllerName}/{$actionName}", $routeParams);
     }
 
@@ -256,7 +247,7 @@ class Url extends \Magento\Core\Model\Url
     public function getSecretKey($routeName = null, $controller = null, $action = null)
     {
         $salt = $this->formKey->getFormKey();
-        $request = $this->getRequest();
+        $request = $this->_getRequest();
         if (!$routeName) {
             if ($request->getBeforeForwardInfo('route_name') !== null) {
                 $routeName = $request->getBeforeForwardInfo('route_name');
@@ -285,17 +276,17 @@ class Url extends \Magento\Core\Model\Url
     /**
      * Return secret key settings flag
      *
-     * @return boolean
+     * @return bool
      */
     public function useSecretKey()
     {
-        return $this->_config->getFlag('admin/security/use_form_key') && !$this->getNoSecret();
+        return $this->_scopeConfig->isSetFlag(self::XML_PATH_USE_SECURE_KEY) && !$this->getNoSecret();
     }
 
     /**
      * Enable secret key using
      *
-     * @return \Magento\Backend\Model\Url
+     * @return $this
      */
     public function turnOnSecretKey()
     {
@@ -306,7 +297,7 @@ class Url extends \Magento\Core\Model\Url
     /**
      * Disable secret key using
      *
-     * @return \Magento\Backend\Model\Url
+     * @return $this
      */
     public function turnOffSecretKey()
     {
@@ -317,11 +308,11 @@ class Url extends \Magento\Core\Model\Url
     /**
      * Refresh admin menu cache etc.
      *
-     * @return \Magento\Backend\Model\Url
+     * @return void
      */
     public function renewSecretUrls()
     {
-        $this->_cache->clean(array(\Magento\Backend\Block\Menu::CACHE_TAGS));
+        $this->_cache->clean([\Magento\Backend\Block\Menu::CACHE_TAGS]);
     }
 
     /**
@@ -331,8 +322,10 @@ class Url extends \Magento\Core\Model\Url
      */
     public function getStartupPageUrl()
     {
-        $menuItem = $this->_getMenu()->get($this->_startupMenuItemId);
-        if (!is_null($menuItem)) {
+        $menuItem = $this->_getMenu()->get(
+            $this->_scopeConfig->getValue(self::XML_PATH_STARTUP_MENU_ITEM, $this->_scopeType)
+        );
+        if ($menuItem !== null) {
             if ($menuItem->isAllowed() && $menuItem->getAction()) {
                 return $menuItem->getAction();
             }
@@ -356,7 +349,7 @@ class Url extends \Magento\Core\Model\Url
             if ($user) {
                 $user->setHasAvailableResources(false);
             }
-            $action = '*/*/denied';
+            $action = '*/denied';
         }
         return $action;
     }
@@ -368,17 +361,31 @@ class Url extends \Magento\Core\Model\Url
      */
     protected function _getMenu()
     {
-        if (is_null($this->_menu)) {
+        if ($this->_menu === null) {
             $this->_menu = $this->_menuConfig->getMenu();
         }
         return $this->_menu;
     }
 
     /**
+     * Set scope entity
+     *
+     * @param mixed $scopeId
+     * @return \Magento\Framework\UrlInterface
+     * @since 101.0.3
+     */
+    public function setScope($scopeId)
+    {
+        parent::setScope($scopeId);
+        $this->_scope = $this->_scopeResolver->getScope($scopeId);
+        return $this;
+    }
+
+    /**
      * Set custom auth session
      *
      * @param \Magento\Backend\Model\Auth\Session $session
-     * @return \Magento\Backend\Model\Url
+     * @return $this
      */
     public function setSession(\Magento\Backend\Model\Auth\Session $session)
     {
@@ -410,14 +417,14 @@ class Url extends \Magento\Core\Model\Url
     }
 
     /**
-     * Retrieve action path.
-     * Add backend area front name as a prefix to action path
+     * Retrieve action path, add backend area front name as a prefix to action path
      *
      * @return string
      */
-    public function getActionPath()
+    protected function _getActionPath()
     {
-        $path = parent::getActionPath();
+
+        $path = parent::_getActionPath();
         if ($path) {
             if ($this->getAreaFrontName()) {
                 $path = $this->getAreaFrontName() . '/' . $path;
@@ -427,17 +434,21 @@ class Url extends \Magento\Core\Model\Url
     }
 
     /**
-     * Get fake store for the url instance
+     * Get scope for the url instance
      *
-     * @return \Magento\Core\Model\Store
+     * @return \Magento\Store\Model\Store
      */
-    public function getStore()
+    protected function _getScope()
     {
-        return $this->_storeFactory->create(array('url' => $this, 'data' => array(
-            'code' => 'admin',
-            'force_disable_rewrites' => true,
-            'disable_store_in_url' => true
-        )));
+        if (!$this->_scope) {
+            $this->_scope = $this->_storeFactory->create(
+                [
+                    'url' => $this,
+                    'data' => ['code' => 'admin', 'force_disable_rewrites' => false, 'disable_store_in_url' => true],
+                ]
+            );
+        }
+        return $this->_scope;
     }
 
     /**
@@ -452,14 +463,13 @@ class Url extends \Magento\Core\Model\Url
     }
 
     /**
-     * Get config data by path
-     * Use only global config values for backend
+     * Get config data by path, use only global config values for backend
      *
      * @param string $path
      * @return null|string
      */
     protected function _getConfig($path)
     {
-        return $this->_coreConfig->getValue($path, 'default');
+        return $this->_scopeConfig->getValue($path);
     }
 }

@@ -1,35 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Rule
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Abstract Rule entity data model
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Rule\Model;
 
-abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
+use Magento\Framework\Api\AttributeValueFactory;
+use Magento\Framework\Api\ExtensionAttributesFactory;
+
+/**
+ * Abstract Rule entity data model
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * phpcs:disable Magento2.Classes.AbstractApi
+ * @api
+ * @since 100.0.2
+ */
+abstract class AbstractModel extends \Magento\Framework\Model\AbstractExtensibleModel
 {
     /**
      * Store rule combine conditions model
@@ -48,7 +35,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     /**
      * Store rule form instance
      *
-     * @var \Magento\Data\Form
+     * @var \Magento\Framework\Data\Form
      */
     protected $_form;
 
@@ -67,6 +54,12 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     protected $_isReadonly = false;
 
     /**
+     * @var \Magento\Framework\Serialize\Serializer\Json
+     * @since 100.2.0
+     */
+    protected $serializer;
+
+    /**
      * Getter for rule combine conditions instance
      *
      * @return \Magento\Rule\Model\Condition\Combine
@@ -81,62 +74,88 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     abstract public function getActionsInstance();
 
     /**
-     * @var \Magento\Data\FormFactory
+     * Form factory
+     *
+     * @var \Magento\Framework\Data\FormFactory
      */
     protected $_formFactory;
 
     /**
-     * @var \Magento\Core\Model\LocaleInterface
+     * Timezone instance
+     *
+     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
      */
-    protected $_locale;
+    protected $_localeDate;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Data\FormFactory $formFactory
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * AbstractModel constructor
+     *
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Data\FormFactory $formFactory
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
      * @param array $data
+     * @param ExtensionAttributesFactory|null $extensionFactory
+     * @param AttributeValueFactory|null $customAttributeFactory
+     * @param \Magento\Framework\Serialize\Serializer\Json $serializer
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Data\FormFactory $formFactory,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Data\FormFactory $formFactory,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = [],
+        ExtensionAttributesFactory $extensionFactory = null,
+        AttributeValueFactory $customAttributeFactory = null,
+        \Magento\Framework\Serialize\Serializer\Json $serializer = null
     ) {
         $this->_formFactory = $formFactory;
-        $this->_locale = $locale;
-        parent::__construct($context, $registry, $resource, $resourceCollection, $data);
+        $this->_localeDate = $localeDate;
+        $this->serializer = $serializer ?: \Magento\Framework\App\ObjectManager::getInstance()->get(
+            \Magento\Framework\Serialize\Serializer\Json::class
+        );
+        parent::__construct(
+            $context,
+            $registry,
+            $extensionFactory ?: $this->getExtensionFactory(),
+            $customAttributeFactory ?: $this->getCustomAttributeFactory(),
+            $resource,
+            $resourceCollection,
+            $data
+        );
     }
 
     /**
      * Prepare data before saving
      *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
         // Check if discount amount not negative
         if ($this->hasDiscountAmount()) {
             if ((int)$this->getDiscountAmount() < 0) {
-                throw new \Magento\Core\Exception(__('Invalid discount amount.'));
+                throw new \Magento\Framework\Exception\LocalizedException(__('Please choose a valid discount amount.'));
             }
         }
 
         // Serialize conditions
         if ($this->getConditions()) {
-            $this->setConditionsSerialized(serialize($this->getConditions()->asArray()));
-            $this->unsConditions();
+            $this->setConditionsSerialized($this->serializer->serialize($this->getConditions()->asArray()));
+            $this->_conditions = null;
         }
 
         // Serialize actions
         if ($this->getActions()) {
-            $this->setActionsSerialized(serialize($this->getActions()->asArray()));
-            $this->unsActions();
+            $this->setActionsSerialized($this->serializer->serialize($this->getActions()->asArray()));
+            $this->_actions = null;
         }
 
         /**
@@ -161,7 +180,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
             }
         }
 
-        parent::_beforeSave();
+        parent::beforeSave();
         return $this;
     }
 
@@ -169,8 +188,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Set rule combine conditions model
      *
      * @param \Magento\Rule\Model\Condition\Combine $conditions
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
      */
     public function setConditions($conditions)
     {
@@ -193,7 +211,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
         if ($this->hasConditionsSerialized()) {
             $conditions = $this->getConditionsSerialized();
             if (!empty($conditions)) {
-                $conditions = unserialize($conditions);
+                $conditions = $this->serializer->unserialize($conditions);
                 if (is_array($conditions) && !empty($conditions)) {
                     $this->_conditions->loadArray($conditions);
                 }
@@ -208,8 +226,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Set rule actions model
      *
      * @param \Magento\Rule\Model\Action\Collection $actions
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
      */
     public function setActions($actions)
     {
@@ -232,7 +249,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
         if ($this->hasActionsSerialized()) {
             $actions = $this->getActionsSerialized();
             if (!empty($actions)) {
-                $actions = unserialize($actions);
+                $actions = $this->serializer->unserialize($actions);
                 if (is_array($actions) && !empty($actions)) {
                     $this->_actions->loadArray($actions);
                 }
@@ -247,12 +264,11 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Reset rule combine conditions
      *
      * @param null|\Magento\Rule\Model\Condition\Combine $conditions
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
      */
     protected function _resetConditions($conditions = null)
     {
-        if (is_null($conditions)) {
+        if (null === $conditions) {
             $conditions = $this->getConditionsInstance();
         }
         $conditions->setRule($this)->setId('1')->setPrefix('conditions');
@@ -265,12 +281,11 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Reset rule actions
      *
      * @param null|\Magento\Rule\Model\Action\Collection $actions
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
      */
     protected function _resetActions($actions = null)
     {
-        if (is_null($actions)) {
+        if (null === $actions) {
             $actions = $this->getActionsInstance();
         }
         $actions->setRule($this)->setId('1')->setPrefix('actions');
@@ -282,7 +297,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     /**
      * Rule form getter
      *
-     * @return \Magento\Data\Form
+     * @return \Magento\Framework\Data\Form
      */
     public function getForm()
     {
@@ -296,17 +311,16 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Initialize rule model data from array
      *
      * @param array $data
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
      */
     public function loadPost(array $data)
     {
         $arr = $this->_convertFlatToRecursive($data);
         if (isset($arr['conditions'])) {
-            $this->getConditions()->setConditions(array())->loadArray($arr['conditions'][1]);
+            $this->getConditions()->setConditions([])->loadArray($arr['conditions'][1]);
         }
         if (isset($arr['actions'])) {
-            $this->getActions()->setActions(array())->loadArray($arr['actions'][1], 'actions');
+            $this->getActions()->setActions([])->loadArray($arr['actions'][1], 'actions');
         }
 
         return $this;
@@ -315,25 +329,25 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     /**
      * Set specified data to current rule.
      * Set conditions and actions recursively.
-     * Convert dates into \Zend_Date.
+     * Convert dates into \DateTime.
      *
      * @param array $data
-     *
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     protected function _convertFlatToRecursive(array $data)
     {
-        $arr = array();
+        $arr = [];
         foreach ($data as $key => $value) {
             if (($key === 'conditions' || $key === 'actions') && is_array($value)) {
                 foreach ($value as $id => $data) {
                     $path = explode('--', $id);
-                    $node =& $arr;
-                    for ($i = 0, $l = sizeof($path); $i < $l; $i++) {
+                    $node = & $arr;
+                    for ($i = 0, $l = count($path); $i < $l; $i++) {
                         if (!isset($node[$key][$path[$i]])) {
-                            $node[$key][$path[$i]] = array();
+                            $node[$key][$path[$i]] = [];
                         }
-                        $node =& $node[$key][$path[$i]];
+                        $node = & $node[$key][$path[$i]];
                     }
                     foreach ($data as $k => $v) {
                         $node[$k] = $v;
@@ -341,15 +355,10 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
                 }
             } else {
                 /**
-                 * Convert dates into \Zend_Date
+                 * Convert dates into \DateTime
                  */
-                if (in_array($key, array('from_date', 'to_date')) && $value) {
-                    $value = $this->_locale->date(
-                        $value,
-                        \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT,
-                        null,
-                        false
-                    );
+                if (in_array($key, ['from_date', 'to_date'], true) && $value) {
+                    $value = new \DateTime($value);
                 }
                 $this->setData($key, $value);
             }
@@ -361,11 +370,10 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     /**
      * Validate rule conditions to determine if rule can run
      *
-     * @param \Magento\Object $object
-     *
+     * @param \Magento\Framework\DataObject $object
      * @return bool
      */
-    public function validate(\Magento\Object $object)
+    public function validate(\Magento\Framework\DataObject $object)
     {
         return $this->getConditions()->validate($object);
     }
@@ -373,39 +381,40 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
     /**
      * Validate rule data
      *
-     * @param \Magento\Object $object
-     *
-     * @return bool|array - return true if validation passed successfully. Array with errors description otherwise
+     * @param \Magento\Framework\DataObject $dataObject
+     * @return bool|string[] - return true if validation passed successfully. Array with errors description otherwise
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    public function validateData(\Magento\Object $object)
+    public function validateData(\Magento\Framework\DataObject $dataObject)
     {
-        $result   = array();
+        $result = [];
         $fromDate = $toDate = null;
 
-        if ($object->hasFromDate() && $object->hasToDate()) {
-            $fromDate = $object->getFromDate();
-            $toDate = $object->getToDate();
+        if ($dataObject->hasFromDate() && $dataObject->hasToDate()) {
+            $fromDate = $dataObject->getFromDate();
+            $toDate = $dataObject->getToDate();
         }
 
         if ($fromDate && $toDate) {
-            $fromDate = new \Zend_Date($fromDate, \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
-            $toDate = new \Zend_Date($toDate, \Magento\Stdlib\DateTime::DATE_INTERNAL_FORMAT);
+            $fromDate = new \DateTime($fromDate);
+            $toDate = new \DateTime($toDate);
 
-            if ($fromDate->compare($toDate) === 1) {
+            if ($fromDate > $toDate) {
                 $result[] = __('End Date must follow Start Date.');
             }
         }
 
-        if ($object->hasWebsiteIds()) {
-            $websiteIds = $object->getWebsiteIds();
+        if ($dataObject->hasWebsiteIds()) {
+            $websiteIds = $dataObject->getWebsiteIds();
             if (empty($websiteIds)) {
-                $result[] = __('Websites must be specified.');
+                $result[] = __('Please specify a website.');
             }
         }
-        if ($object->hasCustomerGroupIds()) {
-            $customerGroupIds = $object->getCustomerGroupIds();
+        if ($dataObject->hasCustomerGroupIds()) {
+            $customerGroupIds = $dataObject->getCustomerGroupIds();
             if (empty($customerGroupIds)) {
-                $result[] = __('Customer Groups must be specified.');
+                $result[] = __('Please specify Customer Groups.');
             }
         }
 
@@ -416,6 +425,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Check availability to delete rule
      *
      * @return bool
+     * @codeCoverageIgnore
      */
     public function isDeleteable()
     {
@@ -426,8 +436,8 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Set is rule can be deleted flag
      *
      * @param bool $value
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function setIsDeleteable($value)
     {
@@ -439,6 +449,7 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Check if rule is readonly
      *
      * @return bool
+     * @codeCoverageIgnore
      */
     public function isReadonly()
     {
@@ -449,8 +460,8 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
      * Set is readonly flag to rule
      *
      * @param bool $value
-     *
-     * @return \Magento\Rule\Model\AbstractModel
+     * @return $this
+     * @codeCoverageIgnore
      */
     public function setIsReadonly($value)
     {
@@ -472,54 +483,27 @@ abstract class AbstractModel extends \Magento\Core\Model\AbstractModel
         return $this->_getData('website_ids');
     }
 
-
-
-
     /**
-     * @deprecated since 1.7.0.0
+     * Get extension factory
      *
-     * @param string $format
-     *
-     * @return string
+     * @return \Magento\Framework\Api\ExtensionAttributesFactory
+     * @deprecated 100.1.0
      */
-    public function asString($format = '')
+    private function getExtensionFactory()
     {
-        return '';
+        return \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\Api\ExtensionAttributesFactory::class);
     }
 
     /**
-     * @deprecated since 1.7.0.0
+     * Get custom attribute factory
      *
-     * @return string
+     * @return \Magento\Framework\Api\AttributeValueFactory
+     * @deprecated 100.1.0
      */
-    public function asHtml()
+    private function getCustomAttributeFactory()
     {
-        return '';
-    }
-
-    /**
-     * Returns rule as an array for admin interface
-     *
-     * @deprecated since 1.7.0.0
-     *
-     * @param array $arrAttributes
-     *
-     * @return array
-     */
-    public function asArray(array $arrAttributes = array())
-    {
-        return array();
-    }
-
-    /**
-     * Combine website ids to string
-     *
-     * @deprecated since 1.7.0.0
-     *
-     * @return \Magento\Rule\Model\AbstractModel
-     */
-    protected function _prepareWebsiteIds()
-    {
-        return $this;
+        return \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\Api\AttributeValueFactory::class);
     }
 }

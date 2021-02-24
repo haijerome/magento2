@@ -1,118 +1,103 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Block\Product\ProductList;
 
+use Magento\Catalog\Block\Product\AbstractProduct;
+use Magento\Catalog\Block\Product\Context;
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Visibility as ProductVisibility;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
+use Magento\Checkout\Model\ResourceModel\Cart as CartResourceModel;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Framework\DataObject\IdentityInterface;
+use Magento\Framework\Module\Manager;
+use Magento\Framework\View\Element\AbstractBlock;
+
 /**
  * Catalog product related items block
  *
+ * @api
  * @SuppressWarnings(PHPMD.LongVariable)
+ * @since 100.0.2
  */
-class Related extends \Magento\Catalog\Block\Product\AbstractProduct
+class Related extends AbstractProduct implements IdentityInterface
 {
     /**
-     * Default MAP renderer type
-     *
-     * @var string
+     * @var Collection
      */
-    protected $_mapRenderer = 'msrp_noform';
-
     protected $_itemCollection;
 
     /**
      * Checkout session
      *
-     * @var \Magento\Checkout\Model\Session
+     * @var CheckoutSession
      */
     protected $_checkoutSession;
 
     /**
      * Catalog product visibility
      *
-     * @var \Magento\Catalog\Model\Product\Visibility
+     * @var ProductVisibility
      */
     protected $_catalogProductVisibility;
 
     /**
      * Checkout cart
      *
-     * @var \Magento\Checkout\Model\Resource\Cart
+     * @var CartResourceModel
      */
     protected $_checkoutCart;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Checkout\Model\Resource\Cart $checkoutCart
-     * @param \Magento\Catalog\Model\Product\Visibility $catalogProductVisibility
-     * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @var Manager
+     */
+    protected $moduleManager;
+
+    /**
+     * @param Context $context
+     * @param CartResourceModel $checkoutCart
+     * @param ProductVisibility $catalogProductVisibility
+     * @param CheckoutSession $checkoutSession
+     * @param Manager $moduleManager
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Checkout\Model\Resource\Cart $checkoutCart,
-        \Magento\Catalog\Model\Product\Visibility $catalogProductVisibility,
-        \Magento\Checkout\Model\Session $checkoutSession,
-        array $data = array()
+        Context $context,
+        CartResourceModel $checkoutCart,
+        ProductVisibility $catalogProductVisibility,
+        CheckoutSession $checkoutSession,
+        Manager $moduleManager,
+        array $data = []
     ) {
         $this->_checkoutCart = $checkoutCart;
         $this->_catalogProductVisibility = $catalogProductVisibility;
         $this->_checkoutSession = $checkoutSession;
-        parent::__construct($context, $catalogConfig, $registry, $taxData, $catalogData, $mathRandom, $data);
+        $this->moduleManager = $moduleManager;
+        parent::__construct($context, $data);
     }
 
+    /**
+     * Prepare data
+     *
+     * @return $this
+     */
     protected function _prepareData()
     {
-        $product = $this->_coreRegistry->registry('product');
-        /* @var $product \Magento\Catalog\Model\Product */
+        $product = $this->getProduct();
+        /* @var $product Product */
 
-        $this->_itemCollection = $product->getRelatedProductCollection()
-            ->addAttributeToSelect('required_options')
-            ->setPositionOrder()
-            ->addStoreFilter();
+        $this->_itemCollection = $product->getRelatedProductCollection()->addAttributeToSelect(
+            'required_options'
+        )->setPositionOrder()->addStoreFilter();
 
-        if ($this->_catalogData->isModuleEnabled('Magento_Checkout')) {
-            $this->_checkoutCart->addExcludeProductFilter(
-                $this->_itemCollection,
-                $this->_checkoutSession->getQuoteId()
-            );
+        if ($this->moduleManager->isEnabled('Magento_Checkout')) {
             $this->_addProductAttributesAndPrices($this->_itemCollection);
         }
-        $this->_itemCollection->setVisibility(
-            $this->_catalogProductVisibility->getVisibleInCatalogIds()
-        );
+        $this->_itemCollection->setVisibility($this->_catalogProductVisibility->getVisibleInCatalogIds());
 
         $this->_itemCollection->load();
 
@@ -123,14 +108,60 @@ class Related extends \Magento\Catalog\Block\Product\AbstractProduct
         return $this;
     }
 
+    /**
+     * Before to html handler
+     *
+     * @return $this
+     */
     protected function _beforeToHtml()
     {
         $this->_prepareData();
         return parent::_beforeToHtml();
     }
 
+    /**
+     * Get collection items
+     *
+     * @return Collection
+     */
     public function getItems()
     {
+        /**
+         * getIdentities() depends on _itemCollection populated, but it can be empty if the block is hidden
+         * @see https://github.com/magento/magento2/issues/5897
+         */
+        if ($this->_itemCollection === null) {
+            $this->_prepareData();
+        }
         return $this->_itemCollection;
+    }
+
+    /**
+     * Return identifiers for produced content
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        $identities = [];
+        foreach ($this->getItems() as $item) {
+            $identities[] = $item->getIdentities();
+        }
+        return array_merge([], ...$identities);
+    }
+
+    /**
+     * Find out if some products can be easy added to cart
+     *
+     * @return bool
+     */
+    public function canItemsAddToCart()
+    {
+        foreach ($this->getItems() as $item) {
+            if (!$item->isComposite() && $item->isSaleable() && !$item->getRequiredOptions()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

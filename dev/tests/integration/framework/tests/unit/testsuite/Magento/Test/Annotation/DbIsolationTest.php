@@ -1,30 +1,8 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Test\Annotation;
 
 /**
@@ -32,14 +10,14 @@ namespace Magento\Test\Annotation;
  *
  * @magentoDbIsolation enabled
  */
-class DbIsolationTest extends \PHPUnit_Framework_TestCase
+class DbIsolationTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\TestFramework\Annotation\DbIsolation
      */
     protected $_object;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->_object = new \Magento\TestFramework\Annotation\DbIsolation();
     }
@@ -85,20 +63,22 @@ class DbIsolationTest extends \PHPUnit_Framework_TestCase
 
     /**
      * @magentoDbIsolation invalid
-     * @expectedException \Magento\Exception
      */
     public function testStartTestTransactionRequestInvalidAnnotation()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+
         $this->_object->startTestTransactionRequest($this, new \Magento\TestFramework\Event\Param\Transaction());
     }
 
     /**
      * @magentoDbIsolation enabled
      * @magentoDbIsolation disabled
-     * @expectedException \Magento\Exception
      */
     public function testStartTestTransactionRequestAmbiguousAnnotation()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+
         $this->_object->startTestTransactionRequest($this, new \Magento\TestFramework\Event\Param\Transaction());
     }
 

@@ -1,54 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Product Chooser for "Product Link" Cms Widget Plugin
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Adminhtml\Product\Widget;
 
-class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
+use Magento\Backend\Block\Widget\Grid;
+use Magento\Backend\Block\Widget\Grid\Column;
+use Magento\Backend\Block\Widget\Grid\Extended;
+use Magento\Framework\Data\Form\Element\AbstractElement;
+
+class Chooser extends Extended
 {
-    protected $_selectedProducts = array();
+    /**
+     * @var array
+     */
+    protected $_selectedProducts = [];
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Category
+     * @var \Magento\Catalog\Model\ResourceModel\Category
      */
     protected $_resourceCategory;
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Product
+     * @var \Magento\Catalog\Model\ResourceModel\Product
      */
     protected $_resourceProduct;
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Product\CollectionFactory
+     * @var \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory
      */
     protected $_collectionFactory;
 
@@ -59,31 +45,33 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
+     * @param \Magento\Backend\Helper\Data $backendHelper
      * @param \Magento\Catalog\Model\CategoryFactory $categoryFactory
-     * @param \Magento\Catalog\Model\Resource\Product\CollectionFactory $collectionFactory
-     * @param \Magento\Catalog\Model\Resource\Category $resourceCategory
-     * @param \Magento\Catalog\Model\Resource\Product $resourceProduct
+     * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $collectionFactory
+     * @param \Magento\Catalog\Model\ResourceModel\Category $resourceCategory
+     * @param \Magento\Catalog\Model\ResourceModel\Product $resourceProduct
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
+        \Magento\Backend\Helper\Data $backendHelper,
         \Magento\Catalog\Model\CategoryFactory $categoryFactory,
-        \Magento\Catalog\Model\Resource\Product\CollectionFactory $collectionFactory,
-        \Magento\Catalog\Model\Resource\Category $resourceCategory,
-        \Magento\Catalog\Model\Resource\Product $resourceProduct,
-        array $data = array()
+        \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $collectionFactory,
+        \Magento\Catalog\Model\ResourceModel\Category $resourceCategory,
+        \Magento\Catalog\Model\ResourceModel\Product $resourceProduct,
+        array $data = []
     ) {
         $this->_categoryFactory = $categoryFactory;
         $this->_collectionFactory = $collectionFactory;
         $this->_resourceCategory = $resourceCategory;
         $this->_resourceProduct = $resourceProduct;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
     /**
      * Block construction, prepare grid params
+     *
+     * @return void
      */
     protected function _construct()
     {
@@ -95,23 +83,30 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
     /**
      * Prepare chooser element HTML
      *
-     * @param \Magento\Data\Form\Element\AbstractElement $element Form Element
-     * @return \Magento\Data\Form\Element\AbstractElement
+     * @param AbstractElement $element Form Element
+     * @return AbstractElement
      */
-    public function prepareElementHtml(\Magento\Data\Form\Element\AbstractElement $element)
+    public function prepareElementHtml(AbstractElement $element)
     {
         $uniqId = $this->mathRandom->getUniqueHash($element->getId());
-        $sourceUrl = $this->getUrl('catalog/product_widget/chooser', array(
-            'uniq_id' => $uniqId,
-            'use_massaction' => false,
-        ));
+        $sourceUrl = $this->getUrl(
+            'catalog/product_widget/chooser',
+            ['uniq_id' => $uniqId, 'use_massaction' => false]
+        );
 
-        $chooser = $this->getLayout()->createBlock('Magento\Widget\Block\Adminhtml\Widget\Chooser')
-            ->setElement($element)
-            ->setConfig($this->getConfig())
-            ->setFieldsetId($this->getFieldsetId())
-            ->setSourceUrl($sourceUrl)
-            ->setUniqId($uniqId);
+        $chooser = $this->getLayout()->createBlock(
+            \Magento\Widget\Block\Adminhtml\Widget\Chooser::class
+        )->setElement(
+            $element
+        )->setConfig(
+            $this->getConfig()
+        )->setFieldsetId(
+            $this->getFieldsetId()
+        )->setSourceUrl(
+            $sourceUrl
+        )->setUniqId(
+            $uniqId
+        );
 
         if ($element->getValue()) {
             $value = explode('/', $element->getValue());
@@ -130,7 +125,9 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
             }
             if ($productId) {
                 $label .= $this->_resourceProduct->getAttributeRawValue(
-                    $productId, 'name', $this->_storeManager->getStore()
+                    $productId,
+                    'name',
+                    $this->_storeManager->getStore()
                 );
             }
             $chooser->setLabel($label);
@@ -176,9 +173,15 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
                     if (grid.categoryName) {
                         optionLabel = grid.categoryName + " / " + optionLabel;
                     }
-                    '.$chooserJsObject.'.setElementValue(optionValue);
-                    '.$chooserJsObject.'.setElementLabel(optionLabel);
-                    '.$chooserJsObject.'.close();
+                    ' .
+                $chooserJsObject .
+                '.setElementValue(optionValue);
+                    ' .
+                $chooserJsObject .
+                '.setElementLabel(optionLabel);
+                    ' .
+                $chooserJsObject .
+                '.close();
                 }
             ';
         }
@@ -199,24 +202,24 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
                 {jsObject}.categoryName = node.attributes.id != "none" ? node.text : false;
             }
         ';
-        $js = str_replace('{jsObject}', $this->getJsObjectName(), $js);
+        $js = str_replace('{jsObject}', $this->escapeJs($this->getJsObjectName()), $js);
         return $js;
     }
 
     /**
      * Filter checked/unchecked rows in grid
      *
-     * @param \Magento\Adminhtml\Block\Widget\Grid\Column $column
-     * @return \Magento\Catalog\Block\Adminhtml\Product\Widget\Chooser
+     * @param Column $column
+     * @return $this
      */
     protected function _addColumnFilterToCollection($column)
     {
         if ($column->getId() == 'in_products') {
             $selected = $this->getSelectedProducts();
             if ($column->getFilter()->getValue()) {
-                $this->getCollection()->addFieldToFilter('entity_id', array('in'=>$selected));
+                $this->getCollection()->addFieldToFilter('entity_id', ['in' => $selected]);
             } else {
-                $this->getCollection()->addFieldToFilter('entity_id', array('nin'=>$selected));
+                $this->getCollection()->addFieldToFilter('entity_id', ['nin' => $selected]);
             }
         } else {
             parent::_addColumnFilterToCollection($column);
@@ -227,14 +230,12 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
     /**
      * Prepare products collection, defined collection filters (category, product type)
      *
-     * @return \Magento\Adminhtml\Block\Widget\Grid
+     * @return Extended
      */
     protected function _prepareCollection()
     {
-        /* @var $collection \Magento\Catalog\Model\Resource\Product\Collection */
-        $collection = $this->_collectionFactory->create()
-            ->setStoreId(0)
-            ->addAttributeToSelect('name');
+        /* @var $collection \Magento\Catalog\Model\ResourceModel\Product\Collection */
+        $collection = $this->_collectionFactory->create()->setStoreId(0)->addAttributeToSelect('name');
 
         if ($categoryId = $this->getCategoryId()) {
             $category = $this->_categoryFactory->create()->load($categoryId);
@@ -245,7 +246,7 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
                 if (empty($productIds)) {
                     $productIds = 0;
                 }
-                $collection->addFieldToFilter('entity_id', array('in' => $productIds));
+                $collection->addFieldToFilter('entity_id', ['in' => $productIds]);
             }
         }
 
@@ -260,45 +261,57 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
     /**
      * Prepare columns for products grid
      *
-     * @return \Magento\Adminhtml\Block\Widget\Grid
+     * @return Extended
      */
     protected function _prepareColumns()
     {
         if ($this->getUseMassaction()) {
-            $this->addColumn('in_products', array(
-                'header_css_class' => 'a-center',
-                'type'      => 'checkbox',
-                'name'      => 'in_products',
-                'inline_css' => 'checkbox entities',
-                'field_name' => 'in_products',
-                'values'    => $this->getSelectedProducts(),
-                'align'     => 'center',
-                'index'     => 'entity_id',
-                'use_index' => true,
-            ));
+            $this->addColumn(
+                'in_products',
+                [
+                    'header_css_class' => 'a-center',
+                    'type' => 'checkbox',
+                    'name' => 'in_products',
+                    'inline_css' => 'checkbox entities',
+                    'field_name' => 'in_products',
+                    'values' => $this->getSelectedProducts(),
+                    'align' => 'center',
+                    'index' => 'entity_id',
+                    'use_index' => true
+                ]
+            );
         }
 
-        $this->addColumn('entity_id', array(
-            'header'    => __('ID'),
-            'sortable'  => true,
-            'index'     => 'entity_id',
-            'header_css_class'  => 'col-id',
-            'column_css_class'  => 'col-id'
-        ));
-        $this->addColumn('chooser_sku', array(
-            'header'    => __('SKU'),
-            'name'      => 'chooser_sku',
-            'index'     => 'sku',
-            'header_css_class'  => 'col-sku',
-            'column_css_class'  => 'col-sku'
-        ));
-        $this->addColumn('chooser_name', array(
-            'header'    => __('Product'),
-            'name'      => 'chooser_name',
-            'index'     => 'name',
-            'header_css_class'  => 'col-product',
-            'column_css_class'  => 'col-product'
-        ));
+        $this->addColumn(
+            'entity_id',
+            [
+                'header' => __('ID'),
+                'sortable' => true,
+                'index' => 'entity_id',
+                'header_css_class' => 'col-id',
+                'column_css_class' => 'col-id'
+            ]
+        );
+        $this->addColumn(
+            'chooser_sku',
+            [
+                'header' => __('SKU'),
+                'name' => 'chooser_sku',
+                'index' => 'sku',
+                'header_css_class' => 'col-sku',
+                'column_css_class' => 'col-sku'
+            ]
+        );
+        $this->addColumn(
+            'chooser_name',
+            [
+                'header' => __('Product'),
+                'name' => 'chooser_name',
+                'index' => 'name',
+                'header_css_class' => 'col-product',
+                'column_css_class' => 'col-product'
+            ]
+        );
 
         return parent::_prepareColumns();
     }
@@ -310,20 +323,23 @@ class Chooser extends \Magento\Adminhtml\Block\Widget\Grid
      */
     public function getGridUrl()
     {
-        return $this->getUrl('catalog/product_widget/chooser', array(
-            'products_grid' => true,
-            '_current' => true,
-            'uniq_id' => $this->getId(),
-            'use_massaction' => $this->getUseMassaction(),
-            'product_type_id' => $this->getProductTypeId()
-        ));
+        return $this->getUrl(
+            'catalog/product_widget/chooser',
+            [
+                'products_grid' => true,
+                '_current' => true,
+                'uniq_id' => $this->getId(),
+                'use_massaction' => $this->getUseMassaction(),
+                'product_type_id' => $this->getProductTypeId()
+            ]
+        );
     }
 
     /**
      * Setter
      *
      * @param array $selectedProducts
-     * @return \Magento\Catalog\Block\Adminhtml\Product\Widget\Chooser
+     * @return $this
      */
     public function setSelectedProducts($selectedProducts)
     {

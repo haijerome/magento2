@@ -1,44 +1,28 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Eav
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
+namespace Magento\Eav\Model\Entity\Increment;
 
 /**
- * Enter description here...
- *
  * Properties:
  * - prefix
  * - pad_length
  * - pad_char
  * - last_id
+ *
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Eav\Model\Entity\Increment;
-
-abstract class AbstractIncrement extends \Magento\Object
-    implements \Magento\Eav\Model\Entity\Increment\IncrementInterface
+abstract class AbstractIncrement extends \Magento\Framework\DataObject implements
+    \Magento\Eav\Model\Entity\Increment\IncrementInterface
 {
+    /**
+     * Get pad length
+     *
+     * @return int
+     */
     public function getPadLength()
     {
         $padLength = $this->getData('pad_length');
@@ -48,6 +32,11 @@ abstract class AbstractIncrement extends \Magento\Object
         return $padLength;
     }
 
+    /**
+     * Get pad char
+     *
+     * @return string
+     */
     public function getPadChar()
     {
         $padChar = $this->getData('pad_char');
@@ -57,13 +46,26 @@ abstract class AbstractIncrement extends \Magento\Object
         return $padChar;
     }
 
+    /**
+     * Pad format
+     *
+     * @param mixed $id
+     * @return string
+     */
     public function format($id)
     {
         $result = $this->getPrefix();
-        $result.= str_pad((string)$id, $this->getPadLength(), $this->getPadChar(), STR_PAD_LEFT);
+        $result .= str_pad((string)$id, $this->getPadLength(), $this->getPadChar(), STR_PAD_LEFT);
         return $result;
     }
 
+    /**
+     * Frontend format
+     *
+     * @param mixed $id
+     * @return mixed
+     * @codeCoverageIgnore
+     */
     public function frontendFormat($id)
     {
         return $id;

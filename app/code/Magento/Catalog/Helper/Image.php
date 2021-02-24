@@ -1,38 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Helper;
+
+use Magento\Catalog\Model\Config\CatalogMediaConfig;
+use Magento\Framework\App\Helper\AbstractHelper;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\View\Element\Block\ArgumentInterface;
 
 /**
  * Catalog image helper
  *
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @SuppressWarnings(PHPMD.TooManyFields)
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Helper;
-
-class Image extends \Magento\App\Helper\AbstractHelper
+class Image extends AbstractHelper implements ArgumentInterface
 {
+    /**
+     * Media config node
+     */
+    const MEDIA_TYPE_CONFIG_NODE = 'images';
+
     /**
      * Current model
      *
@@ -45,7 +37,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      *
      * @var bool
      */
-    protected $_scheduleResize = false;
+    protected $_scheduleResize = true;
 
     /**
      * Scheduled for rotate image
@@ -111,16 +103,9 @@ class Image extends \Magento\App\Helper\AbstractHelper
     protected $_placeholder;
 
     /**
-     * @var \Magento\View\Url
+     * @var \Magento\Framework\View\Asset\Repository
      */
-    protected $_viewUrl;
-
-    /**
-     * Core store config
-     *
-     * @var \Magento\Core\Model\Store\Config
-     */
-    protected $_coreStoreConfig;
+    protected $_assetRepo;
 
     /**
      * Product image factory
@@ -130,32 +115,65 @@ class Image extends \Magento\App\Helper\AbstractHelper
     protected $_productImageFactory;
 
     /**
-     * @param \Magento\App\Helper\Context $context
+     * @var \Magento\Framework\View\ConfigInterface
+     */
+    protected $viewConfig;
+
+    /**
+     * @var \Magento\Framework\Config\View
+     */
+    protected $configView;
+
+    /**
+     * Image configuration attributes
+     *
+     * @var array
+     */
+    protected $attributes = [];
+
+    /**
+     * @var \Magento\Catalog\Model\View\Asset\PlaceholderFactory
+     */
+    private $viewAssetPlaceholderFactory;
+
+    /**
+     * @var CatalogMediaConfig
+     */
+    private $mediaConfig;
+
+    /**
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Catalog\Model\Product\ImageFactory $productImageFactory
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\View\ConfigInterface $viewConfig
+     * @param \Magento\Catalog\Model\View\Asset\PlaceholderFactory $placeholderFactory
+     * @param CatalogMediaConfig $mediaConfig
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Catalog\Model\Product\ImageFactory $productImageFactory,
-        \Magento\View\Url $viewUrl,
-        \Magento\Core\Model\Store\Config $coreStoreConfig
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\View\ConfigInterface $viewConfig,
+        \Magento\Catalog\Model\View\Asset\PlaceholderFactory $placeholderFactory = null,
+        CatalogMediaConfig $mediaConfig = null
     ) {
         $this->_productImageFactory = $productImageFactory;
         parent::__construct($context);
-        $this->_coreStoreConfig = $coreStoreConfig;
-        $this->_viewUrl = $viewUrl;
+        $this->_assetRepo = $assetRepo;
+        $this->viewConfig = $viewConfig;
+        $this->viewAssetPlaceholderFactory = $placeholderFactory
+            ?: ObjectManager::getInstance()->get(\Magento\Catalog\Model\View\Asset\PlaceholderFactory::class);
+        $this->mediaConfig = $mediaConfig ?: ObjectManager::getInstance()->get(CatalogMediaConfig::class);
     }
 
     /**
      * Reset all previous data
      *
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     protected function _reset()
     {
         $this->_model = null;
-        $this->_scheduleResize = false;
         $this->_scheduleRotate = false;
         $this->_angle = null;
         $this->_watermark = null;
@@ -164,6 +182,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
         $this->_watermarkImageOpacity = null;
         $this->_product = null;
         $this->_imageFile = null;
+        $this->attributes = [];
         return $this;
     }
 
@@ -171,36 +190,99 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Initialize Helper to work with Image
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @param string $attributeName
-     * @param mixed $imageFile
-     * @return \Magento\Catalog\Helper\Image
+     * @param string $imageId
+     * @param array $attributes
+     * @return $this
      */
-    public function init(\Magento\Catalog\Model\Product $product, $attributeName, $imageFile=null)
+    public function init($product, $imageId, $attributes = [])
     {
         $this->_reset();
-        $this->_setModel($this->_productImageFactory->create());
-        $this->_getModel()->setDestinationSubdir($attributeName);
-        $this->setProduct($product);
 
+        $this->attributes = array_merge(
+            $this->getConfigView()->getMediaAttributes('Magento_Catalog', self::MEDIA_TYPE_CONFIG_NODE, $imageId),
+            $attributes
+        );
+
+        $this->setProduct($product);
+        $this->setImageProperties();
+        $this->setWatermarkProperties();
+
+        return $this;
+    }
+
+    /**
+     * Set image properties
+     *
+     * @return $this
+     */
+    protected function setImageProperties()
+    {
+        $this->_getModel()->setDestinationSubdir($this->getType());
+        $this->_getModel()->setWidth($this->getWidth());
+        $this->_getModel()->setHeight($this->getHeight());
+
+        // Set 'keep frame' flag
+        $frame = $this->getFrame();
+        $this->_getModel()->setKeepFrame($frame);
+
+        // Set 'constrain only' flag
+        $constrain = $this->getAttribute('constrain');
+        if (null !== $constrain) {
+            $this->_getModel()->setConstrainOnly($constrain);
+        }
+
+        // Set 'keep aspect ratio' flag
+        $aspectRatio = $this->getAttribute('aspect_ratio');
+        if (null !== $aspectRatio) {
+            $this->_getModel()->setKeepAspectRatio($aspectRatio);
+        }
+
+        // Set 'transparency' flag
+        $transparency = $this->getAttribute('transparency');
+        if (null !== $transparency) {
+            $this->_getModel()->setKeepTransparency($transparency);
+        }
+
+        // Set background color
+        $background = $this->getAttribute('background');
+        if (null !== $background) {
+            $this->_getModel()->setBackgroundColor($background);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set watermark properties
+     *
+     * @return $this
+     */
+    protected function setWatermarkProperties()
+    {
         $this->setWatermark(
-            $this->_coreStoreConfig->getConfig("design/watermark/{$this->_getModel()->getDestinationSubdir()}_image")
+            $this->scopeConfig->getValue(
+                "design/watermark/{$this->getType()}_image",
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            )
         );
         $this->setWatermarkImageOpacity(
-            $this->_coreStoreConfig->getConfig("design/watermark/{$this->_getModel()->getDestinationSubdir()}_imageOpacity")
+            $this->scopeConfig->getValue(
+                "design/watermark/{$this->getType()}_imageOpacity",
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            )
         );
         $this->setWatermarkPosition(
-            $this->_coreStoreConfig->getConfig("design/watermark/{$this->_getModel()->getDestinationSubdir()}_position")
+            $this->scopeConfig->getValue(
+                "design/watermark/{$this->getType()}_position",
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            )
         );
         $this->setWatermarkSize(
-            $this->_coreStoreConfig->getConfig("design/watermark/{$this->_getModel()->getDestinationSubdir()}_size")
+            $this->scopeConfig->getValue(
+                "design/watermark/{$this->getType()}_size",
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            )
         );
-
-        if ($imageFile) {
-            $this->setImageFile($imageFile);
-        } else {
-            // add for work original size
-            $this->_getModel()->setBaseFile($this->getProduct()->getData($this->_getModel()->getDestinationSubdir()));
-        }
         return $this;
     }
 
@@ -211,7 +293,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * @see \Magento\Catalog\Model\Product\Image
      * @param int $width
      * @param int $height
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function resize($width, $height = null)
     {
@@ -224,7 +306,8 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set image quality, values in percentage from 0 to 100
      *
      * @param int $quality
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
+     * @deprecated 103.0.1
      */
     public function setQuality($quality)
     {
@@ -239,7 +322,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      *
      * @see \Magento\Catalog\Model\Product\Image
      * @param bool $flag
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function keepAspectRatio($flag)
     {
@@ -256,10 +339,10 @@ class Image extends \Magento\App\Helper\AbstractHelper
      *
      * @see \Magento\Catalog\Model\Product\Image
      * @param bool $flag
-     * @param array $position
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function keepFrame($flag, $position = array('center', 'middle'))
+    public function keepFrame($flag)
     {
         $this->_getModel()->setKeepFrame($flag);
         return $this;
@@ -274,10 +357,10 @@ class Image extends \Magento\App\Helper\AbstractHelper
      *
      * @see \Magento\Catalog\Model\Product\Image
      * @param bool $flag
-     * @param int $alphaOpacity
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function keepTransparency($flag, $alphaOpacity = null)
+    public function keepTransparency($flag)
     {
         $this->_getModel()->setKeepTransparency($flag);
         return $this;
@@ -289,7 +372,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * It is false by default
      *
      * @param bool $flag
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function constrainOnly($flag)
     {
@@ -305,13 +388,15 @@ class Image extends \Magento\App\Helper\AbstractHelper
      *
      * @see \Magento\Catalog\Model\Product\Image
      * @param array $colorRGB
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function backgroundColor($colorRGB)
     {
         // assume that 3 params were given instead of array
         if (!is_array($colorRGB)) {
+            //phpcs:disable
             $colorRGB = func_get_args();
+            //phpcs:enabled
         }
         $this->_getModel()->setBackgroundColor($colorRGB);
         return $this;
@@ -321,7 +406,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Rotate image into specified angle
      *
      * @param int $angle
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function rotate($angle)
     {
@@ -333,20 +418,26 @@ class Image extends \Magento\App\Helper\AbstractHelper
 
     /**
      * Add watermark to image
-     * size param in format 100x200
+     *
+     * Size param in format 100x200
      *
      * @param string $fileName
      * @param string $position
      * @param string $size
      * @param int $imageOpacity
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
-    public function watermark($fileName, $position, $size=null, $imageOpacity=null)
+    public function watermark($fileName, $position, $size = null, $imageOpacity = null)
     {
-        $this->setWatermark($fileName)
-            ->setWatermarkPosition($position)
-            ->setWatermarkSize($size)
-            ->setWatermarkImageOpacity($imageOpacity);
+        $this->setWatermark(
+            $fileName
+        )->setWatermarkPosition(
+            $position
+        )->setWatermarkSize(
+            $size
+        )->setWatermarkImageOpacity(
+            $imageOpacity
+        );
         return $this;
     }
 
@@ -364,66 +455,151 @@ class Image extends \Magento\App\Helper\AbstractHelper
     /**
      * Get Placeholder
      *
+     * @param null|string $placeholder
      * @return string
+     *
+     * @deprecated 102.0.0 Returns only default placeholder.
+     * Does not take into account custom placeholders set in Configuration.
      */
-    public function getPlaceholder()
+    public function getPlaceholder($placeholder = null)
     {
-        if (!$this->_placeholder) {
-            $attr = $this->_getModel()->getDestinationSubdir();
-            $this->_placeholder = 'Magento_Catalog::images/product/placeholder/' . $attr . '.jpg';
+        if ($placeholder) {
+            $placeholderFullPath = 'Magento_Catalog::images/product/placeholder/' . $placeholder . '.jpg';
+        } else {
+            $placeholderFullPath = $this->_placeholder
+                ?: 'Magento_Catalog::images/product/placeholder/' . $this->_getModel()->getDestinationSubdir() . '.jpg';
         }
-        return $this->_placeholder;
+        return $placeholderFullPath;
     }
 
     /**
-     * Return Image URL
+     * Apply scheduled actions
      *
-     * @return string
+     * @return $this
+     * @throws \Exception
      */
-    public function __toString()
+    protected function applyScheduledActions()
     {
-        try {
+        $this->initBaseFile();
+        if ($this->isScheduledActionsAllowed()) {
             $model = $this->_getModel();
+            if ($this->_scheduleRotate) {
+                $model->rotate($this->getAngle());
+            }
+            if ($this->_scheduleResize) {
+                $model->resize();
+            }
+            if ($this->getWatermark()) {
+                $model->setWatermark($this->getWatermark());
+            }
+            $model->saveFile();
+        }
+        return $this;
+    }
 
+    /**
+     * Initialize base image file
+     *
+     * @return $this
+     */
+    protected function initBaseFile()
+    {
+        $model = $this->_getModel();
+        $baseFile = $model->getBaseFile();
+        if (!$baseFile) {
             if ($this->getImageFile()) {
                 $model->setBaseFile($this->getImageFile());
             } else {
-                $model->setBaseFile($this->getProduct()->getData($model->getDestinationSubdir()));
+                $model->setBaseFile(
+                    $this->getProduct()
+                        ? $this->getProduct()->getData($model->getDestinationSubdir())
+                        : ''
+                );
             }
-
-            if ($model->isCached()) {
-                return $model->getUrl();
-            } else {
-                if ($this->_scheduleRotate) {
-                    $model->rotate($this->getAngle());
-                }
-
-                if ($this->_scheduleResize) {
-                    $model->resize();
-                }
-
-                if ($this->getWatermark()) {
-                    $model->setWatermark($this->getWatermark());
-                }
-
-                $url = $model->saveFile()->getUrl();
-            }
-        } catch (\Exception $e) {
-            $url = $this->_viewUrl->getViewFileUrl($this->getPlaceholder());
         }
-        return $url;
+        return $this;
     }
 
     /**
-     * Set current Image model
+     * Check if scheduled actions is allowed
      *
-     * @param \Magento\Catalog\Model\Product\Image $model
-     * @return \Magento\Catalog\Helper\Image
+     * @return bool
      */
-    protected function _setModel($model)
+    protected function isScheduledActionsAllowed()
     {
-        $this->_model = $model;
+        $model = $this->_getModel();
+        if ($model->isBaseFilePlaceholder() || $model->isCached()) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Retrieve image URL
+     *
+     * @return string
+     */
+    public function getUrl()
+    {
+        try {
+            switch ($this->mediaConfig->getMediaUrlFormat()) {
+                case CatalogMediaConfig::IMAGE_OPTIMIZATION_PARAMETERS:
+                    $this->initBaseFile();
+                    break;
+                case CatalogMediaConfig::HASH:
+                    $this->applyScheduledActions();
+                    break;
+                default:
+                    throw new LocalizedException(__("The specified Catalog media URL format is not supported."));
+            }
+            return $this->_getModel()->getUrl();
+        } catch (\Exception $e) {
+            return $this->getDefaultPlaceholderUrl();
+        }
+    }
+
+    /**
+     * Save changes
+     *
+     * @return $this
+     */
+    public function save()
+    {
+        $this->applyScheduledActions();
         return $this;
+    }
+
+    /**
+     * Return resized product image information
+     *
+     * @return array
+     */
+    public function getResizedImageInfo()
+    {
+        $this->applyScheduledActions();
+        return $this->_getModel()->getResizedImageInfo();
+    }
+
+    /**
+     * Getter for placeholder url
+     *
+     * @param null|string $placeholder
+     * @return string
+     */
+    public function getDefaultPlaceholderUrl($placeholder = null)
+    {
+        try {
+            $imageAsset = $this->viewAssetPlaceholderFactory->create(
+                [
+                    'type' => $placeholder ?: $this->_getModel()->getDestinationSubdir(),
+                ]
+            );
+            $url = $imageAsset->getUrl();
+        } catch (\Exception $e) {
+            $this->_logger->critical($e);
+            $url = $this->_urlBuilder->getUrl('', ['_direct' => 'core/index/notFound']);
+        }
+        return $url;
     }
 
     /**
@@ -433,6 +609,9 @@ class Image extends \Magento\App\Helper\AbstractHelper
      */
     protected function _getModel()
     {
+        if (!$this->_model) {
+            $this->_model = $this->_productImageFactory->create();
+        }
         return $this->_model;
     }
 
@@ -440,7 +619,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set Rotation Angle
      *
      * @param int $angle
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     protected function setAngle($angle)
     {
@@ -462,7 +641,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set watermark file name
      *
      * @param string $watermark
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     protected function setWatermark($watermark)
     {
@@ -485,7 +664,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set watermark position
      *
      * @param string $position
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     protected function setWatermarkPosition($position)
     {
@@ -506,10 +685,11 @@ class Image extends \Magento\App\Helper\AbstractHelper
 
     /**
      * Set watermark size
-     * param size in format 100x200
+     *
+     * Param size in format 100x200
      *
      * @param string $size
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function setWatermarkSize($size)
     {
@@ -532,7 +712,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set watermark image opacity
      *
      * @param int $imageOpacity
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     public function setWatermarkImageOpacity($imageOpacity)
     {
@@ -559,7 +739,7 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set current Product
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
     protected function setProduct($product)
     {
@@ -581,9 +761,9 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Set Image file
      *
      * @param string $file
-     * @return \Magento\Catalog\Helper\Image
+     * @return $this
      */
-    protected function setImageFile($file)
+    public function setImageFile($file)
     {
         $this->_imageFile = $file;
         return $this;
@@ -608,11 +788,8 @@ class Image extends \Magento\App\Helper\AbstractHelper
     protected function parseSize($string)
     {
         $size = explode('x', strtolower($string));
-        if (sizeof($size) == 2) {
-            return array(
-                'width' => ($size[0] > 0) ? $size[0] : null,
-                'heigth' => ($size[1] > 0) ? $size[1] : null,
-            );
+        if (count($size) == 2) {
+            return ['width' => $size[0] > 0 ? $size[0] : null, 'height' => $size[1] > 0 ? $size[1] : null];
         }
         return false;
     }
@@ -641,13 +818,92 @@ class Image extends \Magento\App\Helper\AbstractHelper
      * Retrieve Original image size as array
      * 0 - width, 1 - height
      *
-     * @return array
+     * @return int[]
      */
     public function getOriginalSizeArray()
     {
-        return array(
-            $this->getOriginalWidth(),
-            $this->getOriginalHeight()
-        );
+        return [$this->getOriginalWidth(), $this->getOriginalHeight()];
+    }
+
+    /**
+     * Retrieve config view
+     *
+     * @return \Magento\Framework\Config\View
+     */
+    protected function getConfigView()
+    {
+        if (!$this->configView) {
+            $this->configView = $this->viewConfig->getViewConfig();
+        }
+        return $this->configView;
+    }
+
+    /**
+     * Retrieve image type
+     *
+     * @return string
+     */
+    public function getType()
+    {
+        return $this->getAttribute('type');
+    }
+
+    /**
+     * Retrieve image width
+     *
+     * @return string
+     */
+    public function getWidth()
+    {
+        return $this->getAttribute('width');
+    }
+
+    /**
+     * Retrieve image height
+     *
+     * @return string
+     */
+    public function getHeight()
+    {
+        return $this->getAttribute('height') ?: $this->getAttribute('width');
+    }
+
+    /**
+     * Retrieve image frame flag
+     *
+     * @return false|string
+     */
+    public function getFrame()
+    {
+        $frame = $this->getAttribute('frame');
+        if ($frame === null) {
+            $frame = $this->getConfigView()->getVarValue('Magento_Catalog', 'product_image_white_borders');
+        }
+        return (bool)$frame;
+    }
+
+    /**
+     * Retrieve image attribute
+     *
+     * @param string $name
+     * @return string
+     */
+    protected function getAttribute($name)
+    {
+        return $this->attributes[$name] ?? null;
+    }
+
+    /**
+     * Return image label
+     *
+     * @return string
+     */
+    public function getLabel()
+    {
+        $label = $this->_product->getData($this->getType() . '_' . 'label');
+        if (empty($label)) {
+            $label = $this->_product->getName();
+        }
+        return $label;
     }
 }

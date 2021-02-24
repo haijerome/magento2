@@ -1,40 +1,24 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_ImportExport
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Data source with columns for Magento_ImportExport
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\ImportExport\Model\Import;
 
+use Magento\ImportExport\Model\Import\AbstractEntity;
+
+/**
+ * Data source with columns for Magento_ImportExport
+ *
+ * @api
+ * @since 100.0.2
+ */
 abstract class AbstractSource implements \SeekableIterator
 {
     /**
      * @var array
      */
-    protected $_colNames = array();
+    protected $_colNames = [];
 
     /**
      * Quantity of columns
@@ -48,7 +32,7 @@ abstract class AbstractSource implements \SeekableIterator
      *
      * @var array
      */
-    protected $_row = array();
+    protected $_row = [];
 
     /**
      * Current row number
@@ -58,6 +42,11 @@ abstract class AbstractSource implements \SeekableIterator
      * @var int
      */
     protected $_key = -1;
+
+    /**
+     * @var bool
+     */
+    protected $_foundWrongQuoteFlag = false;
 
     /**
      * Get and validate column names
@@ -98,20 +87,26 @@ abstract class AbstractSource implements \SeekableIterator
     {
         $row = $this->_row;
         if (count($row) != $this->_colQty) {
-            $row = array_pad($this->_row, $this->_colQty, '');
+            if ($this->_foundWrongQuoteFlag) {
+                throw new \InvalidArgumentException(AbstractEntity::ERROR_CODE_WRONG_QUOTES);
+            } else {
+                throw new \InvalidArgumentException(AbstractEntity::ERROR_CODE_COLUMNS_NUMBER);
+            }
         }
         return array_combine($this->_colNames, $row);
     }
 
     /**
      * Move forward to next element (\Iterator interface)
+     *
+     * @return void
      */
     public function next()
     {
         $this->_key++;
         $row = $this->_getNextRow();
-        if (false === $row) {
-            $this->_row = array();
+        if (false === $row || [] === $row) {
+            $this->_row = [];
             $this->_key = -1;
         } else {
             $this->_row = $row;
@@ -123,7 +118,7 @@ abstract class AbstractSource implements \SeekableIterator
      *
      * Return array or false on error
      *
-     * @return array|bool
+     * @return array|false
      */
     abstract protected function _getNextRow();
 
@@ -147,14 +142,15 @@ abstract class AbstractSource implements \SeekableIterator
         return -1 !== $this->_key;
     }
 
-
     /**
      * Rewind the \Iterator to the first element (\Iterator interface)
+     *
+     * @return void
      */
     public function rewind()
     {
         $this->_key = -1;
-        $this->_row = array();
+        $this->_row = [];
         $this->next();
     }
 
@@ -162,6 +158,7 @@ abstract class AbstractSource implements \SeekableIterator
      * Seeks to a position (Seekable interface)
      *
      * @param int $position The position to seek to 0 or more
+     * @return void
      * @throws \OutOfBoundsException
      */
     public function seek($position)

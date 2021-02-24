@@ -1,54 +1,32 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * @method string|array getInputNames()
- *
- * @category   Magento
- * @package    Magento_Backend
- * @author     Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\Widget\Grid;
 
-class Serializer extends \Magento\View\Element\Template
+/**
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
+ * @method string|array getInputNames()
+ * @since 100.0.2
+ */
+class Serializer extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        array $data = []
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         parent::__construct($context, $data);
@@ -66,14 +44,15 @@ class Serializer extends \Magento\View\Element\Template
             $grid = $this->getLayout()->getBlock($grid);
         }
         if ($grid instanceof \Magento\Backend\Block\Widget\Grid) {
-            $this->setGridBlock($grid)
-                ->setSerializeData($grid->{$this->getCallback()}());
+            $this->setGridBlock($grid)->setSerializeData($grid->{$this->getCallback()}());
         }
         return parent::_prepareLayout();
     }
 
     /**
      * Set serializer template
+     *
+     * @return void
      */
     public function _construct()
     {
@@ -85,7 +64,6 @@ class Serializer extends \Magento\View\Element\Template
      * Get grid column input names to serialize
      *
      * @param bool $asJSON
-     *
      * @return string|array
      */
     public function getColumnInputNames($asJSON = false)
@@ -103,7 +81,7 @@ class Serializer extends \Magento\View\Element\Template
      */
     public function getDataAsJSON()
     {
-        $result = array();
+        $result = [];
         $inputNames = $this->getInputNames();
         if ($serializeData = $this->getSerializeData()) {
             $result = $serializeData;

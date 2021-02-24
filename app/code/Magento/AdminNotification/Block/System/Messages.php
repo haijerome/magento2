@@ -1,52 +1,63 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- * 
- * @copyright Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license   http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\AdminNotification\Block\System;
 
-class Messages extends \Magento\Backend\Block\Template
+use Magento\AdminNotification\Model\ResourceModel\System\Message\Collection\Synchronized;
+use Magento\Backend\Block\Template;
+use Magento\Backend\Block\Template\Context as TemplateContext;
+use Magento\Framework\Json\Helper\Data as JsonDataHelper;
+use Magento\Framework\Notification\MessageInterface;
+use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
+
+/**
+ * AdminNotification Messages class
+ */
+class Messages extends Template
 {
     /**
-     * Message list
+     * Synchronized Message collection
      *
-     * @var \Magento\AdminNotification\Model\Resource\System\Message\Collection\Synchronized
+     * @var Synchronized
      */
     protected $_messages;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\AdminNotification\Model\Resource\System\Message\Collection\Synchronized $messages
+     * @var JsonDataHelper
+     * @deprecated 100.3.0
+     */
+    protected $jsonHelper;
+
+    /**
+     * @var JsonSerializer
+     */
+    private $serializer;
+
+    /**
+     * @param TemplateContext $context
+     * @param Synchronized $messages
+     * @param JsonDataHelper $jsonHelper
+     * @param JsonSerializer $serializer
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\AdminNotification\Model\Resource\System\Message\Collection\Synchronized $messages,
-        array $data = array()
+        TemplateContext $context,
+        Synchronized $messages,
+        JsonDataHelper $jsonHelper,
+        JsonSerializer $serializer,
+        array $data = []
     ) {
+        $this->jsonHelper = $jsonHelper;
         parent::__construct($context, $data);
         $this->_messages = $messages;
+        $this->serializer = $serializer;
     }
 
     /**
+     * Prepare html output
+     *
      * @return string
      */
     protected function _toHtml()
@@ -60,15 +71,14 @@ class Messages extends \Magento\Backend\Block\Template
     /**
      * Retrieve message list
      *
-     * @return \Magento\AdminNotification\Model\System\MessageInterface[]
+     * @return MessageInterface[]|null
      */
     public function getLastCritical()
     {
         $items = array_values($this->_messages->getItems());
-        if (isset($items[0]) && $items[0]->getSeverity()
-            == \Magento\AdminNotification\Model\System\MessageInterface::SEVERITY_CRITICAL
-        ) {
-            return $items[0];
+
+        if (!empty($items) && current($items)->getSeverity() === MessageInterface::SEVERITY_CRITICAL) {
+            return current($items);
         }
         return null;
     }
@@ -80,9 +90,7 @@ class Messages extends \Magento\Backend\Block\Template
      */
     public function getCriticalCount()
     {
-        return $this->_messages->getCountBySeverity(
-            \Magento\AdminNotification\Model\System\MessageInterface::SEVERITY_CRITICAL
-        );
+        return $this->_messages->getCountBySeverity(MessageInterface::SEVERITY_CRITICAL);
     }
 
     /**
@@ -92,9 +100,7 @@ class Messages extends \Magento\Backend\Block\Template
      */
     public function getMajorCount()
     {
-        return $this->_messages->getCountBySeverity(
-            \Magento\AdminNotification\Model\System\MessageInterface::SEVERITY_MAJOR
-        );
+        return $this->_messages->getCountBySeverity(MessageInterface::SEVERITY_MAJOR);
     }
 
     /**
@@ -104,7 +110,7 @@ class Messages extends \Magento\Backend\Block\Template
      */
     public function hasMessages()
     {
-        return (bool) count($this->_messages->getItems());
+        return (bool)count($this->_messages->getItems());
     }
 
     /**
@@ -118,18 +124,20 @@ class Messages extends \Magento\Backend\Block\Template
     }
 
     /**
-     * Initialize Syste,Message dialog widget
+     * Initialize system message dialog widget
      *
      * @return string
      */
     public function getSystemMessageDialogJson()
     {
-        return $this->helper('Magento\Core\Helper\Data')->jsonEncode(array(
-            'systemMessageDialog' => array(
-                'autoOpen' => false,
-                'width' => 600,
-                'ajaxUrl' => $this->_getMessagesUrl(),
-            ),
-        ));
+        return $this->serializer->serialize(
+            [
+                'systemMessageDialog' => [
+                    'buttons' => [],
+                    'modalClass' => 'ui-dialog-active ui-popup-message modal-system-messages',
+                    'ajaxUrl' => $this->_getMessagesUrl()
+                ],
+            ]
+        );
     }
 }

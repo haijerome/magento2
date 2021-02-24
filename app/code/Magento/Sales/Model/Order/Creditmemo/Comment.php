@@ -1,46 +1,19 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * @method \Magento\Sales\Model\Resource\Order\Creditmemo\Comment _getResource()
- * @method \Magento\Sales\Model\Resource\Order\Creditmemo\Comment getResource()
- * @method int getParentId()
- * @method \Magento\Sales\Model\Order\Creditmemo\Comment setParentId(int $value)
- * @method int getIsCustomerNotified()
- * @method \Magento\Sales\Model\Order\Creditmemo\Comment setIsCustomerNotified(int $value)
- * @method int getIsVisibleOnFront()
- * @method \Magento\Sales\Model\Order\Creditmemo\Comment setIsVisibleOnFront(int $value)
- * @method string getComment()
- * @method \Magento\Sales\Model\Order\Creditmemo\Comment setComment(string $value)
- * @method string getCreatedAt()
- * @method \Magento\Sales\Model\Order\Creditmemo\Comment setCreatedAt(string $value)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Model\Order\Creditmemo;
 
-class Comment extends \Magento\Sales\Model\AbstractModel
+use Magento\Framework\Api\AttributeValueFactory;
+use Magento\Sales\Api\Data\CreditmemoCommentInterface;
+use Magento\Sales\Model\AbstractModel;
+
+/**
+ * @api
+ * @since 100.0.2
+ */
+class Comment extends AbstractModel implements CreditmemoCommentInterface
 {
     /**
      * Creditmemo instance
@@ -50,49 +23,60 @@ class Comment extends \Magento\Sales\Model\AbstractModel
     protected $_creditmemo;
 
     /**
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\LocaleInterface $coreLocale
-     * @param \Magento\Stdlib\DateTime $dateTime
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param AttributeValueFactory $customAttributeFactory
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\LocaleInterface $coreLocale,
-        \Magento\Stdlib\DateTime $dateTime,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        AttributeValueFactory $customAttributeFactory,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         parent::__construct(
-            $context, $registry, $coreLocale, $dateTime, $resource, $resourceCollection, $data
+            $context,
+            $registry,
+            $extensionFactory,
+            $customAttributeFactory,
+            $resource,
+            $resourceCollection,
+            $data
         );
         $this->_storeManager = $storeManager;
     }
 
     /**
      * Initialize resource model
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Sales\Model\Resource\Order\Creditmemo\Comment');
+        $this->_init(\Magento\Sales\Model\ResourceModel\Order\Creditmemo\Comment::class);
     }
 
     /**
      * Declare Creditmemo instance
      *
-     * @param   \Magento\Sales\Model\Order\Creditmemo $creditmemo
-     * @return  \Magento\Sales\Model\Order\Creditmemo\Comment
+     * @codeCoverageIgnore
+     *
+     * @param \Magento\Sales\Model\Order\Creditmemo $creditmemo
+     * @return $this
      */
     public function setCreditmemo(\Magento\Sales\Model\Order\Creditmemo $creditmemo)
     {
@@ -102,6 +86,8 @@ class Comment extends \Magento\Sales\Model\AbstractModel
 
     /**
      * Retrieve Creditmemo instance
+     *
+     * @codeCoverageIgnore
      *
      * @return \Magento\Sales\Model\Order\Creditmemo
      */
@@ -113,7 +99,7 @@ class Comment extends \Magento\Sales\Model\AbstractModel
     /**
      * Get store object
      *
-     * @return \Magento\Core\Model\Store
+     * @return \Magento\Store\Model\Store
      */
     public function getStore()
     {
@@ -123,19 +109,119 @@ class Comment extends \Magento\Sales\Model\AbstractModel
         return $this->_storeManager->getStore();
     }
 
+    //@codeCoverageIgnoreStart
+
     /**
-     * Before object save
+     * Returns comment
      *
-     * @return \Magento\Sales\Model\Order\Creditmemo\Comment
+     * @return string
      */
-    protected function _beforeSave()
+    public function getComment()
     {
-        parent::_beforeSave();
-
-        if (!$this->getParentId() && $this->getCreditmemo()) {
-            $this->setParentId($this->getCreditmemo()->getId());
-        }
-
-        return $this;
+        return $this->getData(CreditmemoCommentInterface::COMMENT);
     }
+
+    /**
+     * Returns created_at
+     *
+     * @return string
+     */
+    public function getCreatedAt()
+    {
+        return $this->getData(CreditmemoCommentInterface::CREATED_AT);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setCreatedAt($createdAt)
+    {
+        return $this->setData(CreditmemoCommentInterface::CREATED_AT, $createdAt);
+    }
+
+    /**
+     * Returns is_customer_notified
+     *
+     * @return int
+     */
+    public function getIsCustomerNotified()
+    {
+        return $this->getData(CreditmemoCommentInterface::IS_CUSTOMER_NOTIFIED);
+    }
+
+    /**
+     * Returns is_visible_on_front
+     *
+     * @return int
+     */
+    public function getIsVisibleOnFront()
+    {
+        return $this->getData(CreditmemoCommentInterface::IS_VISIBLE_ON_FRONT);
+    }
+
+    /**
+     * Returns parent_id
+     *
+     * @return int
+     */
+    public function getParentId()
+    {
+        return $this->getData(CreditmemoCommentInterface::PARENT_ID);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setParentId($id)
+    {
+        return $this->setData(CreditmemoCommentInterface::PARENT_ID, $id);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setIsCustomerNotified($isCustomerNotified)
+    {
+        return $this->setData(CreditmemoCommentInterface::IS_CUSTOMER_NOTIFIED, $isCustomerNotified);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setIsVisibleOnFront($isVisibleOnFront)
+    {
+        return $this->setData(CreditmemoCommentInterface::IS_VISIBLE_ON_FRONT, $isVisibleOnFront);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setComment($comment)
+    {
+        return $this->setData(CreditmemoCommentInterface::COMMENT, $comment);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @return \Magento\Sales\Api\Data\CreditmemoCommentExtensionInterface|null
+     */
+    public function getExtensionAttributes()
+    {
+        return $this->_getExtensionAttributes();
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @param \Magento\Sales\Api\Data\CreditmemoCommentExtensionInterface $extensionAttributes
+     * @return $this
+     */
+    public function setExtensionAttributes(
+        \Magento\Sales\Api\Data\CreditmemoCommentExtensionInterface $extensionAttributes
+    ) {
+        return $this->_setExtensionAttributes($extensionAttributes);
+    }
+
+    //@codeCoverageIgnoreEnd
 }

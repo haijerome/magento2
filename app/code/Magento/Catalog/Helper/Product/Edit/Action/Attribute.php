@@ -1,47 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
-/**
- * Adminhtml catalog product action attribute update helper
- */
 namespace Magento\Catalog\Helper\Product\Edit\Action;
 
+/**
+ * Adminhtml catalog product action attribute update helper.
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ */
 class Attribute extends \Magento\Backend\Helper\Data
 {
     /**
      * Selected products for mass-update
      *
-     * @var \Magento\Catalog\Model\Resource\Product\Collection
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Collection
      */
     protected $_products;
 
     /**
      * Array of same attributes for selected products
      *
-     * @var \Magento\Eav\Model\Resource\Entity\Attribute\Collection
+     * @var \Magento\Eav\Model\ResourceModel\Entity\Attribute\Collection
      */
     protected $_attributes;
 
@@ -50,10 +34,10 @@ class Attribute extends \Magento\Backend\Helper\Data
      *
      * @var array
      */
-    protected $_excludedAttributes = array('url_key');
+    protected $_excludedAttributes = ['url_key'];
 
     /**
-     * @var \Magento\Catalog\Model\Resource\Product\CollectionFactory
+     * @var \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory
      */
     protected $_productsFactory;
 
@@ -68,56 +52,80 @@ class Attribute extends \Magento\Backend\Helper\Data
     protected $_eavConfig;
 
     /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\App\Route\Config $routeConfig
-     * @param \Magento\Core\Model\AppInterface $app
-     * @param \Magento\Backend\Model\Url $backendUrl
+     * @var \Magento\Store\Model\StoreManagerInterface
+     */
+    protected $_storeManager;
+
+    /**
+     * @param \Magento\Framework\App\Helper\Context $context
+     * @param \Magento\Framework\App\Route\Config $routeConfig
+     * @param \Magento\Framework\Locale\ResolverInterface $locale
+     * @param \Magento\Backend\Model\UrlInterface $backendUrl
      * @param \Magento\Backend\Model\Auth $auth
      * @param \Magento\Backend\App\Area\FrontNameResolver $frontNameResolver
-     * @param \Magento\Math\Random $mathRandom
+     * @param \Magento\Framework\Math\Random $mathRandom
      * @param \Magento\Eav\Model\Config $eavConfig
      * @param \Magento\Backend\Model\Session $session
-     * @param \Magento\Catalog\Model\Resource\Product\CollectionFactory $productsFactory
+     * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productsFactory
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\App\Route\Config $routeConfig,
-        \Magento\Core\Model\AppInterface $app,
-        \Magento\Backend\Model\Url $backendUrl,
+        \Magento\Framework\App\Helper\Context $context,
+        \Magento\Framework\App\Route\Config $routeConfig,
+        \Magento\Framework\Locale\ResolverInterface $locale,
+        \Magento\Backend\Model\UrlInterface $backendUrl,
         \Magento\Backend\Model\Auth $auth,
         \Magento\Backend\App\Area\FrontNameResolver $frontNameResolver,
-        \Magento\Math\Random $mathRandom,
+        \Magento\Framework\Math\Random $mathRandom,
         \Magento\Eav\Model\Config $eavConfig,
         \Magento\Backend\Model\Session $session,
-        \Magento\Catalog\Model\Resource\Product\CollectionFactory $productsFactory
+        \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productsFactory,
+        \Magento\Store\Model\StoreManagerInterface $storeManager
     ) {
         $this->_eavConfig = $eavConfig;
         $this->_session = $session;
         $this->_productsFactory = $productsFactory;
-        parent::__construct($context, $routeConfig, $app, $backendUrl, $auth, $frontNameResolver, $mathRandom);
+        $this->_storeManager = $storeManager;
+        parent::__construct($context, $routeConfig, $locale, $backendUrl, $auth, $frontNameResolver, $mathRandom);
     }
 
     /**
      * Return product collection with selected product filter
+     *
      * Product collection didn't load
      *
-     * @return \Magento\Catalog\Model\Resource\Product\Collection
+     * @return \Magento\Catalog\Model\ResourceModel\Product\Collection
      */
     public function getProducts()
     {
-        if (is_null($this->_products)) {
+        if ($this->_products === null) {
             $productsIds = $this->getProductIds();
 
             if (!is_array($productsIds)) {
-                $productsIds = array(0);
+                $productsIds = [0];
             }
 
-            $this->_products = $this->_productsFactory->create()
-                ->setStoreId($this->getSelectedStoreId())
-                ->addIdFilter($productsIds);
+            $this->_products = $this->_productsFactory->create()->setStoreId(
+                $this->getSelectedStoreId()
+            )->addIdFilter(
+                $productsIds
+            );
         }
 
         return $this->_products;
+    }
+
+    /**
+     * Set array of selected product
+     *
+     * @param array $productIds
+     *
+     * @return void
+     */
+    public function setProductIds($productIds)
+    {
+        $this->_session->setProductIds($productIds);
     }
 
     /**
@@ -127,10 +135,6 @@ class Attribute extends \Magento\Backend\Helper\Data
      */
     public function getProductIds()
     {
-        if ($this->_getRequest()->isPost() && $this->_getRequest()->getActionName() == 'edit') {
-            $this->_session->setProductIds($this->_getRequest()->getParam('product', null));
-        }
-
         return $this->_session->getProductIds();
     }
 
@@ -141,7 +145,7 @@ class Attribute extends \Magento\Backend\Helper\Data
      */
     public function getSelectedStoreId()
     {
-        return (int)$this->_getRequest()->getParam('store', \Magento\Core\Model\Store::DEFAULT_STORE_ID);
+        return (int)$this->_getRequest()->getParam('store', \Magento\Store\Model\Store::DEFAULT_STORE_ID);
     }
 
     /**
@@ -157,22 +161,23 @@ class Attribute extends \Magento\Backend\Helper\Data
     /**
      * Return collection of same attributes for selected products without unique
      *
-     * @return \Magento\Eav\Model\Resource\Entity\Attribute\Collection
+     * @return \Magento\Eav\Model\ResourceModel\Entity\Attribute\Collection
      */
     public function getAttributes()
     {
-        if (is_null($this->_attributes)) {
-            $this->_attributes  = $this->_eavConfig->getEntityType(\Magento\Catalog\Model\Product::ENTITY)
-                ->getAttributeCollection()
-                ->addIsNotUniqueFilter()
-                ->setInAllAttributeSetsFilter($this->getProductsSetIds());
+        if ($this->_attributes === null) {
+            $this->_attributes = $this->_eavConfig->getEntityType(
+                \Magento\Catalog\Model\Product::ENTITY
+            )->getAttributeCollection()->addIsNotUniqueFilter()->setInAllAttributeSetsFilter(
+                $this->getProductsSetIds()
+            );
 
-            if ($this->_excludedAttributes) {
-                $this->_attributes->addFieldToFilter('attribute_code', array('nin' => $this->_excludedAttributes));
+            if ($excludedAttributes = $this->getExcludedAttributes()) {
+                $this->_attributes->addFieldToFilter('attribute_code', ['nin' => $excludedAttributes]);
             }
 
             // check product type apply to limitation and remove attributes that impossible to change in mass-update
-            $productTypeIds  = $this->getProducts()->getProductTypeIds();
+            $productTypeIds = $this->getProducts()->getProductTypeIds();
             foreach ($this->_attributes as $attribute) {
                 /* @var $attribute \Magento\Catalog\Model\Entity\Attribute */
                 foreach ($productTypeIds as $productTypeId) {
@@ -186,5 +191,27 @@ class Attribute extends \Magento\Backend\Helper\Data
         }
 
         return $this->_attributes;
+    }
+
+    /**
+     * Gets website id.
+     *
+     * @param int $storeId
+     * @return int
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     */
+    public function getStoreWebsiteId($storeId)
+    {
+        return $this->_storeManager->getStore($storeId)->getWebsiteId();
+    }
+
+    /**
+     * Retrieve excluded attributes.
+     *
+     * @return array
+     */
+    public function getExcludedAttributes(): array
+    {
+        return $this->_excludedAttributes;
     }
 }

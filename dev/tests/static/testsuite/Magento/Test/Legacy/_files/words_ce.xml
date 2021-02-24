@@ -1,29 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    tests
- * @package     static
- * @subpackage  Legacy
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 -->
 <!-- These are the settings for legacy testing of Magento 2 Community Edition -->
@@ -43,6 +22,7 @@
         <word>secure_base_url}}js/</word>
         <word>secure_base_url}}skin/</word>
         <word>secure_base_url}}media/</word>
+        <word>head.js</word>
         <!-- typos -->
         <word>overriden</word>
         <word>retrive</word>
@@ -53,34 +33,45 @@
             <path>CHANGELOG.md</path>
         </item>
         <item>
-            <path>CHANGELOG_CE.md</path>
+            <path>composer.lock</path>
         </item>
         <item>
-            <path>app/code/Magento/User/data/user_setup/data-upgrade-1.6.1.1-1.6.1.2.php</path>
-            <word>xmlconnect</word>
-            <word>system/convert/gui</word>
-            <word>system/convert/profiles</word>
-            <word>Mage_Adminhtml::gui</word>
-            <word>Mage_Adminhtml::profiles</word>
+            <path>dev/build/publication/extra_files/ce/CHANGELOG.md</path>
         </item>
         <item>
-            <path>app/code/Magento/User/sql/user_setup/upgrade-1.6.1.2-1.6.1.3.php</path>
-            <word>xmlconnect</word>
-            <word>system/convert/gui</word>
-            <word>system/convert/profiles</word>
-            <word>Mage_Adminhtml::gui</word>
-            <word>Mage_Adminhtml::profiles</word>
+            <path>lib/internal/Zend</path>
         </item>
         <item>
-            <path>dev/tests/static/testsuite/Magento/Test/Php/Exemplar/CodeMessTest/phpmd_ruleset.xsd</path>
-            <word>dataflow</word>
-        </item>
-        <item>
-            <path>lib/Zend</path>
+            <path>dev/tests/static/testsuite/Magento/Test/_files</path>
         </item>
         <item>
             <path>dev/tests/static/testsuite/Magento/Test/Legacy/_files/obsolete_constants.php</path>
             <word>overriden</word>
+        </item>
+        <item>
+            <path>dev/tests/api-functional/testsuite/Magento/Webapi/Routing/RequestIdOverrideTest.php</path>
+            <word>overriden</word>
+        </item>
+        <item>
+            <path>dev/composer.lock</path>
+        </item>
+        <item>
+            <path>app/code/Magento/Customer/view/frontend/web/js/zxcvbn.js</path>
+            <word>twig</word>
+        </item>
+        <item>
+            <path>app/code/Magento/Swagger/view/frontend/web/swagger-ui/js/lib/jsoneditor.min.js</path>
+            <word>twig</word>
+        </item>
+        <item>
+            <path>dev/tests/acceptance/composer.lock</path>
+        </item>
+        <item>
+            <path>dev/build/publication/sanity/ce.xml</path>
+        </item>
+        <item>
+            <path>app/design/adminhtml/Magento/backend/Magento_Rma/web/css/source/_module.less</path>
+            <word>rma</word>
         </item>
     </whitelist>
 </config>

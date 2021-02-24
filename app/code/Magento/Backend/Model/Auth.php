@@ -1,34 +1,21 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Model;
+
+use Magento\Framework\Exception\AuthenticationException;
+use Magento\Framework\Exception\Plugin\AuthenticationException as PluginAuthenticationException;
+use Magento\Framework\Phrase;
 
 /**
  * Backend Auth model
+ *
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Model;
-
 class Auth
 {
     /**
@@ -51,35 +38,35 @@ class Auth
     /**
      * Core event manager proxy
      *
-     * @var \Magento\Event\ManagerInterface
+     * @var \Magento\Framework\Event\ManagerInterface
      */
     protected $_eventManager;
 
     /**
-     * @var \Magento\Core\Model\Config
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
      */
     protected $_coreConfig;
 
     /**
-     * @var \Magento\Core\Model\Factory
+     * @var \Magento\Framework\Data\Collection\ModelFactory
      */
     protected $_modelFactory;
 
     /**
-     * @param \Magento\Event\ManagerInterface $eventManager
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
      * @param \Magento\Backend\Helper\Data $backendData
      * @param \Magento\Backend\Model\Auth\StorageInterface $authStorage
      * @param \Magento\Backend\Model\Auth\Credential\StorageInterface $credentialStorage
-     * @param \Magento\Core\Model\Config $coreConfig
-     * @param \Magento\Core\Model\Factory $modelFactory
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $coreConfig
+     * @param \Magento\Framework\Data\Collection\ModelFactory $modelFactory
      */
     public function __construct(
-        \Magento\Event\ManagerInterface $eventManager,
+        \Magento\Framework\Event\ManagerInterface $eventManager,
         \Magento\Backend\Helper\Data $backendData,
         \Magento\Backend\Model\Auth\StorageInterface $authStorage,
         \Magento\Backend\Model\Auth\Credential\StorageInterface $credentialStorage,
-        \Magento\Core\Model\Config $coreConfig,
-        \Magento\Core\Model\Factory $modelFactory
+        \Magento\Framework\App\Config\ScopeConfigInterface $coreConfig,
+        \Magento\Framework\Data\Collection\ModelFactory $modelFactory
     ) {
         $this->_eventManager = $eventManager;
         $this->_backendData = $backendData;
@@ -93,13 +80,13 @@ class Auth
      * Set auth storage if it is instance of \Magento\Backend\Model\Auth\StorageInterface
      *
      * @param \Magento\Backend\Model\Auth\StorageInterface $storage
-     * @return \Magento\Backend\Model\Auth
-     * @throw \Magento\Backend\Model\Auth\Exception if $storage is not correct
+     * @return $this
+     * @throws \Magento\Framework\Exception\AuthenticationException
      */
     public function setAuthStorage($storage)
     {
-        if (!($storage instanceof \Magento\Backend\Model\Auth\StorageInterface)) {
-            self::throwException('Authentication storage is incorrect.');
+        if (!$storage instanceof \Magento\Backend\Model\Auth\StorageInterface) {
+            self::throwException(__('Authentication storage is incorrect.'));
         }
         $this->_authStorage = $storage;
         return $this;
@@ -110,6 +97,7 @@ class Auth
      * If auth storage was not defined outside - returns default object of auth storage
      *
      * @return \Magento\Backend\Model\Auth\StorageInterface
+     * @codeCoverageIgnore
      */
     public function getAuthStorage()
     {
@@ -135,14 +123,15 @@ class Auth
     protected function _initCredentialStorage()
     {
         $this->_credentialStorage = $this->_modelFactory->create(
-            'Magento\Backend\Model\Auth\Credential\StorageInterface'
+            \Magento\Backend\Model\Auth\Credential\StorageInterface::class
         );
     }
 
     /**
      * Return credential storage object
      *
-     * @return null | \Magento\Backend\Model\Auth\Credential\StorageInterface
+     * @return null|\Magento\Backend\Model\Auth\Credential\StorageInterface
+     * @codeCoverageIgnore
      */
     public function getCredentialStorage()
     {
@@ -154,13 +143,17 @@ class Auth
      *
      * @param string $username
      * @param string $password
-     * @throws \Exception|\Magento\Backend\Model\Auth\Plugin\Exception
+     * @return void
+     * @throws \Magento\Framework\Exception\AuthenticationException
      */
     public function login($username, $password)
     {
         if (empty($username) || empty($password)) {
             self::throwException(
-                __('Please correct the user name or password.')
+                __(
+                    'The account sign-in was incorrect or your account is disabled temporarily. '
+                    . 'Please wait and try again later.'
+                )
             );
         }
 
@@ -168,29 +161,39 @@ class Auth
             $this->_initCredentialStorage();
             $this->getCredentialStorage()->login($username, $password);
             if ($this->getCredentialStorage()->getId()) {
-
                 $this->getAuthStorage()->setUser($this->getCredentialStorage());
                 $this->getAuthStorage()->processLogin();
 
-                $this->_eventManager
-                    ->dispatch('backend_auth_user_login_success', array('user' => $this->getCredentialStorage()));
+                $this->_eventManager->dispatch(
+                    'backend_auth_user_login_success',
+                    ['user' => $this->getCredentialStorage()]
+                );
             }
 
             if (!$this->getAuthStorage()->getUser()) {
                 self::throwException(
-                    __('Please correct the user name or password.')
+                    __(
+                        'The account sign-in was incorrect or your account is disabled temporarily. '
+                        . 'Please wait and try again later.'
+                    )
                 );
             }
-
-        } catch (\Magento\Backend\Model\Auth\Plugin\Exception $e) {
-            $this->_eventManager
-                ->dispatch('backend_auth_user_login_failed', array('user_name' => $username, 'exception' => $e));
+        } catch (PluginAuthenticationException $e) {
+            $this->_eventManager->dispatch(
+                'backend_auth_user_login_failed',
+                ['user_name' => $username, 'exception' => $e]
+            );
             throw $e;
-        } catch (\Magento\Core\Exception $e) {
-            $this->_eventManager
-                ->dispatch('backend_auth_user_login_failed', array('user_name' => $username, 'exception' => $e));
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
+            $this->_eventManager->dispatch(
+                'backend_auth_user_login_failed',
+                ['user_name' => $username, 'exception' => $e]
+            );
             self::throwException(
-                __('Please correct the user name or password.')
+                __(
+                    $e->getMessage()? : 'The account sign-in was incorrect or your account is disabled temporarily. '
+                        . 'Please wait and try again later.'
+                )
             );
         }
     }
@@ -208,7 +211,7 @@ class Auth
     /**
      * Check if current user is logged in
      *
-     * @return boolean
+     * @return bool
      */
     public function isLoggedIn()
     {
@@ -218,16 +221,16 @@ class Auth
     /**
      * Throws specific Backend Authentication \Exception
      *
+     * @param \Magento\Framework\Phrase $msg
+     * @return void
+     * @throws \Magento\Framework\Exception\AuthenticationException
      * @static
-     * @param string $msg
-     * @param string $code
-     * @throws \Magento\Backend\Model\Auth\Exception
      */
-    public static function throwException($msg = null, $code = null)
+    public static function throwException(Phrase $msg = null)
     {
-        if (is_null($msg)) {
-            $msg = __('Authentication error occurred.');
+        if ($msg === null) {
+            $msg = __('An authentication error occurred. Verify and try again.');
         }
-        throw new \Magento\Backend\Model\Auth\Exception($msg, $code);
+        throw new AuthenticationException($msg);
     }
 }

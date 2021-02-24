@@ -1,75 +1,53 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Core
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Test\Integrity\Modular;
 
-class LayoutFilesTest extends \PHPUnit_Framework_TestCase
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class LayoutFilesTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * @var \Magento\View\Layout\Argument\HandlerFactory
+     * @var \Magento\Framework\View\Layout\Argument\Parser
      */
-    protected $_handlerFactory;
+    protected $_argParser;
 
     /**
-     * @var array
+     * @var \Magento\Framework\Data\Argument\InterpreterInterface
      */
-    protected $_types;
+    protected $_argInterpreter;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
-        $this->_handlerFactory = $objectManager->get('Magento\View\Layout\Argument\HandlerFactory');
-        $this->_types = $this->_handlerFactory->getTypes();
+        $this->_argParser = $objectManager->get(\Magento\Framework\View\Layout\Argument\Parser::class);
+        $this->_argInterpreter = $objectManager->get('layoutArgumentGeneratorInterpreter');
     }
 
     /**
-     * @dataProvider layoutTypesDataProvider
+     * @param string $area
+     * @param string $layoutFile
+     * @dataProvider layoutArgumentsDataProvider
      */
-    public function testLayoutTypes($area, $layout)
+    public function testLayoutArguments($area, $layoutFile)
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\App')->loadArea($area);
-        $layout = simplexml_load_file(
-            $layout,
-            'Magento\View\Layout\Element'
-        );
-        foreach ($layout->xpath('//*[@xsi:type]') as $argument) {
-            $type = (string)$argument->attributes('xsi', true)->type;
-            if (!in_array($type, $this->_types)) {
-                continue;
-            }
+        \Magento\TestFramework\Helper\Bootstrap::getInstance()->loadArea($area);
+        $dom = new \DOMDocument();
+        $dom->load($layoutFile);
+        $xpath = new \DOMXPath($dom);
+        $argumentNodes = $xpath->query('/layout//arguments/argument | /layout//action/argument');
+        /** @var \DOMNode $argumentNode */
+        foreach ($argumentNodes as $argumentNode) {
             try {
-                /* @var $handler \Magento\View\Layout\Argument\HandlerInterface */
-                $handler = $this->_handlerFactory->getArgumentHandlerByType($type);
-                $argument = $handler->parse($argument);
-                if ($this->_isIgnored($argument)) {
+                $argumentData = $this->_argParser->parse($argumentNode);
+                if ($this->isSkippedArgument($argumentData)) {
                     continue;
                 }
-                $handler->process($argument);
-            } catch (\InvalidArgumentException $e) {
+                $this->_argInterpreter->evaluate($argumentData);
+            } catch (\Exception $e) {
                 $this->fail($e->getMessage());
             }
         }
@@ -78,51 +56,55 @@ class LayoutFilesTest extends \PHPUnit_Framework_TestCase
     /**
      * @return array
      */
-    public function layoutTypesDataProvider()
+    public function layoutArgumentsDataProvider()
     {
-        $areas = array('adminhtml', 'frontend', 'install', 'email');
-        $data = array();
+        $areas = ['adminhtml', 'frontend', 'email'];
+        $data = [];
         foreach ($areas as $area) {
-            $layoutFiles = \Magento\TestFramework\Utility\Files::init()->getLayoutFiles(array('area' => $area), false);
+            $layoutFiles = \Magento\Framework\App\Utility\Files::init()->getLayoutFiles(['area' => $area], false);
             foreach ($layoutFiles as $layoutFile) {
-                $data[] = array($area, $layoutFile);
+                $data[substr($layoutFile, strlen(BP))] = [$area, $layoutFile];
             }
         }
         return $data;
     }
 
     /**
-     * @param $argument
+     * Whether an argument should be skipped, because it cannot be evaluated in the testing environment
+     *
+     * @param array $argumentData
      * @return bool
      */
-    protected function _isIgnored($argument)
+    protected function isSkippedArgument(array $argumentData)
     {
-        return
-            // we can't process updaters without value
-            !isset($argument['value']) && isset($argument['updaters'])
+        // Do not take into account argument name, shared and parameters
+        unset($argumentData['name'], $argumentData['param'], $argumentData['shared']);
 
-            // ignored objects
-            || isset($argument['value']['object'])
-                && in_array($argument['value']['object'], array(
-                    'Magento\Catalog\Model\Resource\Product\Type\Grouped\AssociatedProductsCollection',
-                    'Magento\Catalog\Model\Resource\Product\Collection\AssociatedProduct',
-                    'Magento\Search\Model\Resource\Search\Grid\Collection',
-                    'Magento\Wishlist\Model\Resource\Item\Collection\Grid',
-                    'Magento\CustomerSegment\Model\Resource\Segment\Report\Detail\Collection',
-                ))
+        $isUpdater = isset($argumentData['updater']);
+        unset($argumentData['updater']);
 
-            // ignored helpers
-            || isset($argument['value']['helperClass']) &&
-                in_array($argument['value']['helperClass'] . '::' . $argument['value']['helperMethod'], array(
-                    'Magento\Pbridge\Helper\Data::getReviewButtonTemplate'
-                ))
+        // Arguments, evaluation of which causes a run-time error, because of unsafe assumptions to the environment
+        $typeAttr = \Magento\Framework\View\Model\Layout\Merge::TYPE_ATTRIBUTE;
+        $prCollection =
+            \Magento\GroupedProduct\Model\ResourceModel\Product\Type\Grouped\AssociatedProductsCollection::class;
+        $ignoredArguments = [
+            [
+                $typeAttr => 'object',
+                'value' => $prCollection,
+            ],
+            [$typeAttr => 'object', 'value' => \Magento\Wishlist\Model\ResourceModel\Item\Collection\Grid::class],
+            [
+                $typeAttr => 'object',
+                'value' => \Magento\CustomerSegment\Model\ResourceModel\Segment\Report\Detail\Collection::class
+            ],
+            [$typeAttr => 'options', 'model' => \Magento\Logging\Model\ResourceModel\Grid\ActionsGroup::class],
+            [$typeAttr => 'options', 'model' => \Magento\Logging\Model\ResourceModel\Grid\Actions::class],
+        ];
+        $isIgnoredArgument = in_array($argumentData, $ignoredArguments, true);
 
-            // ignored options
-            || isset($argument['value']['model'])
-                && in_array($argument['value']['model'], array(
-                    'Magento\Search\Model\Adminhtml\Search\Grid\Options',
-                    'Magento\Logging\Model\Resource\Grid\ActionsGroup',
-                    'Magento\Logging\Model\Resource\Grid\Actions',
-                ));
+        unset($argumentData[$typeAttr]);
+        $hasValue = !empty($argumentData);
+
+        return $isIgnoredArgument || $isUpdater && !$hasValue;
     }
 }

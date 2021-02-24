@@ -1,40 +1,25 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Newsletter
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Newsletter\Block\Adminhtml\Template;
 
 /**
  * Newsletter template preview block
  *
- * @category   Magento
- * @package    Magento_Newsletter
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Newsletter\Block\Adminhtml\Template;
-
-class Preview extends \Magento\Adminhtml\Block\Widget
+class Preview extends \Magento\Backend\Block\Widget
 {
+    /**
+     * Name for profiler
+     *
+     * @var string
+     */
+    protected $profilerName = "newsletter_template_proccessing";
+
     /**
      * @var \Magento\Newsletter\Model\TemplateFactory
      */
@@ -55,49 +40,118 @@ class Preview extends \Magento\Adminhtml\Block\Widget
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Newsletter\Model\TemplateFactory $templateFactory,
         \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        array $data = array()
+        array $data = []
     ) {
         $this->_templateFactory = $templateFactory;
         $this->_subscriberFactory = $subscriberFactory;
         parent::__construct($context, $data);
     }
 
+    /**
+     * Get html code
+     *
+     * @return string
+     */
     protected function _toHtml()
     {
         /* @var $template \Magento\Newsletter\Model\Template */
         $template = $this->_templateFactory->create();
 
         if ($id = (int)$this->getRequest()->getParam('id')) {
-            $template->load($id);
+            $this->loadTemplate($template, $id);
         } else {
-            $template->setTemplateType($this->getRequest()->getParam('type'));
-            $template->setTemplateText($this->getRequest()->getParam('text'));
-            $template->setTemplateStyles($this->getRequest()->getParam('styles'));
+            $previewData = $this->getPreviewData();
+
+            $template->setTemplateType($previewData['type']);
+            $template->setTemplateText($previewData['text']);
+            $template->setTemplateStyles($previewData['styles']);
+            $template->setData('is_legacy', false);
         }
 
-        $storeId = (int)$this->getRequest()->getParam('store_id');
-        if (!$storeId) {
-            $storeId = $this->_storeManager->getDefaultStoreView()->getId();
-        }
-
-        \Magento\Profiler::start("newsletter_template_proccessing");
-        $vars = array();
+        \Magento\Framework\Profiler::start($this->profilerName);
+        $vars = [];
 
         $vars['subscriber'] = $this->_subscriberFactory->create();
         if ($this->getRequest()->getParam('subscriber')) {
             $vars['subscriber']->load($this->getRequest()->getParam('subscriber'));
         }
 
-        $template->emulateDesign($storeId);
-        $templateProcessed = $template->getProcessedTemplate($vars, true);
+        $template->emulateDesign($this->getStoreId());
+        $templateProcessed = $this->_appState->emulateAreaCode(
+            \Magento\Newsletter\Model\Template::DEFAULT_DESIGN_AREA,
+            [$template, 'getProcessedTemplate'],
+            [$vars]
+        );
         $template->revertDesign();
 
         if ($template->isPlain()) {
-            $templateProcessed = "<pre>" . htmlspecialchars($templateProcessed) . "</pre>";
+            $templateProcessed = "<pre>" . $this->escapeHtml($templateProcessed) . "</pre>";
         }
 
-        \Magento\Profiler::stop("newsletter_template_proccessing");
+        \Magento\Framework\Profiler::stop($this->profilerName);
 
         return $templateProcessed;
+    }
+
+    /**
+     * Return template preview data
+     *
+     * @return array
+     */
+    private function getPreviewData()
+    {
+        $previewData = [];
+        $previewParams = ['type', 'text', 'styles'];
+
+        $sessionData = [];
+        if ($this->_backendSession->hasPreviewData()) {
+            $sessionData = $this->_backendSession->getPreviewData();
+        }
+
+        foreach ($previewParams as $param) {
+            if (isset($sessionData[$param])) {
+                $previewData[$param] = $sessionData[$param];
+            } else {
+                $previewData[$param] = $this->getRequest()->getParam($param);
+            }
+        }
+
+        return $previewData;
+    }
+
+    /**
+     * Get Store Id from request or default
+     *
+     * @return int|null
+     */
+    protected function getStoreId()
+    {
+        $storeId = (int)$this->getRequest()->getParam('store');
+        if ($storeId) {
+            return $storeId;
+        }
+
+        $defaultStore = $this->_storeManager->getDefaultStoreView();
+        if (!$defaultStore) {
+            $allStores = $this->_storeManager->getStores();
+            if (isset($allStores[0])) {
+                $defaultStore = $allStores[0];
+            }
+        }
+
+        return $defaultStore ? $defaultStore->getId() : null;
+    }
+
+    /**
+     * Return template
+     *
+     * @param \Magento\Newsletter\Model\Template $template
+     * @param string $id
+     * @return $this
+     */
+    protected function loadTemplate(\Magento\Newsletter\Model\Template $template, $id)
+    {
+        $template->load($id);
+        return $this;
     }
 }

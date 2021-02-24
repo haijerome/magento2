@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    tests
- * @package     static
- * @subpackage  Legacy
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,23 +9,29 @@
  */
 namespace Magento\Test\Legacy;
 
-class EmailTemplateTest extends \PHPUnit_Framework_TestCase
+class EmailTemplateTest extends \PHPUnit\Framework\TestCase
 {
     public function testObsoleteDirectives()
     {
-        $invoker = new \Magento\TestFramework\Utility\AggregateInvoker($this);
+        $invoker = new \Magento\Framework\App\Utility\AggregateInvoker($this);
         $invoker(
             /**
              * @param string $file
              */
             function ($file) {
-                $this->assertNotRegExp(
+                $this->assertDoesNotMatchRegularExpression(
                     '/\{\{htmlescape.*?\}\}/i',
                     file_get_contents($file),
-                    'Directive {{htmlescape}} is obsolete. Use {{escapehtml}} instead.'
+                    'Directive {{htmlescape}} is obsolete. Use {{var}} instead.'
+                );
+
+                $this->assertDoesNotMatchRegularExpression(
+                    '/\{\{escapehtml.*?\}\}/i',
+                    file_get_contents($file),
+                    'Directive {{escapehtml}} is obsolete. Use {{var}} instead.'
                 );
             },
-            \Magento\TestFramework\Utility\Files::init()->getEmailTemplates()
+            \Magento\Framework\App\Utility\Files::init()->getEmailTemplates()
         );
     }
 }

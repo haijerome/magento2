@@ -1,59 +1,49 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Block\Store;
 
 /**
  * Store switcher block
  *
- * @category   Magento
- * @package    Magento_Backend
- * @author     Magento Core Team <core@magentocommerce.com>
- */
-namespace Magento\Backend\Block\Store;
-
-/**
- * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @api
+ * @since 100.0.2
  */
 class Switcher extends \Magento\Backend\Block\Template
 {
     /**
      * URL for store switcher hint
      */
-    const HINT_URL = 'http://www.magentocommerce.com/knowledge-base/entry/understanding-store-scopes';
+    const HINT_URL = 'https://docs.magento.com/user-guide/configuration/scope.html';
 
     /**
-     * @var array
+     * Name of website variable
+     *
+     * @var string
      */
-    protected $_storeIds;
+    protected $_defaultWebsiteVarName = 'website';
+
+    /**
+     * Name of store group variable
+     *
+     * @var string
+     */
+    protected $_defaultStoreGroupVarName = 'group';
 
     /**
      * Name of store variable
      *
      * @var string
      */
-    protected $_storeVarName = 'store';
+    protected $_defaultStoreVarName = 'store';
+
+    /**
+     * @var array
+     */
+    protected $_storeIds;
 
     /**
      * Url for store switcher hint
@@ -77,37 +67,39 @@ class Switcher extends \Magento\Backend\Block\Template
     /**
      * Website factory
      *
-     * @var \Magento\Core\Model\Website\Factory
+     * @var \Magento\Store\Model\WebsiteFactory
      */
     protected $_websiteFactory;
 
     /**
      * Store Group Factory
      *
-     * @var \Magento\Core\Model\Store\Group\Factory
+     * @var \Magento\Store\Model\GroupFactory
      */
     protected $_storeGroupFactory;
 
     /**
      * Store Factory
      *
-     * @var \Magento\Core\Model\StoreFactory
+     * @var \Magento\Store\Model\StoreFactory
      */
     protected $_storeFactory;
 
     /**
+     * Switcher constructor.
+     *
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Website\Factory $websiteFactory
-     * @param \Magento\Core\Model\Store\Group\Factory $storeGroupFactory
-     * @param \Magento\Core\Model\StoreFactory $storeFactory
+     * @param \Magento\Store\Model\WebsiteFactory $websiteFactory
+     * @param \Magento\Store\Model\GroupFactory $storeGroupFactory
+     * @param \Magento\Store\Model\StoreFactory $storeFactory
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Website\Factory $websiteFactory,
-        \Magento\Core\Model\Store\Group\Factory $storeGroupFactory,
-        \Magento\Core\Model\StoreFactory $storeFactory,
-        array $data = array()
+        \Magento\Store\Model\WebsiteFactory $websiteFactory,
+        \Magento\Store\Model\GroupFactory $storeGroupFactory,
+        \Magento\Store\Model\StoreFactory $storeFactory,
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_websiteFactory = $websiteFactory;
@@ -115,24 +107,41 @@ class Switcher extends \Magento\Backend\Block\Template
         $this->_storeFactory = $storeFactory;
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _construct()
     {
         parent::_construct();
 
         $this->setUseConfirm(true);
         $this->setUseAjax(true);
-        $this->setDefaultStoreName(__('All Store Views'));
+
+        $this->setShowManageStoresLink(0);
+
+        if (!$this->hasData('switch_websites')) {
+            $this->setSwitchWebsites(false);
+        }
+        if (!$this->hasData('switch_store_groups')) {
+            $this->setSwitchStoreGroups(false);
+        }
+        if (!$this->hasData('switch_store_views')) {
+            $this->setSwitchStoreViews(true);
+        }
+        $this->setDefaultSelectionName(__('All Store Views'));
     }
 
     /**
-     * @return \Magento\Core\Model\Resource\Website\Collection
+     * Get website collection.
+     *
+     * @return \Magento\Store\Model\ResourceModel\Website\Collection
      */
     public function getWebsiteCollection()
     {
         $collection = $this->_websiteFactory->create()->getResourceCollection();
 
         $websiteIds = $this->getWebsiteIds();
-        if (!is_null($websiteIds)) {
+        if ($websiteIds !== null) {
             $collection->addIdFilter($this->getWebsiteIds());
         }
 
@@ -142,28 +151,86 @@ class Switcher extends \Magento\Backend\Block\Template
     /**
      * Get websites
      *
-     * @return array
+     * @return \Magento\Store\Model\Website[]
      */
     public function getWebsites()
     {
         $websites = $this->_storeManager->getWebsites();
         if ($websiteIds = $this->getWebsiteIds()) {
-            foreach (array_keys($websites) as $websiteId) {
-                if (!in_array($websiteId, $websiteIds)) {
-                    unset($websites[$websiteId]);
-                }
-            }
+            $websites = array_intersect_key($websites, array_flip($websiteIds));
         }
         return $websites;
     }
 
     /**
-     * @param int|\Magento\Core\Model\Website $website
-     * @return \Magento\Core\Model\Resource\Store\Group\Collection
+     * Check if can switch to websites
+     *
+     * @return bool
+     */
+    public function isWebsiteSwitchEnabled()
+    {
+        return (bool)$this->getData('switch_websites');
+    }
+
+    /**
+     * Set website variable name.
+     *
+     * @param string $varName
+     * @return $this
+     */
+    public function setWebsiteVarName($varName)
+    {
+        $this->setData('website_var_name', $varName);
+        return $this;
+    }
+
+    /**
+     * Get website variable name.
+     *
+     * @return string
+     */
+    public function getWebsiteVarName()
+    {
+        if ($this->hasData('website_var_name')) {
+            return (string)$this->getData('website_var_name');
+        } else {
+            return (string)$this->_defaultWebsiteVarName;
+        }
+    }
+
+    /**
+     * Check if current website selected.
+     *
+     * @param \Magento\Store\Model\Website $website
+     * @return bool
+     */
+    public function isWebsiteSelected(\Magento\Store\Model\Website $website)
+    {
+        return $this->getWebsiteId() === $website->getId() && $this->getStoreId() === null;
+    }
+
+    /**
+     * Return website Id.
+     *
+     * @return int|null
+     */
+    public function getWebsiteId()
+    {
+        if (!$this->hasData('website_id')) {
+            $this->setData('website_id', (int)$this->getRequest()->getParam($this->getWebsiteVarName()));
+        }
+        return $this->getData('website_id');
+    }
+
+    /**
+     * Return group collection provided website.
+     *
+     * @param int|\Magento\Store\Model\Website $website
+     * @return \Magento\Store\Model\ResourceModel\Group\Collection
      */
     public function getGroupCollection($website)
     {
-        if (!$website instanceof \Magento\Core\Model\Website) {
+        if (!$website instanceof \Magento\Store\Model\Website) {
             $website = $this->_websiteFactory->create()->load($website);
         }
         return $website->getGroupCollection();
@@ -172,24 +239,86 @@ class Switcher extends \Magento\Backend\Block\Template
     /**
      * Get store groups for specified website
      *
-     * @param \Magento\Core\Model\Website|int $website
+     * @param \Magento\Store\Model\Website|int $website
      * @return array
      */
     public function getStoreGroups($website)
     {
-        if (!$website instanceof \Magento\Core\Model\Website) {
+        if (!$website instanceof \Magento\Store\Model\Website) {
             $website = $this->_storeManager->getWebsite($website);
         }
         return $website->getGroups();
     }
 
     /**
-     * @param \Magento\Core\Model\Store\Group|int $group
-     * @return \Magento\Core\Model\Resource\Store\Collection
+     * Check if can switch to store group
+     *
+     * @return bool
+     */
+    public function isStoreGroupSwitchEnabled()
+    {
+        return (bool)$this->getData('switch_store_groups');
+    }
+
+    /**
+     * Sets store group variable name.
+     *
+     * @param string $varName
+     * @return $this
+     */
+    public function setStoreGroupVarName($varName)
+    {
+        $this->setData('store_group_var_name', $varName);
+        return $this;
+    }
+
+    /**
+     * Return store group variable name.
+     *
+     * @return string
+     */
+    public function getStoreGroupVarName()
+    {
+        if ($this->hasData('store_group_var_name')) {
+            return (string)$this->getData('store_group_var_name');
+        } else {
+            return (string)$this->_defaultStoreGroupVarName;
+        }
+    }
+
+    /**
+     * Is provided group selected.
+     *
+     * @param \Magento\Store\Model\Group $group
+     * @return bool
+     */
+    public function isStoreGroupSelected(\Magento\Store\Model\Group $group)
+    {
+        return $this->getStoreGroupId() === $group->getId() && $this->getStoreGroupId() === null;
+    }
+
+    /**
+     * Return store group Id.
+     *
+     * @return int|null
+     */
+    public function getStoreGroupId()
+    {
+        if (!$this->hasData('store_group_id')) {
+            $this->setData('store_group_id', (int)$this->getRequest()->getParam($this->getStoreGroupVarName()));
+        }
+        return $this->getData('store_group_id');
+    }
+
+    /**
+     * Return store collection.
+     *
+     * @param \Magento\Store\Model\Group|int $group
+     * @return \Magento\Store\Model\ResourceModel\Store\Collection
      */
     public function getStoreCollection($group)
     {
-        if (!$group instanceof \Magento\Core\Model\Store\Group) {
+        if (!$group instanceof \Magento\Store\Model\Group) {
             $group = $this->_storeGroupFactory->create()->load($group);
         }
         $stores = $group->getStoreCollection();
@@ -203,12 +332,12 @@ class Switcher extends \Magento\Backend\Block\Template
     /**
      * Get store views for specified store group
      *
-     * @param \Magento\Core\Model\Store\Group|int $group
-     * @return array
+     * @param \Magento\Store\Model\Group|int $group
+     * @return \Magento\Store\Model\Store[]
      */
     public function getStores($group)
     {
-        if (!$group instanceof \Magento\Core\Model\Store\Group) {
+        if (!$group instanceof \Magento\Store\Model\Group) {
             $group = $this->_storeManager->getGroup($group);
         }
         $stores = $group->getStores();
@@ -223,6 +352,68 @@ class Switcher extends \Magento\Backend\Block\Template
     }
 
     /**
+     * Return store Id.
+     *
+     * @return int|null
+     */
+    public function getStoreId()
+    {
+        if (!$this->hasData('store_id')) {
+            $this->setData('store_id', (int)$this->getRequest()->getParam($this->getStoreVarName()));
+        }
+        return $this->getData('store_id');
+    }
+
+    /**
+     * Check is provided store selected.
+     *
+     * @param \Magento\Store\Model\Store $store
+     * @return bool
+     */
+    public function isStoreSelected(\Magento\Store\Model\Store $store)
+    {
+        return $this->getStoreId() !== null && (int)$this->getStoreId() === (int)$store->getId();
+    }
+
+    /**
+     * Check if can switch to store views
+     *
+     * @return bool
+     */
+    public function isStoreSwitchEnabled()
+    {
+        return (bool)$this->getData('switch_store_views');
+    }
+
+    /**
+     * Sets store variable name.
+     *
+     * @param string $varName
+     * @return $this
+     */
+    public function setStoreVarName($varName)
+    {
+        $this->setData('store_var_name', $varName);
+        return $this;
+    }
+
+    /**
+     * Return store variable name.
+     *
+     * @return mixed|string
+     */
+    public function getStoreVarName()
+    {
+        if ($this->hasData('store_var_name')) {
+            return (string)$this->getData('store_var_name');
+        } else {
+            return (string)$this->_defaultStoreVarName;
+        }
+    }
+
+    /**
+     * Return switch url.
+     *
      * @return string
      */
     public function getSwitchUrl()
@@ -230,46 +421,106 @@ class Switcher extends \Magento\Backend\Block\Template
         if ($url = $this->getData('switch_url')) {
             return $url;
         }
-        return $this->getUrl('*/*/*', array('_current' => true, $this->_storeVarName => null));
+        return $this->getUrl(
+            '*/*/*',
+            [
+                '_current' => true,
+                $this->getStoreVarName() => null,
+                $this->getStoreGroupVarName() => null,
+                $this->getWebsiteVarName() => null,
+            ]
+        );
     }
 
     /**
-     * @param string $varName
-     * @return \Magento\Backend\Block\Store\Switcher
+     * Checks if scope selected.
+     *
+     * @return bool
      */
-    public function setStoreVarName($varName)
+    public function hasScopeSelected()
     {
-        $this->_storeVarName = $varName;
-        return $this;
+        return $this->getStoreId() !== null || $this->getStoreGroupId() !== null || $this->getWebsiteId() !== null;
     }
 
     /**
-     * Get current store
+     * Get current selection name
+     *
+     * @return string
+     */
+    public function getCurrentSelectionName()
+    {
+        if ($this->getCurrentStoreName() !== '') {
+            return $this->getCurrentStoreName();
+        }
+        if ($this->getCurrentStoreGroupName() !== '') {
+            return $this->getCurrentStoreGroupName();
+        }
+
+        if ($this->getCurrentWebsiteName() !== '') {
+            return $this->getCurrentWebsiteName();
+        }
+        return $this->getDefaultSelectionName();
+    }
+
+    /**
+     * Get current website name
+     *
+     * @return string
+     */
+    public function getCurrentWebsiteName()
+    {
+        if ($this->getWebsiteId() !== null) {
+            $website = $this->_websiteFactory->create();
+            $website->load($this->getWebsiteId());
+            if ($website->getId()) {
+                return $website->getName();
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Get current store group name
+     *
+     * @return string
+     */
+    public function getCurrentStoreGroupName()
+    {
+        if ($this->getStoreGroupId() !== null) {
+            $group = $this->_storeGroupFactory->create();
+            $group->load($this->getStoreGroupId());
+            if ($group->getId()) {
+                return $group->getName();
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Get current store view name
      *
      * @return string
      */
     public function getCurrentStoreName()
     {
-        $store = $this->_storeFactory->create();
-        $store->load($this->getStoreId());
-        if ($store->getId()) {
-            return $store->getName();
-        } else {
-            return $this->getDefaultStoreName();
+        if ($this->getStoreId() !== null) {
+            $store = $this->_storeFactory->create();
+            $store->load($this->getStoreId());
+            if ($store->getId()) {
+                return $store->getName();
+            }
         }
+
+        return '';
     }
 
     /**
-     * @return int
-     */
-    public function getStoreId()
-    {
-        return $this->getRequest()->getParam($this->_storeVarName);
-    }
-
-    /**
+     * Sets store ids.
+     *
      * @param array $storeIds
-     * @return \Magento\Backend\Block\Store\Switcher
+     * @return $this
      */
     public function setStoreIds($storeIds)
     {
@@ -278,6 +529,8 @@ class Switcher extends \Magento\Backend\Block\Template
     }
 
     /**
+     * Return store ids.
+     *
      * @return array
      */
     public function getStoreIds()
@@ -286,6 +539,8 @@ class Switcher extends \Magento\Backend\Block\Template
     }
 
     /**
+     * Check if system is run in the single store mode.
+     *
      * @return bool
      */
     public function isShow()
@@ -294,6 +549,8 @@ class Switcher extends \Magento\Backend\Block\Template
     }
 
     /**
+     * Render block.
+     *
      * @return string
      */
     protected function _toHtml()
@@ -338,16 +595,25 @@ class Switcher extends \Magento\Backend\Block\Template
         $html = '';
         $url = $this->getHintUrl();
         if ($url) {
-            $html = '<div class="tooltip">'
-                . '<span class="help"><a'
-                . ' href="'. $this->escapeUrl($url) . '"'
-                . ' onclick="this.target=\'_blank\'"'
-                . ' title="' . __('What is this?') . '"'
-                . ' class="link-store-scope">'
-                . __('What is this?')
-                . '</a></span>'
-                .' </div>';
+            $html = '<div class="admin__field-tooltip tooltip"><a href="%s" onclick="this.target=\'_blank\'"  title="%s"
+           class="admin__field-tooltip-action action-help"><span>%s</span></a></span></div>';
+            $title =  $this->escapeHtmlAttr(__('What is this?'));
+            $span= $this->escapeHtml(__('What is this?'));
+            $html = sprintf($html, $this->escapeUrl($url), $title, $span);
         }
         return $html;
+    }
+
+    /**
+     * Get whether iframe is being used
+     *
+     * @return bool
+     */
+    public function isUsingIframe()
+    {
+        if ($this->hasData('is_using_iframe')) {
+            return (bool)$this->getData('is_using_iframe');
+        }
+        return false;
     }
 }

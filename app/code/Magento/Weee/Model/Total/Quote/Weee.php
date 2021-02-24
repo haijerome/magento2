@@ -1,289 +1,331 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Weee
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Weee\Model\Total\Quote;
 
-class Weee extends \Magento\Tax\Model\Sales\Total\Quote\Tax
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+use Magento\Quote\Api\Data\ShippingAssignmentInterface;
+use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\Quote\Address;
+use Magento\Quote\Model\Quote\Address\Total;
+use Magento\Quote\Model\Quote\Address\Total\AbstractTotal;
+use Magento\Quote\Model\Quote\Item\AbstractItem;
+use Magento\Store\Model\Store;
+use Magento\Tax\Model\Sales\Total\Quote\CommonTaxCollector;
+use Magento\Weee\Helper\Data as WeeHelper;
+
+/**
+ * Calculate totals for Quote
+ */
+class Weee extends AbstractTotal
 {
     /**
-     * Weee module helper object
-     *
-     * @var \Magento\Weee\Helper\Data
+     * Constant for weee item code prefix
      */
-    protected $_weeeData;
+    const ITEM_CODE_WEEE_PREFIX = 'weee';
+    /**
+     * Constant for weee item type
+     */
+    const ITEM_TYPE = 'weee';
 
     /**
-     * @var \Magento\Core\Model\Store
+     * @var WeeHelper
+     */
+    protected $weeeData;
+
+    /**
+     * @var \Magento\Store\Model\Store
      */
     protected $_store;
 
     /**
-     * Flag which notify what tax amount can be affected by fixed porduct tax
+     * Counter
      *
-     * @var bool
+     * @var int
      */
-    protected $_isTaxAffected;
+    protected $counter = 0;
 
     /**
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Tax\Model\Calculation $calculation
-     * @param \Magento\Tax\Model\Config $taxConfig
-     * @param \Magento\Weee\Helper\Data $weeeData
+     * Array to keep track of weee taxable item code to quote item
+     *
+     * @var array
+     */
+    protected $weeeCodeToItemMap;
+
+    /**
+     * Accumulates totals for Weee excluding tax
+     *
+     * @var int
+     */
+    protected $weeeTotalExclTax;
+
+    /**
+     * Accumulates totals for Weee base excluding tax
+     *
+     * @var int
+     */
+    protected $weeeBaseTotalExclTax;
+
+    /**
+     * @var PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
+     * @param WeeHelper $weeeData
+     * @param PriceCurrencyInterface $priceCurrency
      */
     public function __construct(
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Tax\Model\Calculation $calculation,
-        \Magento\Tax\Model\Config $taxConfig,
-        \Magento\Weee\Helper\Data $weeeData
+        WeeHelper $weeeData,
+        PriceCurrencyInterface $priceCurrency
     ) {
-        $this->_weeeData = $weeeData;
-        parent::__construct($taxData, $calculation, $taxConfig);
+        $this->priceCurrency = $priceCurrency;
+        $this->weeeData = $weeeData;
         $this->setCode('weee');
+        $this->weeeCodeToItemMap = [];
     }
 
     /**
-     * Collect Weee taxes amount and prepare items prices for taxation and discount
+     * Collect Weee amounts for the quote / order
      *
-     * @param   \Magento\Sales\Model\Quote\Address $address
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
+     * @param Quote $quote
+     * @param ShippingAssignmentInterface $shippingAssignment
+     * @param Total $total
+     * @return $this
      */
-    public function collect(\Magento\Sales\Model\Quote\Address $address)
-    {
-        \Magento\Sales\Model\Quote\Address\Total\AbstractTotal::collect($address);
-        $this->_isTaxAffected = false;
-        $items = $this->_getAddressItems($address);
+    public function collect(
+        Quote $quote,
+        ShippingAssignmentInterface $shippingAssignment,
+        Total $total
+    ) {
+        AbstractTotal::collect($quote, $shippingAssignment, $total);
+        $this->_store = $quote->getStore();
+        if (!$this->weeeData->isEnabled($this->_store)) {
+            return $this;
+        }
+
+        $address = $shippingAssignment->getShipping()->getAddress();
+        $items = $shippingAssignment->getItems();
         if (!count($items)) {
             return $this;
         }
 
-        $address->setAppliedTaxesReset(true);
-        $address->setAppliedTaxes(array());
-
-        $this->_store = $address->getQuote()->getStore();
+        $this->weeeTotalExclTax = 0;
+        $this->weeeBaseTotalExclTax = 0;
         foreach ($items as $item) {
-            if ($item->getParentItemId()) {
+            if ($item->getParentItem()) {
                 continue;
             }
-            $this->_resetItemData($item);
+            $this->resetItemData($item);
             if ($item->getHasChildren() && $item->isChildrenCalculated()) {
                 foreach ($item->getChildren() as $child) {
-                    $this->_resetItemData($child);
-                    $this->_process($address, $child);
+                    $this->resetItemData($child);
+                    $this->process($address, $total, $child);
                 }
-                $this->_recalculateParent($item);
+                $this->recalculateParent($item);
             } else {
-                $this->_process($address, $item);
+                $this->process($address, $total, $item);
             }
         }
-
-        if ($this->_isTaxAffected) {
-            $address->unsSubtotalInclTax();
-            $address->unsBaseSubtotalInclTax();
-        }
-
+        $total->setWeeeCodeToItemMap($this->weeeCodeToItemMap);
+        $total->setWeeeTotalExclTax($this->weeeTotalExclTax);
+        $total->setWeeeBaseTotalExclTax($this->weeeBaseTotalExclTax);
         return $this;
     }
 
     /**
-     * Calculate item fixed tax and prepare information for discount and recular taxation
+     * Calculate item fixed tax and prepare information for discount and regular taxation
      *
-     * @param   \Magento\Sales\Model\Quote\Address $address
-     * @param   \Magento\Sales\Model\Quote\Item\AbstractItem $item
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
+     * @param Address $address
+     * @param Total $total
+     * @param AbstractItem $item
+     * @return void|$this
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
-    protected function _process(\Magento\Sales\Model\Quote\Address $address, $item)
-    {
-        if (!$this->_weeeData->isEnabled($this->_store)) {
-            return $this;
-        }
-
-        $attributes = $this->_weeeData->getProductWeeeAttributes(
+    protected function process(
+        Address $address,
+        Total $total,
+        $item
+    ) {
+        $attributes = $this->weeeData->getProductWeeeAttributes(
             $item->getProduct(),
             $address,
             $address->getQuote()->getBillingAddress(),
             $this->_store->getWebsiteId()
         );
 
-        $applied = array();
-        $productTaxes = array();
+        $productTaxes = [];
 
-        $totalValue         = 0;
-        $baseTotalValue     = 0;
-        $totalRowValue      = 0;
-        $baseTotalRowValue  = 0;
+        $totalValueInclTax = 0;
+        $baseTotalValueInclTax = 0;
+        $totalRowValueInclTax = 0;
+        $baseTotalRowValueInclTax = 0;
 
-        foreach ($attributes as $k=>$attribute) {
-            $baseValue      = $attribute->getAmount();
-            $value          = $this->_store->convertPrice($baseValue);
-            $rowValue       = $value*$item->getTotalQty();
-            $baseRowValue   = $baseValue*$item->getTotalQty();
-            $title          = $attribute->getName();
+        $totalValueExclTax = 0;
+        $baseTotalValueExclTax = 0;
+        $totalRowValueExclTax = 0;
+        $baseTotalRowValueExclTax = 0;
 
-            $totalValue         += $value;
-            $baseTotalValue     += $baseValue;
-            $totalRowValue      += $rowValue;
-            $baseTotalRowValue  += $baseRowValue;
-
-            $productTaxes[] = array(
-                'title'         => $title,
-                'base_amount'   => $baseValue,
-                'amount'        => $value,
-                'row_amount'    => $rowValue,
-                'base_row_amount'=> $baseRowValue,
-                /**
-                 * Tax value can't be presented as include/exclude tax
-                 */
-                'base_amount_incl_tax'      => $baseValue,
-                'amount_incl_tax'           => $value,
-                'row_amount_incl_tax'       => $rowValue,
-                'base_row_amount_incl_tax'  => $baseRowValue,
-            );
-
-            $applied[] = array(
-                'id'        => $attribute->getCode(),
-                'percent'   => null,
-                'hidden'    => $this->_weeeData->includeInSubtotal($this->_store),
-                'rates'     => array(array(
-                    'base_real_amount'=> $baseRowValue,
-                    'base_amount'   => $baseRowValue,
-                    'amount'        => $rowValue,
-                    'code'          => $attribute->getCode(),
-                    'title'         => $title,
-                    'percent'       => null,
-                    'position'      => 1,
-                    'priority'      => -1000+$k,
-                ))
-            );
-        }
-
-        $item->setWeeeTaxAppliedAmount($totalValue)
-            ->setBaseWeeeTaxAppliedAmount($baseTotalValue)
-            ->setWeeeTaxAppliedRowAmount($totalRowValue)
-            ->setBaseWeeeTaxAppliedRowAmnt($baseTotalRowValue);
-
-        $this->_processTaxSettings($item, $totalValue, $baseTotalValue, $totalRowValue, $baseTotalRowValue)
-            ->_processTotalAmount($address, $totalRowValue, $baseTotalRowValue)
-            ->_processDiscountSettings($item, $totalValue, $baseTotalValue);
-
-        $this->_weeeData->setApplied($item, array_merge($this->_weeeData->getApplied($item), $productTaxes));
-        if ($applied) {
-            $this->_saveAppliedTaxes($address, $applied,
-               $item->getWeeeTaxAppliedAmount(),
-               $item->getBaseWeeeTaxAppliedAmount(),
-               null
-            );
-        }
-
-    }
-
-    /**
-     * Check if discount should be applied to weee and add weee to discounted price
-     *
-     * @param   \Magento\Sales\Model\Quote\Item\AbstractItem $item
-     * @param   float $value
-     * @param   float $baseValue
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
-     */
-    protected function _processDiscountSettings($item, $value, $baseValue)
-    {
-        if ($this->_weeeData->isDiscounted($this->_store)) {
-            $this->_weeeData->addItemDiscountPrices($item, $baseValue, $value);
-        }
-        return $this;
-    }
-
-    /**
-     * Add extra amount which should be taxable by regular tax
-     *
-     * @param   \Magento\Sales\Model\Quote\Item\AbstractItem $item
-     * @param   float $value
-     * @param   float $baseValue
-     * @param   float $rowValue
-     * @param   float $baseRowValue
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
-     */
-    protected function _processTaxSettings($item, $value, $baseValue, $rowValue, $baseRowValue)
-    {
-        if ($this->_weeeData->isTaxable($this->_store) && $rowValue) {
-            if (!$this->_config->priceIncludesTax($this->_store)) {
-                $item->setExtraTaxableAmount($value)
-                    ->setBaseExtraTaxableAmount($baseValue)
-                    ->setExtraRowTaxableAmount($rowValue)
-                    ->setBaseExtraRowTaxableAmount($baseRowValue);
-            }
-            $item->unsRowTotalInclTax()
-                ->unsBaseRowTotalInclTax()
-                ->unsPriceInclTax()
-                ->unsBasePriceInclTax();
-            $this->_isTaxAffected = true;
-        }
-        return $this;
-    }
-
-    /**
-     * Proces row amount based on FPT total amount configuration setting
-     *
-     * @param   \Magento\Sales\Model\Quote\Address $address
-     * @param   float $rowValue
-     * @param   float $baseRowValue
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
-     */
-    protected function _processTotalAmount($address, $rowValue, $baseRowValue)
-    {
-        if ($this->_weeeData->includeInSubtotal($this->_store)) {
-            $address->addTotalAmount('subtotal', $rowValue);
-            $address->addBaseTotalAmount('subtotal', $baseRowValue);
-            $this->_isTaxAffected = true;
+        $associatedTaxables = $item->getAssociatedTaxables();
+        if (!$associatedTaxables) {
+            $associatedTaxables = [];
         } else {
-            $address->setExtraTaxAmount($address->getExtraTaxAmount() + $rowValue);
-            $address->setBaseExtraTaxAmount($address->getBaseExtraTaxAmount() + $baseRowValue);
+            // remove existing weee associated taxables
+            foreach ($associatedTaxables as $iTaxable => $taxable) {
+                if ($taxable[CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_TYPE] == self::ITEM_TYPE) {
+                    unset($associatedTaxables[$iTaxable]);
+                }
+            }
         }
+
+        foreach ($attributes as $key => $attribute) {
+            $title = $attribute->getName();
+
+            $baseValueExclTax = $baseValueInclTax = $attribute->getAmount();
+            $valueExclTax = $valueInclTax = $this->priceCurrency->round(
+                $this->priceCurrency->convert($baseValueExclTax, $this->_store)
+            );
+
+            $rowValueInclTax = $rowValueExclTax = $this->priceCurrency->round($valueInclTax * $item->getTotalQty());
+            $baseRowValueInclTax = $this->priceCurrency->round($baseValueInclTax * $item->getTotalQty());
+            $baseRowValueExclTax = $baseRowValueInclTax;
+
+            $totalValueInclTax += $valueInclTax;
+            $baseTotalValueInclTax += $baseValueInclTax;
+            $totalRowValueInclTax += $rowValueInclTax;
+            $baseTotalRowValueInclTax += $baseRowValueInclTax;
+
+            $totalValueExclTax += $valueExclTax;
+            $baseTotalValueExclTax += $baseValueExclTax;
+            $totalRowValueExclTax += $rowValueExclTax;
+            $baseTotalRowValueExclTax += $baseRowValueExclTax;
+
+            $productTaxes[] = [
+                'title' => $title,
+                'base_amount' => $baseValueExclTax,
+                'amount' => $valueExclTax,
+                'row_amount' => $rowValueExclTax,
+                'base_row_amount' => $baseRowValueExclTax,
+                'base_amount_incl_tax' => $baseValueInclTax,
+                'amount_incl_tax' => $valueInclTax,
+                'row_amount_incl_tax' => $rowValueInclTax,
+                'base_row_amount_incl_tax' => $baseRowValueInclTax,
+            ];
+
+            if ($this->weeeData->isTaxable($this->_store)) {
+                $weeeItemCode = self::ITEM_CODE_WEEE_PREFIX . $this->getNextIncrement();
+                $weeeItemCode .= '-' . $title;
+
+                $associatedTaxables[] = [
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_TYPE => self::ITEM_TYPE,
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_CODE => $weeeItemCode,
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_UNIT_PRICE => $valueExclTax,
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_BASE_UNIT_PRICE => $baseValueExclTax,
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_QUANTITY => $item->getTotalQty(),
+                    CommonTaxCollector::KEY_ASSOCIATED_TAXABLE_TAX_CLASS_ID => $item->getProduct()->getTaxClassId(),
+                ];
+                $this->weeeCodeToItemMap[$weeeItemCode] = $item;
+            }
+        }
+        $item->setAssociatedTaxables($associatedTaxables);
+
+        $item->setWeeeTaxAppliedAmount($totalValueExclTax)
+            ->setBaseWeeeTaxAppliedAmount($baseTotalValueExclTax)
+            ->setWeeeTaxAppliedRowAmount($totalRowValueExclTax)
+            ->setBaseWeeeTaxAppliedRowAmnt($baseTotalRowValueExclTax);
+
+        $item->setWeeeTaxAppliedAmountInclTax($totalValueInclTax)
+            ->setBaseWeeeTaxAppliedAmountInclTax($baseTotalValueInclTax)
+            ->setWeeeTaxAppliedRowAmountInclTax($totalRowValueInclTax)
+            ->setBaseWeeeTaxAppliedRowAmntInclTax($baseTotalRowValueInclTax);
+
+        $this->processTotalAmount(
+            $total,
+            $totalRowValueExclTax,
+            $baseTotalRowValueExclTax,
+            $totalRowValueInclTax,
+            $baseTotalRowValueInclTax
+        );
+
+        $this->weeeData->setApplied($item, array_merge($this->weeeData->getApplied($item), $productTaxes));
+    }
+
+    /**
+     * Process row amount based on FPT total amount configuration setting
+     *
+     * @param Total $total
+     * @param float $rowValueExclTax
+     * @param float $baseRowValueExclTax
+     * @param float $rowValueInclTax
+     * @param float $baseRowValueInclTax
+     * @return $this
+     */
+    protected function processTotalAmount(
+        $total,
+        $rowValueExclTax,
+        $baseRowValueExclTax,
+        $rowValueInclTax,
+        $baseRowValueInclTax
+    ) {
+        if (!$this->weeeData->isTaxable($this->_store)) {
+            //Accumulate the values.  Will be used later in the 'weee tax' collector
+            $this->weeeTotalExclTax += $this->priceCurrency->round($rowValueExclTax);
+            $this->weeeBaseTotalExclTax += $this->priceCurrency->round($baseRowValueExclTax);
+        }
+
+        //This value is used to calculate shipping cost; it will be overridden by tax collector
+        $total->setSubtotalInclTax(
+            $total->getSubtotalInclTax() + $this->priceCurrency->round($rowValueInclTax)
+        );
+        $total->setBaseSubtotalInclTax(
+            $total->getBaseSubtotalInclTax() + $this->priceCurrency->round($baseRowValueInclTax)
+        );
         return $this;
+    }
+
+    /**
+     * Increment and return counter. This function is intended to be used to generate temporary id for an item.
+     *
+     * @return int
+     */
+    protected function getNextIncrement()
+    {
+        return ++$this->counter;
     }
 
     /**
      * Recalculate parent item amounts based on children results
      *
-     * @param   \Magento\Sales\Model\Quote\Item\AbstractItem $item
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
+     * @param AbstractItem $item
+     * @return void
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    protected function _recalculateParent(\Magento\Sales\Model\Quote\Item\AbstractItem $item)
+    protected function recalculateParent(AbstractItem $item)
     {
-
+        $associatedTaxables = [];
+        foreach ($item->getChildren() as $child) {
+            $associatedTaxables[] = $child->getAssociatedTaxables();
+        }
+        $item->setAssociatedTaxables(
+            array_unique(array_merge([], ...$associatedTaxables))
+        );
     }
 
     /**
-     * Reset information about FPT for shopping cart item
+     * Reset information about Tax and Wee on FPT for shopping cart item
      *
-     * @param   \Magento\Sales\Model\Quote\Item\AbstractItem $item
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
+     * @param AbstractItem $item
+     * @return void
      */
-    protected function _resetItemData($item)
+    protected function resetItemData($item)
     {
-        $this->_weeeData->setApplied($item, array());
+        $this->weeeData->setApplied($item, []);
+
+        $item->setAssociatedTaxables([]);
 
         $item->setBaseWeeeTaxDisposition(0);
         $item->setWeeeTaxDisposition(0);
@@ -299,23 +341,25 @@ class Weee extends \Magento\Tax\Model\Sales\Total\Quote\Tax
     }
 
     /**
-     * Fetch FPT data to address object for display in totals block
+     * Return `null` instead of original empty array
      *
-     * @param   \Magento\Sales\Model\Quote\Address $address
-     * @return  \Magento\Weee\Model\Total\Quote\Weee
+     * @param Quote $quote
+     * @param Total $total
+     * @return array|null
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function fetch(\Magento\Sales\Model\Quote\Address $address)
+    public function fetch(Quote $quote, Total $total)
     {
-        return $this;
+        return null;
     }
 
     /**
-     * Process model configuration array.
-     * This method can be used for changing totals collect sort order
+     * Process model configuration array. This method can be used for changing totals collect sort order
      *
-     * @param   array $config
-     * @param   store $store
-     * @return  array
+     * @param array $config
+     * @param Store $store
+     * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function processConfigArray($config, $store)
     {
@@ -325,7 +369,8 @@ class Weee extends \Magento\Tax\Model\Sales\Total\Quote\Tax
     /**
      * No aggregated label for fixed product tax
      *
-     * TODO: fix
+     * @TODO: fix
+     * @return string
      */
     public function getLabel()
     {

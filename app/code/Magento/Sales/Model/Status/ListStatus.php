@@ -1,40 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Model\Status;
 
 /**
  * Service model for managing statuses information. Statuses are just records with code, message and any
  * additional data. The model helps to keep track and manipulate statuses, that different modules want to set
  * to owner object of this model.
  *
- * @category    Magento
- * @package     Magento_Sales
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Sales\Model\Status;
-
 class ListStatus
 {
     /**
@@ -42,7 +19,7 @@ class ListStatus
      *
      * @var array
      */
-    protected $_items = array();
+    protected $_items = [];
 
     /**
      * Adds status information to the list of items.
@@ -50,17 +27,17 @@ class ListStatus
      * @param string|null $origin Usually a name of module, that adds this status
      * @param int|null $code Code of status, unique for origin, that sets it
      * @param string|null $message Status message
-     * @param \Magento\Object|null $additionalData Any additional data, that caller would like to store
-     * @return \Magento\Sales\Model\Status\ListStatus
+     * @param \Magento\Framework\DataObject|null $additionalData Any additional data, that caller would like to store
+     * @return $this
      */
     public function addItem($origin = null, $code = null, $message = null, $additionalData = null)
     {
-        $this->_items[] = array(
+        $this->_items[] = [
             'origin' => $origin,
             'code' => $code,
             'message' => $message,
-            'additionalData' => $additionalData
-        );
+            'additionalData' => $additionalData,
+        ];
         return $this;
     }
 
@@ -87,11 +64,11 @@ class ListStatus
     {
         $items = $this->getItems();
         if (!$items) {
-            return array();
+            return [];
         }
 
-        $indexes = array();
-        $paramKeys = array('origin', 'code', 'message');
+        $indexes = [];
+        $paramKeys = ['origin', 'code', 'message'];
         foreach ($items as $index => $item) {
             $remove = true;
             foreach ($paramKeys as $key) {
@@ -120,20 +97,20 @@ class ListStatus
      */
     public function removeItems($indexes)
     {
-        if (!array($indexes)) {
-            $indexes = array($indexes);
+        if (![$indexes]) {
+            $indexes = [$indexes];
         }
         if (!$indexes) {
-            return array();
+            return [];
         }
 
         $items = $this->getItems();
         if (!$items) {
-            return array();
+            return [];
         }
 
-        $newItems = array();
-        $removedItems = array();
+        $newItems = [];
+        $removedItems = [];
         foreach ($items as $indexNow => $item) {
             if (in_array($indexNow, $indexes)) {
                 $removedItems[] = $item;
@@ -149,11 +126,11 @@ class ListStatus
     /**
      * Clears list from all items
      *
-     * @return \Magento\Sales\Model\Status\ListStatus
+     * @return $this
      */
     public function clear()
     {
-        $this->_items = array();
+        $this->_items = [];
         return $this;
     }
 }

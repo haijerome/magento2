@@ -1,80 +1,64 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Paypal\Model;
+
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Filesystem\Directory\WriteInterface;
 
 /**
  * PayPal specific model for certificate based authentication
  */
-namespace Magento\Paypal\Model;
-
-class Cert extends \Magento\Core\Model\AbstractModel
+class Cert extends \Magento\Framework\Model\AbstractModel
 {
     /**
      * Certificate base path
      */
-    const BASEPATH_PAYPAL_CERT  = 'cert/paypal';
+    const BASEPATH_PAYPAL_CERT = 'cert/paypal/';
 
     /**
-     * @var \Magento\App\Dir
+     * @var WriteInterface
      */
-    protected $_coreDir;
+    protected $varDirectory;
 
     /**
-     * @var \Magento\Encryption\EncryptorInterface
+     * @var \Magento\Framework\Encryption\EncryptorInterface
      */
-    protected $_encryptor;
+    protected $encryptor;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\App\Dir $coreDir
-     * @param \Magento\Encryption\EncryptorInterface $encryptor
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Encryption\EncryptorInterface $encryptor
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\App\Dir $coreDir,
-        \Magento\Encryption\EncryptorInterface $encryptor,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\Encryption\EncryptorInterface $encryptor,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        $this->_coreDir = $coreDir;
-        $this->_encryptor = $encryptor;
+        $this->varDirectory = $filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
+        $this->encryptor = $encryptor;
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
     }
 
     /**
      * Initialize resource model
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Paypal\Model\Resource\Cert');
+        $this->_init(\Magento\Paypal\Model\ResourceModel\Cert::class);
     }
 
     /**
@@ -82,7 +66,7 @@ class Cert extends \Magento\Core\Model\AbstractModel
      *
      * @param int $websiteId
      * @param bool $strictLoad
-     * @return \Magento\Paypal\Model\Cert
+     * @return $this
      */
     public function loadByWebsite($websiteId, $strictLoad = true)
     {
@@ -95,39 +79,35 @@ class Cert extends \Magento\Core\Model\AbstractModel
      * Get path to PayPal certificate file, if file does not exist try to create it
      *
      * @return string
-     * @throws \Magento\Core\Exception
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getCertPath()
     {
         if (!$this->getContent()) {
-            throw new \Magento\Core\Exception(__('The PayPal certificate does not exist.'));
+            throw new \Magento\Framework\Exception\LocalizedException(__('The PayPal certificate does not exist.'));
         }
 
         $certFileName = sprintf('cert_%s_%s.pem', $this->getWebsiteId(), strtotime($this->getUpdatedAt()));
-        $certFile = $this->_getBaseDir() . DS . $certFileName;
+        $certFile = self::BASEPATH_PAYPAL_CERT . $certFileName;
 
-        if (!file_exists($certFile)) {
+        if (!$this->varDirectory->isExist($certFile)) {
             $this->_createCertFile($certFile);
         }
-        return $certFile;
+        return $this->varDirectory->getAbsolutePath($certFile);
     }
 
     /**
      * Create physical certificate file based on DB data
      *
      * @param string $file
+     * @return void
      */
     protected function _createCertFile($file)
     {
-        $certDir = $this->_getBaseDir();
-        if (!is_dir($certDir)) {
-            $ioAdapter = new \Magento\Io\File();
-            $ioAdapter->checkAndCreateFolder($certDir);
-        } else {
+        if ($this->varDirectory->isDirectory(self::BASEPATH_PAYPAL_CERT)) {
             $this->_removeOutdatedCertFile();
         }
-
-        file_put_contents($file, $this->_encryptor->decrypt($this->getContent()));
+        $this->varDirectory->writeFile($file, $this->encryptor->decrypt($this->getContent()));
     }
 
     /**
@@ -137,33 +117,19 @@ class Cert extends \Magento\Core\Model\AbstractModel
      */
     protected function _removeOutdatedCertFile()
     {
-        $certDir = $this->_getBaseDir();
-        if (is_dir($certDir)) {
-            $entries = scandir($certDir);
-            foreach ($entries as $entry) {
-                if ($entry != '.' && $entry != '..' && strpos($entry, 'cert_' . $this->getWebsiteId()) !== false) {
-                    unlink($certDir . DS . $entry);
-                }
-            }
+        $pattern = sprintf('cert_%s*', $this->getWebsiteId());
+        $entries = $this->varDirectory->search($pattern, self::BASEPATH_PAYPAL_CERT);
+        foreach ($entries as $entry) {
+            $this->varDirectory->delete($entry);
         }
-    }
-
-    /**
-     * Retrieve base directory for certificate
-     *
-     * @return string
-     */
-    protected function _getBaseDir()
-    {
-        return $this->_coreDir->getDir(\Magento\App\Dir::VAR_DIR) . DS . self::BASEPATH_PAYPAL_CERT;
     }
 
     /**
      * Delete assigned certificate file after delete object
      *
-     * @return \Magento\Paypal\Model\Cert
+     * @return $this
      */
-    protected function _afterDelete()
+    public function afterDelete()
     {
         $this->_removeOutdatedCertFile();
         return $this;

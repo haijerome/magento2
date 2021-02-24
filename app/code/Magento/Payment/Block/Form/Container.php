@@ -1,44 +1,73 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Payment
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Payment\Block\Form;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Payment\Model\Method\AbstractMethod;
 
 /**
  * Base container block for payment methods forms
  *
- * @method \Magento\Sales\Model\Quote getQuote()
+ * @method \Magento\Quote\Model\Quote getQuote()
  *
- * @category   Magento
- * @package    Magento_Payment
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Payment\Block\Form;
-
-class Container extends \Magento\View\Element\Template
+class Container extends \Magento\Framework\View\Element\Template
 {
     /**
+     * @var \Magento\Payment\Helper\Data
+     */
+    protected $_paymentHelper;
+
+    /**
+     * @var \Magento\Payment\Model\Checks\SpecificationFactory
+     */
+    protected $methodSpecificationFactory;
+
+    /**
+     * @var \Magento\Payment\Api\PaymentMethodListInterface
+     */
+    private $paymentMethodList;
+
+    /**
+     * @var \Magento\Payment\Model\Method\InstanceFactory
+     */
+    private $paymentMethodInstanceFactory;
+
+    /**
+     * @var array
+     * @since 100.1.3
+     */
+    protected $additionalChecks;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Payment\Helper\Data $paymentHelper
+     * @param \Magento\Payment\Model\Checks\SpecificationFactory $methodSpecificationFactory
+     * @param array $data
+     * @param array $additionalChecks
+     */
+    public function __construct(
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Payment\Helper\Data $paymentHelper,
+        \Magento\Payment\Model\Checks\SpecificationFactory $methodSpecificationFactory,
+        array $data = [],
+        array $additionalChecks = []
+    ) {
+        $this->_paymentHelper = $paymentHelper;
+        $this->methodSpecificationFactory = $methodSpecificationFactory;
+        $this->additionalChecks = $additionalChecks;
+        parent::__construct($context, $data);
+    }
+
+    /**
      * Prepare children blocks
+     *
+     * @return $this
      */
     protected function _prepareLayout()
     {
@@ -47,8 +76,8 @@ class Container extends \Magento\View\Element\Template
          */
         foreach ($this->getMethods() as $method) {
             $this->setChild(
-               'payment.method.'.$method->getCode(),
-               $this->helper('Magento\Payment\Helper\Data')->getMethodFormBlock($method)
+                'payment.method.' . $method->getCode(),
+                $this->_paymentHelper->getMethodFormBlock($method, $this->_layout)
             );
         }
 
@@ -58,14 +87,24 @@ class Container extends \Magento\View\Element\Template
     /**
      * Check payment method model
      *
-     * @param \Magento\Payment\Model\Method\AbstractMethod $method
+     * @param \Magento\Payment\Model\MethodInterface $method
      * @return bool
      */
     protected function _canUseMethod($method)
     {
-        return $method->isApplicableToQuote($this->getQuote(), \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_COUNTRY
-            | \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_CURRENCY
-            | \Magento\Payment\Model\Method\AbstractMethod::CHECK_ORDER_TOTAL_MIN_MAX
+        $checks = array_merge(
+            [
+                AbstractMethod::CHECK_USE_FOR_COUNTRY,
+                AbstractMethod::CHECK_USE_FOR_CURRENCY,
+                AbstractMethod::CHECK_ORDER_TOTAL_MIN_MAX,
+                AbstractMethod::CHECK_ZERO_TOTAL
+            ],
+            $this->additionalChecks
+        );
+
+        return $this->methodSpecificationFactory->create($checks)->isApplicable(
+            $method,
+            $this->getQuote()
         );
     }
 
@@ -74,8 +113,8 @@ class Container extends \Magento\View\Element\Template
      *
      * Redeclare this method in child classes for declaring method info instance
      *
-     * @param \Magento\Payment\Model\Method\AbstractMethod $method
-     * @return bool
+     * @param \Magento\Payment\Model\MethodInterface $method
+     * @return $this
      */
     protected function _assignMethod($method)
     {
@@ -86,14 +125,14 @@ class Container extends \Magento\View\Element\Template
     /**
      * Declare template for payment method form block
      *
-     * @param   string $method
-     * @param   string $template
-     * @return  \Magento\Payment\Block\Form\Container
+     * @param string $method
+     * @param string $template
+     * @return $this
      */
-    public function setMethodFormTemplate($method='', $template='')
+    public function setMethodFormTemplate($method = '', $template = '')
     {
         if (!empty($method) && !empty($template)) {
-            if ($block = $this->getChildBlock('payment.method.'.$method)) {
+            if ($block = $this->getChildBlock('payment.method.' . $method)) {
                 $block->setTemplate($template);
             }
         }
@@ -111,14 +150,12 @@ class Container extends \Magento\View\Element\Template
         if ($methods === null) {
             $quote = $this->getQuote();
             $store = $quote ? $quote->getStoreId() : null;
-            $methods = array();
-            foreach ($this->helper('Magento\Payment\Helper\Data')->getStoreMethods($store, $quote) as $method) {
-                if ($this->_canUseMethod($method) && $method->isApplicableToQuote(
-                    $quote,
-                    \Magento\Payment\Model\Method\AbstractMethod::CHECK_ZERO_TOTAL
-                )) {
-                    $this->_assignMethod($method);
-                    $methods[] = $method;
+            $methods = [];
+            foreach ($this->getPaymentMethodList()->getActiveList($store) as $method) {
+                $methodInstance = $this->getPaymentMethodInstanceFactory()->create($method);
+                if ($methodInstance->isAvailable($quote) && $this->_canUseMethod($methodInstance)) {
+                    $this->_assignMethod($methodInstance);
+                    $methods[] = $methodInstance;
                 }
             }
             $this->setData('methods', $methods);
@@ -129,7 +166,7 @@ class Container extends \Magento\View\Element\Template
     /**
      * Retrieve code of current payment method
      *
-     * @return mixed
+     * @return string|false
      */
     public function getSelectedMethodCode()
     {
@@ -139,5 +176,37 @@ class Container extends \Magento\View\Element\Template
             return current($methods)->getCode();
         }
         return false;
+    }
+
+    /**
+     * Get payment method list.
+     *
+     * @return \Magento\Payment\Api\PaymentMethodListInterface
+     * @deprecated 100.1.3
+     */
+    private function getPaymentMethodList()
+    {
+        if ($this->paymentMethodList === null) {
+            $this->paymentMethodList = ObjectManager::getInstance()->get(
+                \Magento\Payment\Api\PaymentMethodListInterface::class
+            );
+        }
+        return $this->paymentMethodList;
+    }
+
+    /**
+     * Get payment method instance factory.
+     *
+     * @return \Magento\Payment\Model\Method\InstanceFactory
+     * @deprecated 100.1.3
+     */
+    private function getPaymentMethodInstanceFactory()
+    {
+        if ($this->paymentMethodInstanceFactory === null) {
+            $this->paymentMethodInstanceFactory = ObjectManager::getInstance()->get(
+                \Magento\Payment\Model\Method\InstanceFactory::class
+            );
+        }
+        return $this->paymentMethodInstanceFactory;
     }
 }

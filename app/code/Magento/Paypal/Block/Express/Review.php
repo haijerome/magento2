@@ -1,66 +1,89 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Paypal\Block\Express;
+
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+use Magento\Quote\Model\Quote\Address\Rate;
 
 /**
  * Paypal Express Onepage checkout block
  *
- * @category   Magento
- * @package    Magento_Paypal
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Paypal\Block\Express;
-
-class Review extends \Magento\View\Element\Template
+class Review extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var \Magento\Sales\Model\Quote
+     * @var \Magento\Quote\Model\Quote
      */
     protected $_quote;
 
     /**
+     * @var \Magento\Quote\Model\Quote\Address
+     */
+    protected $_address;
+
+    /**
+     * @var \Magento\Customer\Model\Address\Config
+     */
+    protected $_addressConfig;
+
+    /**
      * Currently selected shipping rate
      *
-     * @var \Magento\Sales\Model\Quote\Address\Rate
+     * @var Rate
      */
     protected $_currentShippingRate = null;
 
     /**
-     * Paypal action prefix
+     * Paypal controller path
      *
      * @var string
      */
-    protected $_paypalActionPrefix = 'paypal';
+    protected $_controllerPath = 'paypal/express';
+
+    /**
+     * @var \Magento\Tax\Helper\Data
+     */
+    protected $_taxHelper;
+
+    /**
+     * @var PriceCurrencyInterface
+     */
+    protected $priceCurrency;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Tax\Helper\Data $taxHelper
+     * @param \Magento\Customer\Model\Address\Config $addressConfig
+     * @param PriceCurrencyInterface $priceCurrency
+     * @param array $data
+     */
+    public function __construct(
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Tax\Helper\Data $taxHelper,
+        \Magento\Customer\Model\Address\Config $addressConfig,
+        PriceCurrencyInterface $priceCurrency,
+        array $data = []
+    ) {
+        $this->priceCurrency = $priceCurrency;
+        $this->_taxHelper = $taxHelper;
+        $this->_addressConfig = $addressConfig;
+        parent::__construct($context, $data);
+    }
 
     /**
      * Quote object setter
      *
-     * @param \Magento\Sales\Model\Quote $quote
-     * @return \Magento\Paypal\Block\Express\Review
+     * @param \Magento\Quote\Model\Quote $quote
+     * @return $this
      */
-    public function setQuote(\Magento\Sales\Model\Quote $quote)
+    public function setQuote(\Magento\Quote\Model\Quote $quote)
     {
         $this->_quote = $quote;
         return $this;
@@ -69,7 +92,7 @@ class Review extends \Magento\View\Element\Template
     /**
      * Return quote billing address
      *
-     * @return \Magento\Sales\Model\Quote\Address
+     * @return \Magento\Quote\Model\Quote\Address
      */
     public function getBillingAddress()
     {
@@ -79,7 +102,7 @@ class Review extends \Magento\View\Element\Template
     /**
      * Return quote shipping address
      *
-     * @return \Magento\Sales\Model\Quote\Address
+     * @return false|\Magento\Quote\Model\Quote\Address
      */
     public function getShippingAddress()
     {
@@ -92,12 +115,15 @@ class Review extends \Magento\View\Element\Template
     /**
      * Get HTML output for specified address
      *
-     * @param \Magento\Sales\Model\Quote\Address $address
+     * @param \Magento\Quote\Model\Quote\Address $address
      * @return string
      */
     public function renderAddress($address)
     {
-        return $address->format('html');
+        /** @var \Magento\Customer\Block\Address\Renderer\RendererInterface $renderer */
+        $renderer = $this->_addressConfig->getFormatByCode('html')->getRenderer();
+        $addressData = \Magento\Framework\Convert\ConvertArray::toFlatArray($address->getData());
+        return $renderer->renderArray($addressData);
     }
 
     /**
@@ -108,7 +134,11 @@ class Review extends \Magento\View\Element\Template
      */
     public function getCarrierName($carrierCode)
     {
-        if ($name = $this->_storeConfig->getConfig("carriers/{$carrierCode}/title")) {
+        if ($name = $this->_scopeConfig->getValue(
+            "carriers/{$carrierCode}/title",
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        )
+        ) {
             return $name;
         }
         return $carrierCode;
@@ -117,10 +147,10 @@ class Review extends \Magento\View\Element\Template
     /**
      * Get either shipping rate code or empty value on error
      *
-     * @param \Magento\Object $rate
+     * @param \Magento\Framework\DataObject $rate
      * @return string
      */
-    public function renderShippingRateValue(\Magento\Object $rate)
+    public function renderShippingRateValue(\Magento\Framework\DataObject $rate)
     {
         if ($rate->getErrorMessage()) {
             return '';
@@ -131,7 +161,7 @@ class Review extends \Magento\View\Element\Template
     /**
      * Get shipping rate code title and its price or error message
      *
-     * @param \Magento\Object $rate
+     * @param \Magento\Framework\DataObject $rate
      * @param string $format
      * @param string $inclTaxFormat
      * @return string
@@ -142,16 +172,14 @@ class Review extends \Magento\View\Element\Template
         if ($rate->getErrorMessage()) {
             $price = $rate->getErrorMessage();
         } else {
-            $price = $this->_getShippingPrice($rate->getPrice(),
-                $this->helper('Magento\Tax\Helper\Data')->displayShippingPriceIncludingTax());
+            $price = $this->_getShippingPrice(
+                $rate->getPrice(),
+                $this->_taxHelper->displayShippingPriceIncludingTax()
+            );
 
             $incl = $this->_getShippingPrice($rate->getPrice(), true);
-            if (($incl != $price) && $this->helper('Magento\Tax\Helper\Data')->displayShippingBothPrices()) {
-                $renderedInclTax = sprintf(
-                    $inclTaxFormat,
-                    __('Incl. Tax'),
-                    $incl
-                );
+            if ($incl != $price && $this->_taxHelper->displayShippingBothPrices()) {
+                $renderedInclTax = sprintf($inclTaxFormat, $this->escapeHtml(__('Incl. Tax')), $incl);
             }
         }
         return sprintf($format, $this->escapeHtml($rate->getMethodTitle()), $price, $renderedInclTax);
@@ -160,7 +188,7 @@ class Review extends \Magento\View\Element\Template
     /**
      * Getter for current shipping rate
      *
-     * @return \Magento\Sales\Model\Quote\Address\Rate
+     * @return Rate
      */
     public function getCurrentShippingRate()
     {
@@ -168,11 +196,35 @@ class Review extends \Magento\View\Element\Template
     }
 
     /**
-     * Set paypal actions prefix
+     * Whether can edit shipping method
+     *
+     * @return bool
      */
-    public function setPaypalActionPrefix($prefix)
+    public function canEditShippingMethod()
     {
-        $this->_paypalActionPrefix = $prefix;
+        return $this->getData('can_edit_shipping_method') || !$this->getCurrentShippingRate();
+    }
+
+    /**
+     * Get quote email
+     *
+     * @return string
+     */
+    public function getEmail()
+    {
+        $billingAddress = $this->getBillingAddress();
+        return $billingAddress ? $billingAddress->getEmail() : '';
+    }
+
+    /**
+     * Set controller path
+     *
+     * @param string $prefix
+     * @return void
+     */
+    public function setControllerPath($prefix)
+    {
+        $this->_controllerPath = $prefix;
     }
 
     /**
@@ -180,18 +232,11 @@ class Review extends \Magento\View\Element\Template
      *
      * @param float $price
      * @param bool $isInclTax
-     *
-     * @return bool
+     * @return string
      */
     protected function _getShippingPrice($price, $isInclTax)
     {
-        return $this->_formatPrice(
-            $this->helper('Magento\Tax\Helper\Data')->getShippingPrice(
-                $price,
-                $isInclTax,
-                $this->_address
-            )
-        );
+        return $this->_formatPrice($this->_taxHelper->getShippingPrice($price, $isInclTax, $this->_address));
     }
 
     /**
@@ -202,20 +247,24 @@ class Review extends \Magento\View\Element\Template
      */
     protected function _formatPrice($price)
     {
-        return $this->_quote->getStore()->convertPrice($price, true);
+        return $this->priceCurrency->convertAndFormat(
+            $price,
+            true,
+            PriceCurrencyInterface::DEFAULT_PRECISION,
+            $this->_quote->getStore()
+        );
     }
 
     /**
      * Retrieve payment method and assign additional template values
      *
-     * @return \Magento\Paypal\Block\Express\Review
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
     protected function _beforeToHtml()
     {
         $methodInstance = $this->_quote->getPayment()->getMethodInstance();
         $this->setPaymentMethodTitle($methodInstance->getTitle());
-        $this->setUpdateOrderSubmitUrl($this->getUrl("{$this->_paypalActionPrefix}/express/updateOrder"));
-        $this->setUpdateShippingMethodsUrl($this->getUrl("{$this->_paypalActionPrefix}/express/updateShippingMethods"));
 
         $this->setShippingRateRequired(true);
         if ($this->_quote->getIsVirtual()) {
@@ -231,21 +280,29 @@ class Review extends \Magento\View\Element\Template
                     foreach ($rates as $rate) {
                         if ($this->_address->getShippingMethod() == $rate->getCode()) {
                             $this->_currentShippingRate = $rate;
-                            break(2);
+                            break 2;
                         }
                     }
                 }
             }
 
+            $canEditShippingAddress = $this->_quote->getMayEditShippingAddress() && $this->_quote->getPayment()
+                ->getAdditionalInformation(\Magento\Paypal\Model\Express\Checkout::PAYMENT_INFO_BUTTON) == 1;
             // misc shipping parameters
-            $this->setShippingMethodSubmitUrl($this->getUrl("{$this->_paypalActionPrefix}/express/saveShippingMethod"))
-                ->setCanEditShippingAddress($this->_quote->getMayEditShippingAddress())
-                ->setCanEditShippingMethod($this->_quote->getMayEditShippingMethod())
-            ;
+            $this->setShippingMethodSubmitUrl(
+                $this->getUrl("{$this->_controllerPath}/saveShippingMethod", ['_secure' => true])
+            )->setCanEditShippingAddress(
+                $canEditShippingAddress
+            )->setCanEditShippingMethod(
+                $this->_quote->getMayEditShippingMethod()
+            );
         }
 
-        $this->setEditUrl($this->getUrl("{$this->_paypalActionPrefix}/express/edit"))
-            ->setPlaceOrderUrl($this->getUrl("{$this->_paypalActionPrefix}/express/placeOrder"));
+        $this->setEditUrl(
+            $this->getUrl("{$this->_controllerPath}/edit")
+        )->setPlaceOrderUrl(
+            $this->getUrl("{$this->_controllerPath}/placeOrder", ['_secure' => true])
+        );
 
         return parent::_beforeToHtml();
     }

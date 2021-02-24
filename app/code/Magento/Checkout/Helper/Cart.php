@@ -1,58 +1,31 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Checkout\Helper;
 
 /**
  * Shopping cart helper
  *
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Checkout\Helper;
-
-class Cart extends \Magento\Core\Helper\Url
+class Cart extends \Magento\Framework\Url\Helper\Data
 {
+    /**
+     * Path to controller to delete item from cart
+     */
+    const DELETE_URL = 'checkout/cart/delete';
+
+    /**
+     * Path for redirect to cart
+     */
     const XML_PATH_REDIRECT_TO_CART = 'checkout/cart/redirect_to_cart';
 
     /**
      * Maximal coupon code length according to database table definitions (longer codes are truncated)
      */
     const COUPON_CODE_MAX_LENGTH = 255;
-
-    /**
-     * Core data
-     *
-     * @var \Magento\Core\Helper\Data
-     */
-    protected $_coreData = null;
-
-    /**
-     * Core store config
-     *
-     * @var \Magento\Core\Model\Store\Config
-     */
-    protected $_coreStoreConfig;
 
     /**
      * @var \Magento\Checkout\Model\Cart
@@ -65,32 +38,26 @@ class Cart extends \Magento\Core\Helper\Url
     protected $_checkoutSession;
 
     /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
+     * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Checkout\Model\Cart $checkoutCart
      * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
+        \Magento\Framework\App\Helper\Context $context,
         \Magento\Checkout\Model\Cart $checkoutCart,
         \Magento\Checkout\Model\Session $checkoutSession
     ) {
-        $this->_coreData = $coreData;
-        $this->_coreStoreConfig = $coreStoreConfig;
         $this->_checkoutCart = $checkoutCart;
         $this->_checkoutSession = $checkoutSession;
-        parent::__construct($context, $storeManager);
+        parent::__construct($context);
     }
 
     /**
      * Retrieve cart instance
      *
      * @return \Magento\Checkout\Model\Cart
+     * @codeCoverageIgnore
      */
     public function getCart()
     {
@@ -104,27 +71,35 @@ class Cart extends \Magento\Core\Helper\Url
      * @param array $additional
      * @return  string
      */
-    public function getAddUrl($product, $additional = array())
+    public function getAddUrl($product, $additional = [])
     {
-        $continueUrl    = $this->_coreData->urlEncode($this->_urlBuilder->getCurrentUrl());
-        $urlParamName   = \Magento\App\Action\Action::PARAM_NAME_URL_ENCODED;
+        if (isset($additional['useUencPlaceholder'])) {
+            $uenc = "%uenc%";
+            unset($additional['useUencPlaceholder']);
+        } else {
+            $uenc = $this->urlEncoder->encode($this->_urlBuilder->getCurrentUrl());
+        }
 
-        $routeParams = array(
-            $urlParamName   => $continueUrl,
-            'product'       => $product->getEntityId()
-        );
+        $urlParamName = \Magento\Framework\App\ActionInterface::PARAM_NAME_URL_ENCODED;
+
+        $routeParams = [
+            $urlParamName => $uenc,
+            'product' => $product->getEntityId(),
+            '_secure' => $this->_getRequest()->isSecure()
+        ];
 
         if (!empty($additional)) {
             $routeParams = array_merge($routeParams, $additional);
         }
 
         if ($product->hasUrlDataObject()) {
-            $routeParams['_store'] = $product->getUrlDataObject()->getStoreId();
-            $routeParams['_store_to_url'] = true;
+            $routeParams['_scope'] = $product->getUrlDataObject()->getStoreId();
+            $routeParams['_scope_to_url'] = true;
         }
 
         if ($this->_getRequest()->getRouteName() == 'checkout'
-            && $this->_getRequest()->getControllerName() == 'cart') {
+            && $this->_getRequest()->getControllerName() == 'cart'
+        ) {
             $routeParams['in_cart'] = 1;
         }
 
@@ -134,22 +109,40 @@ class Cart extends \Magento\Core\Helper\Url
     /**
      * Retrieve url for remove product from cart
      *
-     * @param   \Magento\Sales\Model\Quote\Item $item
+     * @param   \Magento\Quote\Model\Quote\Item\AbstractItem $item
      * @return  string
      */
     public function getRemoveUrl($item)
     {
-        $params = array(
-            'id'=>$item->getId(),
-            \Magento\App\Action\Action::PARAM_NAME_BASE64_URL => $this->getCurrentBase64Url()
-        );
-        return $this->_getUrl('checkout/cart/delete', $params);
+        $params = [
+            'id' => $item->getId(),
+            \Magento\Framework\App\ActionInterface::PARAM_NAME_BASE64_URL => $this->getCurrentBase64Url(),
+        ];
+        return $this->_getUrl(self::DELETE_URL, $params);
+    }
+
+    /**
+     * Get post parameters for delete from cart
+     *
+     * @param \Magento\Quote\Model\Quote\Item\AbstractItem $item
+     * @return string
+     */
+    public function getDeletePostJson($item)
+    {
+        $url = $this->_getUrl(self::DELETE_URL);
+
+        $data = ['id' => $item->getId()];
+        if (!$this->_request->isAjax()) {
+            $data[\Magento\Framework\App\ActionInterface::PARAM_NAME_URL_ENCODED] = $this->getCurrentBase64Url();
+        }
+        return json_encode(['action' => $url, 'data' => $data]);
     }
 
     /**
      * Retrieve shopping cart url
      *
-     * @return unknown
+     * @return string
+     * @codeCoverageIgnore
      */
     public function getCartUrl()
     {
@@ -159,7 +152,8 @@ class Cart extends \Magento\Core\Helper\Url
     /**
      * Retrieve current quote instance
      *
-     * @return \Magento\Sales\Model\Quote
+     * @return \Magento\Quote\Model\Quote
+     * @codeCoverageIgnore
      */
     public function getQuote()
     {
@@ -170,6 +164,7 @@ class Cart extends \Magento\Core\Helper\Url
      * Get shopping cart items count
      *
      * @return int
+     * @codeCoverageIgnore
      */
     public function getItemsCount()
     {
@@ -179,7 +174,8 @@ class Cart extends \Magento\Core\Helper\Url
     /**
      * Get shopping cart summary qty
      *
-     * @return decimal
+     * @return int|float
+     * @codeCoverageIgnore
      */
     public function getItemsQty()
     {
@@ -187,9 +183,10 @@ class Cart extends \Magento\Core\Helper\Url
     }
 
     /**
-     * Get shopping cart items summary (inchlude config settings)
+     * Get shopping cart items summary (include config settings)
      *
-     * @return decimal
+     * @return int|float
+     * @codeCoverageIgnore
      */
     public function getSummaryCount()
     {
@@ -197,9 +194,11 @@ class Cart extends \Magento\Core\Helper\Url
     }
 
     /**
-     * Check qoute for virtual products only
+     * Check quote for virtual products only
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
+     * @codeCoverageIgnore
      */
     public function getIsVirtualQuote()
     {
@@ -209,11 +208,17 @@ class Cart extends \Magento\Core\Helper\Url
     /**
      * Checks if customer should be redirected to shopping cart after adding a product
      *
-     * @param int|string|\Magento\Core\Model\Store $store
+     * @param int|string|\Magento\Store\Model\Store $store
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
+     * @codeCoverageIgnore
      */
     public function getShouldRedirectToCart($store = null)
     {
-        return $this->_coreStoreConfig->getConfigFlag(self::XML_PATH_REDIRECT_TO_CART, $store);
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_REDIRECT_TO_CART,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $store
+        );
     }
 }

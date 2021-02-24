@@ -1,38 +1,22 @@
 <?php
 /**
- * Widgets Insertion Plugin Config for Editor HTML Element
- *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+declare(strict_types=1);
+
 namespace Magento\Widget\Model\Widget;
 
-class Config
+/**
+ * Widgets Insertion Plugin Config for Editor HTML Element
+ */
+class Config implements \Magento\Framework\Data\Wysiwyg\ConfigProviderInterface
 {
     /**
-     * @var \Magento\View\Url
+     * @var \Magento\Framework\View\Asset\Repository
      */
-    protected $_viewUrl;
+    protected $_assetRepo;
 
     /**
      * @var \Magento\Widget\Model\Widget
@@ -40,14 +24,14 @@ class Config
     protected $_widget;
 
     /**
-     * @var \Magento\Backend\Model\Url
+     * @var \Magento\Backend\Model\UrlInterface
      */
     protected $_backendUrl;
 
     /**
-     * @var \Magento\Core\Helper\Data
+     * @var \Magento\Framework\Url\DecoderInterface
      */
-    protected $_coreHelper;
+    protected $urlDecoder;
 
     /**
      * @var \Magento\Widget\Model\WidgetFactory
@@ -55,54 +39,119 @@ class Config
     protected $_widgetFactory;
 
     /**
-     * @param \Magento\Backend\Model\Url $backendUrl
-     * @param \Magento\Core\Helper\Data $coreHelper
-     * @param \Magento\View\Url $viewUrl
+     * @var \Magento\Framework\Url\EncoderInterface
+     */
+    protected $urlEncoder;
+
+    /**
+     * @var \Magento\Framework\Registry
+     */
+    private $registry;
+
+    /**
+     * @param \Magento\Backend\Model\UrlInterface $backendUrl
+     * @param \Magento\Framework\Url\DecoderInterface $urlDecoder
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
      * @param \Magento\Widget\Model\WidgetFactory $widgetFactory
+     * @param \Magento\Framework\Url\EncoderInterface $urlEncoder
+     * @param \Magento\Framework\Registry $registry
      */
     public function __construct(
-        \Magento\Backend\Model\Url $backendUrl,
-        \Magento\Core\Helper\Data $coreHelper,
-        \Magento\View\Url $viewUrl,
-        \Magento\Widget\Model\WidgetFactory $widgetFactory
+        \Magento\Backend\Model\UrlInterface $backendUrl,
+        \Magento\Framework\Url\DecoderInterface $urlDecoder,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Widget\Model\WidgetFactory $widgetFactory,
+        \Magento\Framework\Url\EncoderInterface $urlEncoder,
+        \Magento\Framework\Registry $registry
     ) {
         $this->_backendUrl = $backendUrl;
-        $this->_coreHelper = $coreHelper;
-        $this->_viewUrl = $viewUrl;
+        $this->urlDecoder = $urlDecoder;
+        $this->_assetRepo = $assetRepo;
         $this->_widgetFactory = $widgetFactory;
+        $this->urlEncoder = $urlEncoder;
+        $this->registry = $registry;
     }
 
     /**
      * Return config settings for widgets insertion plugin based on editor element config
      *
-     * @param \Magento\Object $config
+     * @param \Magento\Framework\DataObject $config
+     * @return \Magento\Framework\DataObject
+     */
+    public function getConfig(\Magento\Framework\DataObject $config) : \Magento\Framework\DataObject
+    {
+        $settings = $this->getPluginSettings($config);
+        return $config->addData($settings);
+    }
+
+    /**
+     * Return config settings for widgets insertion plugin based on editor element config
+     *
+     * @param \Magento\Framework\DataObject $config
      * @return array
      */
     public function getPluginSettings($config)
     {
-        $url = $this->_viewUrl->getViewFileUrl(
-            'mage/adminhtml/wysiwyg/tiny_mce/plugins/magentowidget/editor_plugin.js'
-        );
-        $settings = array(
-            'widget_plugin_src'   => $url,
-            'widget_placeholders' => $this->_widgetFactory->create()->getPlaceholderImageUrls(),
-            'widget_window_url'   => $this->getWidgetWindowUrl($config)
-        );
+        $widgetWysiwyg = [
+            [
+                'name' => 'magentowidget',
+                'src' => $this->getWysiwygJsPluginSrc(),
+                'options' => [
+                    'window_url' => $this->getWidgetWindowUrl($config),
+                    'types' => $this->getAvailableWidgets($config),
+                    'error_image_url' => $this->getErrorImageUrl(),
+                    'placeholders' => $this->getWidgetPlaceholderImageUrls(),
+                ],
+            ]
+        ];
 
-        return $settings;
+        $configPlugins = (array) $config->getData('plugins');
+
+        $widgetConfig['plugins'] = array_merge($configPlugins, $widgetWysiwyg);
+        return $widgetConfig;
+    }
+
+    /**
+     * Return list of available placeholders for widget
+     *
+     * @return array
+     */
+    public function getWidgetPlaceholderImageUrls()
+    {
+        return $this->_widgetFactory->create()->getPlaceholderImageUrls();
+    }
+
+    /**
+     * Return url to error image
+     *
+     * @return string
+     */
+    public function getErrorImageUrl()
+    {
+        return $this->_assetRepo->getUrl('Magento_Widget::error.png');
+    }
+
+    /**
+     * Return url to wysiwyg plugin
+     *
+     * @return string
+     */
+    public function getWysiwygJsPluginSrc()
+    {
+        return $this->_assetRepo->getUrl('mage/adminhtml/wysiwyg/tiny_mce/plugins/magentowidget/editor_plugin.js');
     }
 
     /**
      * Return Widgets Insertion Plugin Window URL
      *
-     * @param \Magento\Object $config Editor element config
+     * @param \Magento\Framework\DataObject $config Editor element config
      * @return string
      */
     public function getWidgetWindowUrl($config)
     {
-        $params = array();
+        $params = [];
 
-        $skipped = is_array($config->getData('skip_widgets')) ? $config->getData('skip_widgets') : array();
+        $skipped = is_array($config->getData('skip_widgets')) ? $config->getData('skip_widgets') : [];
         if ($config->hasData('widget_filters')) {
             $all = $this->_widgetFactory->create()->getWidgets();
             $filtered = $this->_widgetFactory->create()->getWidgets($config->getData('widget_filters'));
@@ -113,7 +162,7 @@ class Config
             }
         }
 
-        if (count($skipped) > 0) {
+        if (!empty($skipped)) {
             $params['skip_widgets'] = $this->encodeWidgetsToQuery($skipped);
         }
         return $this->_backendUrl->getUrl('adminhtml/widget/index', $params);
@@ -122,26 +171,59 @@ class Config
     /**
      * Encode list of widget types into query param
      *
-     * @param array $widgets List of widgets
+     * @param string[]|string $widgets List of widgets
      * @return string Query param value
      */
     public function encodeWidgetsToQuery($widgets)
     {
-        $widgets = is_array($widgets) ? $widgets : array($widgets);
+        $widgets = is_array($widgets) ? $widgets : [$widgets];
         $param = implode(',', $widgets);
-        return $this->_coreHelper->urlEncode($param);
+        return $this->urlEncoder->encode($param);
     }
 
     /**
      * Decode URL query param and return list of widgets
      *
      * @param string $queryParam Query param value to decode
-     * @return array Array of widget types
+     * @return string[] Array of widget types
      */
     public function decodeWidgetsFromQuery($queryParam)
     {
-        $param = $this->_coreHelper->urlDecode($queryParam);
+        $param = $this->urlDecoder->decode($queryParam);
         return preg_split('/\s*\,\s*/', $param, 0, PREG_SPLIT_NO_EMPTY);
     }
 
+    /**
+     * Get available widgets.
+     *
+     * @param \Magento\Framework\DataObject $config Editor element config
+     * @return array
+     */
+    public function getAvailableWidgets($config)
+    {
+        $result = [];
+
+        if (!$config->hasData('widget_types')) {
+            $allWidgets = $this->_widgetFactory->create()->getWidgetsArray();
+            $skipped = $this->_getSkippedWidgets();
+            foreach ($allWidgets as $widget) {
+                if (is_array($skipped) && in_array($widget['type'], $skipped)) {
+                    continue;
+                }
+                $result[$widget['type']] = $widget['name']->getText();
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Return array of widgets disabled for selection
+     *
+     * @return string[]
+     */
+    protected function _getSkippedWidgets()
+    {
+        return $this->registry->registry('skip_widgets');
+    }
 }

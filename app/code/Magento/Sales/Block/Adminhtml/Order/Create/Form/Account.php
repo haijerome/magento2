@@ -1,70 +1,109 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Form;
+
+use Magento\Backend\Block\Template\Context;
+use Magento\Backend\Model\Session\Quote;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Customer\Api\GroupManagementInterface;
+use Magento\Customer\Model\Metadata\Form;
+use Magento\Framework\Api\ExtensibleDataObjectConverter;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Data\Form\Element\AbstractElement;
+use Magento\Framework\Data\FormFactory;
+use Magento\Customer\Model\Metadata\FormFactory as MetadataFormFactory;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Phrase;
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+use Magento\Framework\Reflection\DataObjectProcessor;
+use Magento\Sales\Model\AdminOrder\Create;
+use Magento\Store\Model\ScopeInterface;
 
 /**
  * Create order account form
  *
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Form;
-
-class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractForm
+class Account extends AbstractForm
 {
     /**
-     * @var \Magento\Customer\Model\CustomerFactory
+     * Metadata form factory
+     *
+     * @var MetadataFormFactory
      */
-    protected $_customerFactory;
+    protected $_metadataFormFactory;
 
     /**
-     * @var \Magento\Customer\Model\FormFactory
+     * Customer repository
+     *
+     * @var CustomerRepositoryInterface
      */
-    protected $_customerFormFactory;
+    protected $customerRepository;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
-     * @param \Magento\Sales\Model\AdminOrder\Create $orderCreate
-     * @param \Magento\Data\FormFactory $formFactory
-     * @param \Magento\Customer\Model\CustomerFactory $customerFactory
-     * @param \Magento\Customer\Model\FormFactory $customerFormFactory
+     * @var ExtensibleDataObjectConverter
+     */
+    protected $_extensibleDataObjectConverter;
+
+    private const XML_PATH_EMAIL_REQUIRED_CREATE_ORDER = 'customer/create_account/email_required_create_order';
+
+    /**
+     * @param Context $context
+     * @param Quote $sessionQuote
+     * @param Create $orderCreate
+     * @param PriceCurrencyInterface $priceCurrency
+     * @param FormFactory $formFactory
+     * @param DataObjectProcessor $dataObjectProcessor
+     * @param MetadataFormFactory $metadataFormFactory
+     * @param CustomerRepositoryInterface $customerRepository
+     * @param ExtensibleDataObjectConverter $extensibleDataObjectConverter
      * @param array $data
+     * @param GroupManagementInterface|null $groupManagement
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
-        \Magento\Sales\Model\AdminOrder\Create $orderCreate,
-        \Magento\Data\FormFactory $formFactory,
-        \Magento\Customer\Model\CustomerFactory $customerFactory,
-        \Magento\Customer\Model\FormFactory $customerFormFactory,
-        array $data = array()
+        Context $context,
+        Quote $sessionQuote,
+        Create $orderCreate,
+        PriceCurrencyInterface $priceCurrency,
+        FormFactory $formFactory,
+        DataObjectProcessor $dataObjectProcessor,
+        MetadataFormFactory $metadataFormFactory,
+        CustomerRepositoryInterface $customerRepository,
+        ExtensibleDataObjectConverter $extensibleDataObjectConverter,
+        array $data = [],
+        ?GroupManagementInterface $groupManagement = null
     ) {
-        $this->_customerFactory = $customerFactory;
-        $this->_customerFormFactory = $customerFormFactory;
-        parent::__construct($context, $sessionQuote, $orderCreate, $formFactory, $data);
+        $this->_metadataFormFactory = $metadataFormFactory;
+        $this->customerRepository = $customerRepository;
+        $this->_extensibleDataObjectConverter = $extensibleDataObjectConverter;
+        $this->groupManagement = $groupManagement ?: ObjectManager::getInstance()->get(GroupManagementInterface::class);
+        parent::__construct(
+            $context,
+            $sessionQuote,
+            $orderCreate,
+            $priceCurrency,
+            $formFactory,
+            $dataObjectProcessor,
+            $data
+        );
     }
+
+    /**
+     * Group Management
+     *
+     * @var GroupManagementInterface
+     */
+    private $groupManagement;
 
     /**
      * Return Header CSS Class
@@ -79,7 +118,7 @@ class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractF
     /**
      * Return header text
      *
-     * @return string
+     * @return Phrase
      */
     public function getHeaderText()
     {
@@ -89,26 +128,21 @@ class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractF
     /**
      * Prepare Form and add elements to form
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Form\Account
+     * @return $this
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
      */
     protected function _prepareForm()
     {
-        /* @var $customerModel \Magento\Customer\Model\Customer */
-        $customerModel = $this->_customerFactory->create();
-
-        /* @var $customerForm \Magento\Customer\Model\Form */
-        $customerForm   = $this->_customerFormFactory->create();
-        $customerForm->setFormCode('adminhtml_checkout')
-            ->setStore($this->getStore())
-            ->setEntity($customerModel);
+        /** @var Form $customerForm */
+        $customerForm = $this->_metadataFormFactory->create('customer', 'adminhtml_checkout');
 
         // prepare customer attributes to show
-        $attributes     = array();
+        $attributes = [];
 
         // add system required attributes
         foreach ($customerForm->getSystemAttributes() as $attribute) {
-            /* @var $attribute \Magento\Customer\Model\Attribute */
-            if ($attribute->getIsRequired()) {
+            if ($attribute->isRequired()) {
                 $attributes[$attribute->getAttributeCode()] = $attribute;
             }
         }
@@ -119,16 +153,15 @@ class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractF
 
         // add user defined attributes
         foreach ($customerForm->getUserAttributes() as $attribute) {
-            /* @var $attribute \Magento\Customer\Model\Attribute */
             $attributes[$attribute->getAttributeCode()] = $attribute;
         }
 
-        $fieldset = $this->_form->addFieldset('main', array());
+        $fieldset = $this->_form->addFieldset('main', []);
 
         $this->_addAttributesToForm($attributes, $fieldset);
 
         $this->_form->addFieldNameSuffix('order[account]');
-        $this->_form->setValues($this->getFormValues());
+        $this->_form->setValues($this->extractValuesFromAttributes($attributes));
 
         return $this;
     }
@@ -136,15 +169,15 @@ class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractF
     /**
      * Add additional data to form element
      *
-     * @param \Magento\Data\Form\Element\AbstractElement $element
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractForm
+     * @param AbstractElement $element
+     * @return $this
      */
-    protected function _addAdditionalFormElementData(\Magento\Data\Form\Element\AbstractElement $element)
+    protected function _addAdditionalFormElementData(AbstractElement $element)
     {
         switch ($element->getId()) {
             case 'email':
-                $element->setRequired(0);
-                $element->setClass('validate-email');
+                $element->setRequired($this->isEmailRequiredToCreateOrder());
+                $element->setClass('validate-email admin__control-text');
                 break;
         }
         return $this;
@@ -154,20 +187,89 @@ class Account extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\AbstractF
      * Return Form Elements values
      *
      * @return array
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
      */
     public function getFormValues()
     {
-        $data = $this->getCustomer()->getData();
+        try {
+            $customer = $this->customerRepository->getById($this->getCustomerId());
+            // phpcs:ignore Magento2.CodeAnalysis.EmptyBlock.DetectedCatch
+        } catch (\Exception $e) {
+            $data = [];
+        }
+        $data = isset($customer)
+            ? $this->_extensibleDataObjectConverter->toFlatArray(
+                $customer,
+                [],
+                CustomerInterface::class
+            )
+            : [];
         foreach ($this->getQuote()->getData() as $key => $value) {
             if (strpos($key, 'customer_') === 0) {
                 $data[substr($key, 9)] = $value;
             }
         }
 
+        if (array_key_exists('group_id', $data) && empty($data['group_id'])) {
+            $data['group_id'] = $this->getSelectedGroupId();
+        }
+
         if ($this->getQuote()->getCustomerEmail()) {
-            $data['email']  = $this->getQuote()->getCustomerEmail();
+            $data['email'] = $this->getQuote()->getCustomerEmail();
         }
 
         return $data;
+    }
+
+    /**
+     * Extract the form values from attributes.
+     *
+     * @param array $attributes
+     * @return array
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
+     */
+    private function extractValuesFromAttributes(array $attributes): array
+    {
+        $formValues = $this->getFormValues();
+        foreach ($attributes as $code => $attribute) {
+            $defaultValue = $attribute->getDefaultValue();
+            if (isset($defaultValue) && !isset($formValues[$code])) {
+                $formValues[$code] = $defaultValue;
+            }
+        }
+
+        return $formValues;
+    }
+
+    /**
+     * Retrieve email is required field for admin order creation
+     *
+     * @return bool
+     */
+    private function isEmailRequiredToCreateOrder()
+    {
+        return $this->_scopeConfig->getValue(
+            self::XML_PATH_EMAIL_REQUIRED_CREATE_ORDER,
+            ScopeInterface::SCOPE_STORE
+        );
+    }
+
+    /**
+     * Retrieve selected group id
+     *
+     * @return string
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
+     */
+    private function getSelectedGroupId(): string
+    {
+        $selectedGroupId = $this->groupManagement->getDefaultGroup($this->getQuote()->getStoreId())->getId();
+        $orderDetails = $this->getRequest()->getParam('order');
+        if (!empty($orderDetails) && !empty($orderDetails['account']['group_id'])) {
+            $selectedGroupId = $orderDetails['account']['group_id'];
+        }
+        return $selectedGroupId;
     }
 }

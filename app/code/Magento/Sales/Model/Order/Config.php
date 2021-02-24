@@ -1,91 +1,97 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Order configuration model
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Model\Order;
 
+use Magento\Framework\Exception\LocalizedException;
+
+/**
+ * Order configuration model
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Config
 {
     /**
-     * @var \Magento\Sales\Model\Resource\Order\Status\Collection
+     * @var \Magento\Sales\Model\ResourceModel\Order\Status\Collection
      */
-    protected $_collection;
+    protected $collection;
 
     /**
      * Statuses per state array
      *
      * @var array
      */
-    protected $_stateStatuses;
+    protected $stateStatuses;
 
     /**
      * @var array
      */
-    private $_states;
+    private $statuses;
 
     /**
-     * @var \Magento\Sales\Model\Order\Status
+     * @var Status
      */
-    protected $_orderStatusFactory;
+    protected $orderStatusFactory;
 
     /**
-     * @var \Magento\Sales\Model\Resource\Order\Status\CollectionFactory
+     * @var \Magento\Sales\Model\ResourceModel\Order\Status\CollectionFactory
      */
-    protected $_orderStatusCollFactory;
+    protected $orderStatusCollectionFactory;
+
+    /**
+     * @var \Magento\Framework\App\State
+     */
+    protected $state;
+
+    /**
+     * @var array
+     */
+    protected $maskStatusesMapping = [
+        \Magento\Framework\App\Area::AREA_FRONTEND => [
+            \Magento\Sales\Model\Order::STATUS_FRAUD => \Magento\Sales\Model\Order::STATUS_FRAUD,
+            \Magento\Sales\Model\Order::STATE_PAYMENT_REVIEW => \Magento\Sales\Model\Order::STATE_PROCESSING
+        ]
+    ];
 
     /**
      * Constructor
      *
      * @param \Magento\Sales\Model\Order\StatusFactory $orderStatusFactory
-     * @param \Magento\Sales\Model\Resource\Order\Status\CollectionFactory $orderStatusCollFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Status\CollectionFactory $orderStatusCollectionFactory
+     * @param \Magento\Framework\App\State $state
      */
     public function __construct(
         \Magento\Sales\Model\Order\StatusFactory $orderStatusFactory,
-        \Magento\Sales\Model\Resource\Order\Status\CollectionFactory $orderStatusCollFactory
+        \Magento\Sales\Model\ResourceModel\Order\Status\CollectionFactory $orderStatusCollectionFactory,
+        \Magento\Framework\App\State $state
     ) {
-        $this->_orderStatusFactory = $orderStatusFactory;
-        $this->_orderStatusCollFactory = $orderStatusCollFactory;
+        $this->orderStatusFactory = $orderStatusFactory;
+        $this->orderStatusCollectionFactory = $orderStatusCollectionFactory;
+        $this->state = $state;
     }
 
     /**
-     * @return \Magento\Sales\Model\Resource\Order\Status\Collection
+     * Get collection.
+     *
+     * @return \Magento\Sales\Model\ResourceModel\Order\Status\Collection
      */
     protected function _getCollection()
     {
-        if ($this->_collection == null) {
-            $this->_collection = $this->_orderStatusCollFactory->create()->joinStates();
+        if ($this->collection == null) {
+            $this->collection = $this->orderStatusCollectionFactory->create()->joinStates();
         }
-        return $this->_collection;
+        return $this->collection;
     }
 
     /**
+     * Get state.
+     *
      * @param string $state
-     * @return \Magento\Sales\Model\Order\Status
+     * @return Status
      */
     protected function _getState($state)
     {
@@ -101,36 +107,83 @@ class Config
      * Retrieve default status for state
      *
      * @param   string $state
-     * @return  string
+     * @return  string|null
      */
-    public function getStateDefaultStatus($state)
+    public function getStateDefaultStatus($state): ?string
     {
         $status = false;
         $stateNode = $this->_getState($state);
         if ($stateNode) {
-            $status = $this->_orderStatusFactory->create()->loadDefaultByState($state);
+            $status = $this->orderStatusFactory->create()->loadDefaultByState($state);
             $status = $status->getStatus();
         }
         return $status;
     }
 
     /**
-     * Retrieve status label
+     * Get status label for a specified area
      *
-     * @param   string $code
-     * @return  string
+     * @param string|null $code
+     * @param string $area
+     * @return string|null
+     */
+    private function getStatusLabelForArea(?string $code, string $area): ?string
+    {
+        $code = $this->maskStatusForArea($area, $code);
+        $status = $this->orderStatusFactory->create()->load($code);
+
+        if ($area === 'adminhtml') {
+            return $status->getLabel();
+        }
+
+        return $status->getStoreLabel();
+    }
+
+    /**
+     * Retrieve status label for detected area
+     *
+     * @param string|null $code
+     * @return string|null
+     * @throws LocalizedException
      */
     public function getStatusLabel($code)
     {
-        $status = $this->_orderStatusFactory->create()->load($code);
-        return $status->getStoreLabel();
+        $area = $this->state->getAreaCode() ?: \Magento\Framework\App\Area::AREA_FRONTEND;
+        return $this->getStatusLabelForArea($code, $area);
+    }
+
+    /**
+     * Retrieve status label for area
+     *
+     * @param string|null $code
+     * @return string|null
+     * @since 102.0.1
+     */
+    public function getStatusFrontendLabel(?string $code): ?string
+    {
+        return $this->getStatusLabelForArea($code, \Magento\Framework\App\Area::AREA_FRONTEND);
+    }
+
+    /**
+     * Mask status for order for specified area
+     *
+     * @param string $area
+     * @param string $code
+     * @return string
+     */
+    protected function maskStatusForArea($area, $code)
+    {
+        if (isset($this->maskStatusesMapping[$area][$code])) {
+            return $this->maskStatusesMapping[$area][$code];
+        }
+        return $code;
     }
 
     /**
      * State label getter
      *
-     * @param   string $state
-     * @return  string
+     * @param string $state
+     * @return \Magento\Framework\Phrase|string
      */
     public function getStateLabel($state)
     {
@@ -141,7 +194,6 @@ class Config
         return $state;
     }
 
-
     /**
      * Retrieve all statuses
      *
@@ -149,7 +201,7 @@ class Config
      */
     public function getStatuses()
     {
-        $statuses = $this->_orderStatusCollFactory->create()->toOptionHash();
+        $statuses = $this->orderStatusCollectionFactory->create()->toOptionHash();
         return $statuses;
     }
 
@@ -160,13 +212,14 @@ class Config
      */
     public function getStates()
     {
-        $states = array();
+        $states = [];
         foreach ($this->_getCollection() as $item) {
-            $states[$item->getState()] = __($item->getData('label'));
+            if ($item->getState() && $item->getIsDefault()) {
+                $states[$item->getState()] = __($item->getData('label'));
+            }
         }
         return $states;
     }
-
 
     /**
      * Retrieve statuses available for state
@@ -179,32 +232,30 @@ class Config
      */
     public function getStateStatuses($state, $addLabels = true)
     {
-        $key = md5(serialize(array($state, $addLabels)));
-        if (isset($this->_stateStatuses[$key])) {
-            return $this->_stateStatuses[$key];
+        $key = sha1(json_encode([$state, $addLabels]));
+        if (isset($this->stateStatuses[$key])) {
+            return $this->stateStatuses[$key];
         }
-        $statuses = array();
+        $statuses = [];
 
         if (!is_array($state)) {
-            $state = array($state);
+            $state = [$state];
         }
         foreach ($state as $_state) {
             $stateNode = $this->_getState($_state);
             if ($stateNode) {
-                $collection = $this->_orderStatusCollFactory->create()
-                    ->addStateFilter($_state)
-                    ->orderByLabel();
+                $collection = $this->orderStatusCollectionFactory->create()->addStateFilter($_state)->orderByLabel();
                 foreach ($collection as $item) {
                     $status = $item->getData('status');
                     if ($addLabels) {
-                        $statuses[$status] = $item->getStoreLabel();
+                        $statuses[$status] = $this->getStatusLabel($status);
                     } else {
                         $statuses[] = $status;
                     }
                 }
             }
         }
-        $this->_stateStatuses[$key] = $statuses;
+        $this->stateStatuses[$key] = $statuses;
         return $statuses;
     }
 
@@ -213,35 +264,60 @@ class Config
      *
      * @return array
      */
-    public function getVisibleOnFrontStates()
+    public function getVisibleOnFrontStatuses()
     {
-        return $this->_getStates(true);
+        return $this->_getStatuses(true);
     }
 
     /**
-     * Get order states, visible on frontend
+     * Get order statuses, invisible on frontend
      *
      * @return array
      */
-    public function getInvisibleOnFrontStates()
+    public function getInvisibleOnFrontStatuses()
     {
-        return $this->_getStates(false);
+        return $this->_getStatuses(false);
     }
 
     /**
+     * Get existing order statuses.
+     *
+     * Visible or invisible on frontend according to passed param.
+     *
      * @param bool $visibility
-     *
      * @return array
      */
-    protected function _getStates($visibility)
+    protected function _getStatuses($visibility)
     {
-        $visibility = (bool)$visibility;
-        if ($this->_states == null) {
-            foreach($this->_getCollection() as $item) {
-                $visible = (bool)$item->getData('visible_on_front');
-                $this->_states[$visible][] = $item->getData('state');
+        if ($this->statuses == null) {
+            $this->statuses = [
+                true => [],
+                false => [],
+            ];
+            foreach ($this->_getCollection() as $item) {
+                $visible = (bool) $item->getData('visible_on_front');
+                $this->statuses[$visible][] = $item->getData('status');
             }
         }
-        return  $this->_states[$visibility];
+        return $this->statuses[(bool) $visibility];
+    }
+
+    /**
+     * Retrieve label by state  and status
+     *
+     * @param string $state
+     * @param string $status
+     * @return \Magento\Framework\Phrase|string
+     * @since 101.0.0
+     */
+    public function getStateLabelByStateAndStatus($state, $status)
+    {
+        foreach ($this->_getCollection() as $item) {
+            if ($item->getData('state') == $state && $item->getData('status') == $status) {
+                $label = $item->getData('label');
+                return __($label);
+            }
+        }
+        return $state;
     }
 }

@@ -1,71 +1,69 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Adminhtml\Edit\Tab;
 
 /**
  * Obtain all carts contents for specified client
  *
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Customer\Block\Adminhtml\Edit\Tab;
-
 class Carts extends \Magento\Backend\Block\Template
 {
     /**
-     * Core registry
-     *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Customer\Model\Config\Share
      */
-    protected $_coreRegistry = null;
+    protected $_shareConfig;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param array $data
+     * @var \Magento\Customer\Api\Data\CustomerInterfaceFactory
+     */
+    protected $customerDataFactory;
+
+    /**
+     * @var \Magento\Framework\Api\DataObjectHelper
+     */
+    protected $dataObjectHelper;
+
+    /**
+     * @param \Magento\Backend\Block\Template\Context          $context
+     * @param \Magento\Customer\Model\Config\Share             $shareConfig
+     * @param \Magento\Customer\Api\Data\CustomerInterfaceFactory $customerDataFactory
+     * @param \Magento\Framework\Api\DataObjectHelper $dataObjectHelper
+     * @param array                                            $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Customer\Model\Config\Share $shareConfig,
+        \Magento\Customer\Api\Data\CustomerInterfaceFactory $customerDataFactory,
+        \Magento\Framework\Api\DataObjectHelper $dataObjectHelper,
+        array $data = []
     ) {
-        $this->_coreRegistry = $registry;
+        $this->_shareConfig = $shareConfig;
+        $this->customerDataFactory = $customerDataFactory;
+        $this->dataObjectHelper = $dataObjectHelper;
         parent::__construct($context, $data);
     }
 
     /**
      * Add shopping cart grid of each website
      *
-     * @return \Magento\Customer\Block\Adminhtml\Edit\Tab\Carts
+     * @return $this
      */
     protected function _prepareLayout()
     {
-        $sharedWebsiteIds = $this->_coreRegistry->registry('current_customer')->getSharedWebsiteIds();
+        $sharedWebsiteIds = $this->_shareConfig->getSharedWebsiteIds($this->_getCustomer()->getWebsiteId());
         $isShared = count($sharedWebsiteIds) > 1;
         foreach ($sharedWebsiteIds as $websiteId) {
             $blockName = 'customer_cart_' . $websiteId;
-            $block = $this->getLayout()->createBlock('Magento\Customer\Block\Adminhtml\Edit\Tab\Cart',
-                $blockName, array('data' => array('website_id' => $websiteId)));
+            $block = $this->getLayout()->createBlock(
+                \Magento\Customer\Block\Adminhtml\Edit\Tab\Cart::class,
+                $blockName,
+                ['data' => ['website_id' => $websiteId]]
+            );
             if ($isShared) {
                 $websiteName = $this->_storeManager->getWebsite($websiteId)->getName();
                 $block->setCartHeader(__('Shopping Cart from %1', $websiteName));
@@ -82,7 +80,21 @@ class Carts extends \Magento\Backend\Block\Template
      */
     protected function _toHtml()
     {
-        $this->_eventManager->dispatch('adminhtml_block_html_before', array('block' => $this));
+        $this->_eventManager->dispatch('adminhtml_block_html_before', ['block' => $this]);
         return $this->getChildHtml();
+    }
+
+    /**
+     * @return \Magento\Customer\Api\Data\CustomerInterface
+     */
+    protected function _getCustomer()
+    {
+        $customerDataObject = $this->customerDataFactory->create();
+        $this->dataObjectHelper->populateWithArray(
+            $customerDataObject,
+            $this->_backendSession->getCustomerData()['account'],
+            \Magento\Customer\Api\Data\CustomerInterface::class
+        );
+        return $customerDataObject;
     }
 }

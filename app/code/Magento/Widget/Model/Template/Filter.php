@@ -1,38 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Widget\Model\Template;
 
 /**
  * Template Filter Model
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Filter extends \Magento\Cms\Model\Template\Filter
 {
     /**
-     * @var \Magento\Widget\Model\Resource\Widget
+     * @var \Magento\Widget\Model\ResourceModel\Widget
      */
     protected $_widgetResource;
 
@@ -42,32 +22,39 @@ class Filter extends \Magento\Cms\Model\Template\Filter
     protected $_widget;
 
     /**
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Logger $logger
-     * @param \Magento\Escaper $escaper
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\VariableFactory $coreVariableFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\View\LayoutInterface $layout
-     * @param \Magento\View\LayoutFactory $layoutFactory
-     * @param \Magento\Widget\Model\Resource\Widget $widgetResource
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Escaper $escaper
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Variable\Model\VariableFactory $coreVariableFactory
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\View\LayoutInterface $layout
+     * @param \Magento\Framework\View\LayoutFactory $layoutFactory
+     * @param \Magento\Framework\App\State $appState
+     * @param \Magento\Framework\UrlInterface $urlModel
+     * @param \Pelago\Emogrifier $emogrifier
+     * @param \Magento\Variable\Model\Source\Variables $configVariables
+     * @param \Magento\Widget\Model\ResourceModel\Widget $widgetResource
      * @param \Magento\Widget\Model\Widget $widget
-     * @param \Magento\App\State $appState
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Stdlib\String $string,
-        \Magento\Logger $logger,
-        \Magento\Escaper $escaper,
-        \Magento\View\Url $viewUrl,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\VariableFactory $coreVariableFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\View\LayoutInterface $layout,
-        \Magento\View\LayoutFactory $layoutFactory,
-        \Magento\Widget\Model\Resource\Widget $widgetResource,
-        \Magento\Widget\Model\Widget $widget,
-        \Magento\App\State $appState
+        \Magento\Framework\Stdlib\StringUtils $string,
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Escaper $escaper,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Variable\Model\VariableFactory $coreVariableFactory,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\View\LayoutInterface $layout,
+        \Magento\Framework\View\LayoutFactory $layoutFactory,
+        \Magento\Framework\App\State $appState,
+        \Magento\Framework\UrlInterface $urlModel,
+        \Pelago\Emogrifier $emogrifier,
+        \Magento\Variable\Model\Source\Variables $configVariables,
+        \Magento\Widget\Model\ResourceModel\Widget $widgetResource,
+        \Magento\Widget\Model\Widget $widget
     ) {
         $this->_widgetResource = $widgetResource;
         $this->_widget = $widget;
@@ -75,30 +62,37 @@ class Filter extends \Magento\Cms\Model\Template\Filter
             $string,
             $logger,
             $escaper,
-            $viewUrl,
-            $coreStoreConfig,
+            $assetRepo,
+            $scopeConfig,
             $coreVariableFactory,
             $storeManager,
             $layout,
             $layoutFactory,
-            $appState
+            $appState,
+            $urlModel,
+            $emogrifier,
+            $configVariables
         );
     }
 
     /**
-     * Generate widget
+     * General method for generate widget
      *
-     * @param array $construction
+     * @param string[] $construction
      * @return string
      */
-    public function widgetDirective($construction)
+    public function generateWidget($construction)
     {
-        $params = $this->_getIncludeParameters($construction[2]);
+        $params = $this->getParameters($construction[2]);
 
         // Determine what name block should have in layout
         $name = null;
         if (isset($params['name'])) {
             $name = $params['name'];
+        }
+
+        if (isset($this->_storeId) && !isset($params['store_id'])) {
+            $params['store_id'] = $this->_storeId;
         }
 
         // validate required parameter type or id
@@ -119,11 +113,35 @@ class Filter extends \Magento\Cms\Model\Template\Filter
         }
 
         // define widget block and check the type is instance of Widget Interface
-        $widget = $this->_layout->createBlock($type, $name, array('data' => $params));
+        $widget = $this->_layout->createBlock($type, $name, ['data' => $params]);
         if (!$widget instanceof \Magento\Widget\Block\BlockInterface) {
             return '';
         }
 
         return $widget->toHtml();
+    }
+
+    /**
+     * Generate widget
+     *
+     * @param string[] $construction
+     * @return string
+     */
+    public function widgetDirective($construction)
+    {
+        return $this->generateWidget($construction);
+    }
+
+    /**
+     * Retrieve media file URL directive
+     *
+     * @param string[] $construction
+     * @return string
+     */
+    public function mediaDirective($construction)
+    {
+        $params = $this->getParameters(html_entity_decode($construction[2], ENT_QUOTES));
+        return $this->_storeManager->getStore()
+            ->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA) . $params['url'];
     }
 }

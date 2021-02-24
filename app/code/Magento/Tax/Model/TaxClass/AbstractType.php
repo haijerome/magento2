@@ -1,27 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -29,7 +9,7 @@
  */
 namespace Magento\Tax\Model\TaxClass;
 
-abstract class AbstractType extends \Magento\Object implements \Magento\Tax\Model\TaxClass\Type\TypeInterface
+abstract class AbstractType extends \Magento\Framework\DataObject implements Type\TypeInterface
 {
     /**
      * @var \Magento\Tax\Model\Calculation\Rule
@@ -47,7 +27,7 @@ abstract class AbstractType extends \Magento\Object implements \Magento\Tax\Mode
      * @param \Magento\Tax\Model\Calculation\Rule $calculationRule
      * @param array $data
      */
-    public function __construct(\Magento\Tax\Model\Calculation\Rule $calculationRule, array $data = array())
+    public function __construct(\Magento\Tax\Model\Calculation\Rule $calculationRule, array $data = [])
     {
         parent::__construct($data);
         $this->_calculationRule = $calculationRule;
@@ -56,12 +36,10 @@ abstract class AbstractType extends \Magento\Object implements \Magento\Tax\Mode
     /**
      * Get Collection of Tax Rules that are assigned to this tax class
      *
-     * @return \Magento\Core\Model\Resource\Db\Collection\AbstractCollection
+     * @return \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
      */
     public function getAssignedToRules()
     {
-        return $this->_calculationRule
-            ->getCollection()
-            ->setClassTypeFilter($this->_classType, $this->getId());
+        return $this->_calculationRule->getCollection()->setClassTypeFilter($this->_classType, $this->getId());
     }
 }

@@ -1,130 +1,120 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Sales\Model\Order\Pdf\Items\Shipment;
 
 /**
  * Sales Order Shipment Pdf default items renderer
  */
-namespace Magento\Sales\Model\Order\Pdf\Items\Shipment;
-
 class DefaultShipment extends \Magento\Sales\Model\Order\Pdf\Items\AbstractItems
 {
     /**
      * Core string
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\App\Dir $coreDir
-     * @param \Magento\Stdlib\String $string
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Filter\FilterManager $filterManager
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
         \Magento\Tax\Helper\Data $taxData,
-        \Magento\App\Dir $coreDir,
-        \Magento\Stdlib\String $string,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\Filter\FilterManager $filterManager,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         $this->string = $string;
-        parent::__construct($context, $registry, $taxData, $coreDir, $resource, $resourceCollection, $data);
+        parent::__construct(
+            $context,
+            $registry,
+            $taxData,
+            $filesystem,
+            $filterManager,
+            $resource,
+            $resourceCollection,
+            $data
+        );
     }
 
     /**
      * Draw item line
+     *
+     * @return void
      */
     public function draw()
     {
-        $item   = $this->getItem();
-        $pdf    = $this->getPdf();
-        $page   = $this->getPage();
-        $lines  = array();
+        $item = $this->getItem();
+        $pdf = $this->getPdf();
+        $page = $this->getPage();
+        $lines = [];
 
         // draw Product name
-        $stringHelper = $this->string;
-        $lines[0] = array(array(
-            'text' => $this->string->split($item->getName(), 60, true, true),
-            'feed' => 100,
-        ));
+        $lines[0] = [
+            [
+                // phpcs:ignore Magento2.Functions.DiscouragedFunction
+                'text' => $this->string->split(html_entity_decode($item->getName()), 60, true, true),
+                'feed' => 100
+            ]
+        ];
 
         // draw QTY
-        $lines[0][] = array(
-            'text'  => $item->getQty()*1,
-            'feed'  => 35
-        );
+        $lines[0][] = ['text' => $item->getQty() * 1, 'feed' => 35];
 
         // draw SKU
-        $lines[0][] = array(
-            'text'  => $this->string->split($this->getSku($item), 25),
-            'feed'  => 565,
-            'align' => 'right'
-        );
+        $lines[0][] = [
+            // phpcs:ignore Magento2.Functions.DiscouragedFunction
+            'text' => $this->string->split(html_entity_decode($this->getSku($item)), 25),
+            'feed' => 565,
+            'align' => 'right',
+        ];
 
         // Custom options
         $options = $this->getItemOptions();
         if ($options) {
             foreach ($options as $option) {
                 // draw options label
-                $lines[][] = array(
-                    'text' => $stringHelper->split(strip_tags($option['label']), 70, true, true),
+                $lines[][] = [
+                    'text' => $this->string->split($this->filterManager->stripTags($option['label']), 70, true, true),
                     'font' => 'italic',
-                    'feed' => 110
-                );
+                    'feed' => 110,
+                ];
 
                 // draw options value
-                if ($option['value']) {
-                    $_printValue = isset($option['print_value'])
-                        ? $option['print_value']
-                        : strip_tags($option['value']);
-                    $values = explode(', ', $_printValue);
+                if ($option['value'] !== null) {
+                    $printValue = isset(
+                        $option['print_value']
+                    ) ? $option['print_value'] : $this->filterManager->stripTags(
+                        $option['value']
+                    );
+                    $values = explode(', ', $printValue);
                     foreach ($values as $value) {
-                        $lines[][] = array(
-                            'text' => $this->string->split($value, 50, true, true),
-                            'feed' => 115
-                        );
+                        $lines[][] = ['text' => $this->string->split($value, 50, true, true), 'feed' => 115];
                     }
                 }
             }
         }
 
-        $lineBlock = array(
-            'lines'  => $lines,
-            'height' => 20
-        );
+        $lineBlock = ['lines' => $lines, 'height' => 20];
 
-        $page = $pdf->drawLineBlocks($page, array($lineBlock), array('table_header' => true));
+        $page = $pdf->drawLineBlocks($page, [$lineBlock], ['table_header' => true]);
         $this->setPage($page);
     }
 }

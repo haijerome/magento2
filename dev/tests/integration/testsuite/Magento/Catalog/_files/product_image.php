@@ -1,34 +1,34 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
-$mediaDir = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->get('Magento\Catalog\Model\Product\Media\Config')->getBaseMediaPath();
-$dir = $mediaDir . '/m/a';
-if (!is_dir($dir)) {
-    mkdir($dir, 0777, true);
+use Magento\Framework\App\Filesystem\DirectoryList;
+
+$objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
+/** @var $mediaConfig \Magento\Catalog\Model\Product\Media\Config */
+$mediaConfig = $objectManager->get(\Magento\Catalog\Model\Product\Media\Config::class);
+/** @var $database \Magento\MediaStorage\Helper\File\Storage\Database */
+$database = $objectManager->get(\Magento\MediaStorage\Helper\File\Storage\Database::class);
+
+/** @var $mediaDirectory \Magento\Framework\Filesystem\Directory\WriteInterface */
+$mediaDirectory = $objectManager->get(\Magento\Framework\Filesystem::class)
+    ->getDirectoryWrite(DirectoryList::MEDIA);
+$targetDirPath = $mediaConfig->getBaseMediaPath() . str_replace('/', DIRECTORY_SEPARATOR, '/m/a/');
+$targetTmpDirPath = $mediaConfig->getBaseTmpMediaPath() . str_replace('/', DIRECTORY_SEPARATOR, '/m/a/');
+$mediaDirectory->create($targetDirPath);
+$mediaDirectory->create($targetTmpDirPath);
+
+$images = ['magento_image.jpg', 'magento_small_image.jpg', 'magento_thumbnail.jpg'];
+
+foreach ($images as $image) {
+    $targetTmpFilePath = $mediaDirectory->getAbsolutePath() . $targetTmpDirPath . $image;
+
+    $sourceFilePath = __DIR__ . DIRECTORY_SEPARATOR . $image;
+    $mediaDirectory->getDriver()->filePutContents($targetTmpFilePath, file_get_contents($sourceFilePath));
+
+    // Copying the image to target dir is not necessary because during product save, it will be moved there from tmp dir
+    $database->saveFile($targetTmpFilePath);
 }
-copy(__DIR__ . '/magento_image.jpg', $mediaDir . '/m/a/magento_image.jpg');

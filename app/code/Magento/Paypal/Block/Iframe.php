@@ -1,34 +1,16 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * HSS iframe block
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Paypal\Block;
 
+/**
+ * HSS iframe block
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Iframe extends \Magento\Payment\Block\Form
 {
     /**
@@ -62,7 +44,7 @@ class Iframe extends \Magento\Payment\Block\Form
     /**
      * @var string
      */
-    protected $_template = 'hss/js.phtml';
+    protected $_template = 'Magento_Paypal::hss/js.phtml';
 
     /**
      * @var \Magento\Sales\Model\OrderFactory
@@ -75,40 +57,66 @@ class Iframe extends \Magento\Payment\Block\Form
     protected $_checkoutSession;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @var \Magento\Paypal\Helper\Hss
+     */
+    protected $_hssHelper;
+
+    /**
+     * @var \Magento\Framework\Filesystem\Directory\ReadFactory
+     */
+    protected $readFactory;
+
+    /**
+     * @var \Magento\Framework\Module\Dir\Reader
+     */
+    protected $reader;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Sales\Model\OrderFactory $orderFactory
      * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @param \Magento\Paypal\Helper\Hss $hssHelper
+     * @param \Magento\Framework\Filesystem\Directory\ReadFactory $readFactory
+     * @param \Magento\Framework\Module\Dir\Reader $reader
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Sales\Model\OrderFactory $orderFactory,
         \Magento\Checkout\Model\Session $checkoutSession,
-        array $data = array()
+        \Magento\Paypal\Helper\Hss $hssHelper,
+        \Magento\Framework\Filesystem\Directory\ReadFactory $readFactory,
+        \Magento\Framework\Module\Dir\Reader $reader,
+        array $data = []
     ) {
+        $this->_hssHelper = $hssHelper;
         $this->_orderFactory = $orderFactory;
         $this->_checkoutSession = $checkoutSession;
+        $this->_isScopePrivate = true;
+        $this->readFactory = $readFactory;
+        $this->reader = $reader;
         parent::__construct($context, $data);
     }
 
     /**
      * Internal constructor
+     *
+     * @return void
      */
     protected function _construct()
     {
         parent::_construct();
-        $paymentCode = $this->_getCheckout()
-            ->getQuote()
-            ->getPayment()
-            ->getMethod();
-        if (in_array($paymentCode, $this->helper('Magento\Paypal\Helper\Hss')->getHssMethods())) {
+        $paymentCode = $this->_getCheckout()->getQuote()->getPayment()->getMethod();
+        if (in_array($paymentCode, $this->_hssHelper->getHssMethods())) {
             $this->_paymentMethodCode = $paymentCode;
             $templatePath = str_replace('_', '', $paymentCode);
-            $templateFile = "{$templatePath}/iframe.phtml";
-            if (file_exists($this->_viewFileSystem->getFilename($templateFile, array('module' => 'Magento_Paypal')))) {
+            $templateFile = "Magento_Paypal::{$templatePath}/iframe.phtml";
+            $directory = $this->readFactory->create($this->reader->getModuleDir('', 'Magento_Paypal'));
+            $file = $this->resolver->getTemplateFileName($templateFile, ['module' => 'Magento_Paypal']);
+            if ($file && $directory->isExist($directory->getRelativePath($file))) {
                 $this->setTemplate($templateFile);
             } else {
-                $this->setTemplate('hss/iframe.phtml');
+                $this->setTemplate('Magento_Paypal::hss/iframe.phtml');
             }
         }
     }
@@ -116,19 +124,21 @@ class Iframe extends \Magento\Payment\Block\Form
     /**
      * Get current block instance
      *
-     * @return \Magento\Paypal\Block\Iframe
-     * @throws \Magento\Core\Exception
+     * @return \Magento\Payment\Block\Form
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     protected function _getBlock()
     {
         if (!$this->_block) {
-            $this->_block = $this->getLayout()
-                ->createBlock('Magento\\Paypal\\Block\\'
-                    . str_replace(' ', \Magento\Autoload\IncludePath::NS_SEPARATOR,
-                            ucwords(str_replace('_', ' ', $this->_paymentMethodCode)))
-                    . '\\Iframe');
+            $this->_block = $this->getLayout()->createBlock(
+                'Magento\\Paypal\\Block\\' . str_replace(
+                    ' ',
+                    '\\',
+                    ucwords(str_replace('_', ' ', $this->_paymentMethodCode))
+                ) . '\\Iframe'
+            );
             if (!$this->_block instanceof \Magento\Paypal\Block\Iframe) {
-                throw new \Magento\Core\Exception('Invalid block type');
+                throw new \Magento\Framework\Exception\LocalizedException(__('Invalid block type'));
             }
         }
 
@@ -162,13 +172,13 @@ class Iframe extends \Magento\Payment\Block\Form
     /**
      * Before rendering html, check if is block rendering needed
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return \Magento\Framework\View\Element\AbstractBlock
      */
     protected function _beforeToHtml()
     {
-        if ($this->_getOrder()->getId()
-            && $this->_getOrder()->getQuoteId() == $this->_getCheckout()->getLastQuoteId()
-            && $this->_paymentMethodCode
+        if ($this->_getOrder()->getId() &&
+            $this->_getOrder()->getQuoteId() == $this->_getCheckout()->getLastQuoteId() &&
+            $this->_paymentMethodCode
         ) {
             $this->_shouldRender = true;
         }
@@ -188,7 +198,7 @@ class Iframe extends \Magento\Payment\Block\Form
     protected function _toHtml()
     {
         if ($this->_isAfterPaymentSave()) {
-            $this->setTemplate('hss/js.phtml');
+            $this->setTemplate('Magento_Paypal::hss/js.phtml');
             return parent::_toHtml();
         }
         if (!$this->_shouldRender) {
@@ -205,10 +215,10 @@ class Iframe extends \Magento\Payment\Block\Form
     protected function _isAfterPaymentSave()
     {
         $quote = $this->_getCheckout()->getQuote();
-        if ($quote->getPayment()->getMethod() == $this->_paymentMethodCode
-            && $quote->getIsActive()
-            && $this->getTemplate()
-            && $this->getRequest()->getActionName() == 'savePayment'
+        if ($quote->getPayment()->getMethod() == $this->_paymentMethodCode &&
+            $quote->getIsActive() &&
+            $this->getTemplate() &&
+            $this->getRequest()->getActionName() == 'savePayment'
         ) {
             return true;
         }

@@ -1,65 +1,60 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Email
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Email\Block\Adminhtml\Template\Grid\Renderer;
 
 /**
  * Email templates grid block action item renderer
  *
- * @category   Magento
- * @package    Magento_Email
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
-namespace Magento\Email\Block\Adminhtml\Template\Grid\Renderer;
-
-class Action extends \Magento\Adminhtml\Block\Widget\Grid\Column\Renderer\Action
+class Action extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\Action
 {
-    public function render(\Magento\Object $row)
+    /**
+     * Render grid column
+     *
+     * @param \Magento\Framework\DataObject $row
+     * @return string
+     */
+    public function render(\Magento\Framework\DataObject $row)
     {
-        $actions = array();
+        $actions = [];
 
-        $actions[] = array(
-            'url'		=>  $this->getUrl('adminhtml/*/preview', array('id'=>$row->getId())),
-            'popup'     =>  true,
-            'caption'	=>	__('Preview')
-        );
+        $actions[] = [
+            'url' => $this->getUrl('adminhtml/*/preview', ['id' => $row->getId()]),
+            'popup' => true,
+            'caption' => __('Preview'),
+        ];
 
         $this->getColumn()->setActions($actions);
 
         return parent::render($row);
     }
 
+    /**
+     * Get escaped value
+     *
+     * @param string $value
+     * @return string
+     */
     protected function _getEscapedValue($value)
     {
-        return addcslashes(htmlspecialchars($value), '\\\'');
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        return addcslashes($this->escapeHtml($value), '\\\'');
     }
 
+    /**
+     * Convert actions to html
+     *
+     * @param array $actions
+     * @return string
+     */
     protected function _actionsToHtml(array $actions)
     {
-        $html = array();
-        $attributesObject = new \Magento\Object();
+        $html = [];
+        $attributesObject = new \Magento\Framework\DataObject();
         foreach ($actions as $action) {
             $attributesObject->setData($action['@']);
             $html[] = '<a ' . $attributesObject->serialize() . '>' . $action['#'] . '</a>';

@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,12 +9,24 @@
  */
 namespace Magento\TestFramework\Annotation;
 
+use Magento\Framework\App\Config\MutableScopeConfigInterface;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Store\Model\ScopeInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Handler which works with magentoConfigFixture annotations
+ */
 class ConfigFixture
 {
+    public const ANNOTATION = 'magentoConfigFixture';
+
     /**
      * Test instance that is available between 'startTest' and 'stopTest' events
      *
-     * @var \PHPUnit_Framework_TestCase
+     * @var TestCase
      */
     protected $_currentTest;
 
@@ -44,30 +35,48 @@ class ConfigFixture
      *
      * @var array
      */
-    private $_globalConfigValues = array();
+    protected $globalConfigValues = [];
+
+    /**
+     * Original values for website-scoped configuration options that need to be restored
+     *
+     * @var array
+     */
+    protected $websiteConfigValues = [];
 
     /**
      * Original values for store-scoped configuration options that need to be restored
      *
      * @var array
      */
-    private $_storeConfigValues = array();
+    protected $storeConfigValues = [];
 
     /**
      * Retrieve configuration node value
      *
      * @param string $configPath
-     * @param string|bool|null $storeCode
+     * @param string|bool|null $scopeCode
      * @return string
      */
-    protected function _getConfigValue($configPath, $storeCode = false)
+    protected function _getConfigValue($configPath, $scopeCode = null)
     {
-        $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
+        return $this->getScopeConfigValue($configPath, ScopeInterface::SCOPE_STORE, $scopeCode);
+    }
+
+    /**
+     * Retrieve scope configuration node value
+     *
+     * @param string $configPath
+     * @param string $scopeType
+     * @param string|null $scopeCode
+     * @return mixed|null
+     */
+    protected function getScopeConfigValue(string $configPath, string $scopeType, string $scopeCode = null)
+    {
         $result = null;
-        if ($storeCode !== false) {
-            /** @var \Magento\Core\Model\Store\Config $storeConfig */
-            $storeConfig = $objectManager->get('Magento\Core\Model\Store\Config');
-            $result = $storeConfig->getConfig($configPath, $storeCode);
+        if ($scopeCode !== false) {
+            $scopeConfig = $this->getScopeConfig();
+            $result = $scopeConfig->getValue($configPath, $scopeType, $scopeCode);
         }
         return $result;
     }
@@ -78,81 +87,181 @@ class ConfigFixture
      * @param string $configPath
      * @param string $value
      * @param string|bool|null $storeCode
+     * @return void
      */
     protected function _setConfigValue($configPath, $value, $storeCode = false)
     {
-        if ($storeCode === false) {
-            $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
-            if (strpos($configPath, 'default/') === 0) {
-                $configPath = substr($configPath, 8);
-                $objectManager->get('Magento\Core\Model\Config')->setValue($configPath, $value);
-            }
+        $scopeType = $storeCode === false ? ScopeConfigInterface::SCOPE_TYPE_DEFAULT : ScopeInterface::SCOPE_STORE;
+        $this->setScopeConfigValue($configPath, $value, $scopeType, $storeCode);
+    }
+
+    /**
+     * Set config scope value
+     *
+     * @param string $configPath
+     * @param string|null $value
+     * @param string $scopeType
+     * @param string|null $scopeCode
+     * @return void
+     */
+    protected function setScopeConfigValue(
+        string $configPath,
+        ?string $value,
+        string $scopeType,
+        ?string $scopeCode
+    ): void {
+        $config = $this->getMutableScopeConfig();
+        if (strpos($configPath, 'default/') === 0) {
+            $configPath = substr($configPath, 8);
+            $config->setValue($configPath, $value, ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
         } else {
-            \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\StoreManagerInterface')
-                ->getStore($storeCode)->setConfig($configPath, $value);
+            $config->setValue($configPath, $value, $scopeType, $scopeCode);
         }
+    }
+
+    /**
+     * Get mutable config object
+     *
+     * @return MutableScopeConfigInterface
+     */
+    protected function getMutableScopeConfig(): MutableScopeConfigInterface
+    {
+        return Bootstrap::getObjectManager()->get(MutableScopeConfigInterface::class);
+    }
+
+    /**
+     * Get config object
+     *
+     * @return ScopeConfigInterface
+     */
+    protected function getScopeConfig(): ScopeConfigInterface
+    {
+        return Bootstrap::getObjectManager()->get(ScopeConfigInterface::class);
     }
 
     /**
      * Assign required config values and save original ones
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param TestCase $test
+     * @return void
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
-    protected function _assignConfigData(\PHPUnit_Framework_TestCase $test)
+    protected function _assignConfigData(TestCase $test)
     {
+        $resolver = Resolver::getInstance();
         $annotations = $test->getAnnotations();
-        if (!isset($annotations['method']['magentoConfigFixture'])) {
-            return;
-        }
-        foreach ($annotations['method']['magentoConfigFixture'] as $configPathAndValue) {
-            if (preg_match('/^.+?(?=_store\s)/', $configPathAndValue, $matches)) {
-                /* Store-scoped config value */
-                $storeCode = ($matches[0] != 'current' ? $matches[0] : '');
-                list(, $configPath, $requiredValue) = preg_split('/\s+/', $configPathAndValue, 3);
-
-                $originalValue = $this->_getConfigValue($configPath, $storeCode);
-                $this->_storeConfigValues[$storeCode][$configPath] = $originalValue;
-
-                $this->_setConfigValue($configPath, $requiredValue, $storeCode);
+        $existingFixtures = $annotations['method'][self::ANNOTATION] ?? [];
+        /* Need to be applied even test does not have added fixtures because fixture can be added via config */
+        $testAnnotations = $resolver->applyConfigFixtures(
+            $test,
+            $existingFixtures,
+            self::ANNOTATION
+        );
+        foreach ($testAnnotations as $configPathAndValue) {
+            if (preg_match('/^[^\/]+?(?=_store\s)/', $configPathAndValue, $matches)) {
+                $this->setStoreConfigValue($matches ?? [], $configPathAndValue);
+            } elseif (preg_match('/^[^\/]+?(?=_website\s)/', $configPathAndValue, $matches)) {
+                $this->setWebsiteConfigValue($matches ?? [], $configPathAndValue);
             } else {
-                /* Global config value */
-                list($configPath, $requiredValue) = preg_split('/\s+/', $configPathAndValue, 2);
-
-                $originalValue = $this->_getConfigValue($configPath);
-                $this->_globalConfigValues[$configPath] = $originalValue;
-
-                $this->_setConfigValue($configPath, $requiredValue);
+                $this->setGlobalConfigValue($configPathAndValue);
             }
-
         }
     }
 
     /**
+     * Sets store-scoped config value
+     *
+     * @param array $matches
+     * @param string $configPathAndValue
+     * @return void
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
+     */
+    protected function setStoreConfigValue(array $matches, $configPathAndValue): void
+    {
+        $storeCode = $matches[0] != 'current' ? $matches[0] : null;
+        $parts = preg_split('/\s+/', $configPathAndValue, 3);
+        list($configScope, $configPath, $requiredValue) = $parts + ['', '', ''];
+        $originalValue = $this->_getConfigValue($configPath, $storeCode);
+        $this->storeConfigValues[$storeCode][$configPath] = $originalValue;
+        $this->_setConfigValue($configPath, $requiredValue, $storeCode);
+    }
+
+    /**
+     * Sets website-scoped config value
+     *
+     * @param array $matches
+     * @param string $configPathAndValue
+     * @return void
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
+     */
+    protected function setWebsiteConfigValue(array $matches, $configPathAndValue): void
+    {
+        $websiteCode = $matches[0] != 'current' ? $matches[0] : null;
+        $parts = preg_split('/\s+/', $configPathAndValue, 3);
+        list($configScope, $configPath, $requiredValue) = $parts + ['', '', ''];
+        $originalValue = $this->getScopeConfigValue($configPath, ScopeInterface::SCOPE_WEBSITES, $websiteCode);
+        $this->websiteConfigValues[$websiteCode][$configPath] = $originalValue;
+        $this->setScopeConfigValue($configPath, $requiredValue, ScopeInterface::SCOPE_WEBSITES, $websiteCode);
+    }
+
+    /**
+     * Sets global config value
+     *
+     * @param string $configPathAndValue
+     * @return void
+     */
+    protected function setGlobalConfigValue($configPathAndValue): void
+    {
+        /* Global config value */
+        list($configPath, $requiredValue) = preg_split('/\s+/', $configPathAndValue, 2);
+        $originalValue = $this->_getConfigValue($configPath);
+        $this->globalConfigValues[$configPath] = $originalValue;
+        $this->_setConfigValue($configPath, $requiredValue);
+    }
+
+    /**
      * Restore original values for changed config options
+     *
+     * @return void
      */
     protected function _restoreConfigData()
     {
         /* Restore global values */
-        foreach ($this->_globalConfigValues as $configPath => $originalValue) {
+        foreach ($this->globalConfigValues as $configPath => $originalValue) {
             $this->_setConfigValue($configPath, $originalValue);
         }
-        $this->_globalConfigValues = array();
+        $this->globalConfigValues = [];
 
         /* Restore store-scoped values */
-        foreach ($this->_storeConfigValues as $storeCode => $originalData) {
+        foreach ($this->storeConfigValues as $storeCode => $originalData) {
             foreach ($originalData as $configPath => $originalValue) {
-                $this->_setConfigValue($configPath, $originalValue, $storeCode);
+                if (empty($storeCode)) {
+                    $storeCode = null;
+                }
+                $this->setScopeConfigValue($configPath, $originalValue, ScopeInterface::SCOPE_STORES, $storeCode);
             }
         }
-        $this->_storeConfigValues = array();
+        $this->storeConfigValues = [];
+
+        /* Restore website-scoped values */
+        foreach ($this->websiteConfigValues as $websiteCode => $originalData) {
+            foreach ($originalData as $configPath => $originalValue) {
+                if (empty($websiteCode)) {
+                    $websiteCode = null;
+                }
+                $this->setScopeConfigValue($configPath, $originalValue, ScopeInterface::SCOPE_WEBSITES, $websiteCode);
+            }
+        }
+        $this->websiteConfigValues = [];
     }
 
     /**
      * Handler for 'startTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param TestCase $test
+     * @return void
      */
-    public function startTest(\PHPUnit_Framework_TestCase $test)
+    public function startTest(TestCase $test)
     {
         $this->_currentTest = $test;
         $this->_assignConfigData($test);
@@ -161,11 +270,11 @@ class ConfigFixture
     /**
      * Handler for 'endTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
-     *
+     * @param TestCase $test
+     * @return void
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function endTest(\PHPUnit_Framework_TestCase $test)
+    public function endTest(TestCase $test)
     {
         $this->_currentTest = null;
         $this->_restoreConfigData();
@@ -173,6 +282,8 @@ class ConfigFixture
 
     /**
      * Reassign configuration data whenever application is reset
+     *
+     * @return void
      */
     public function initStoreAfter()
     {

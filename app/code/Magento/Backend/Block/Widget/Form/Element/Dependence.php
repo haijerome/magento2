@@ -1,43 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Block\Widget\Form\Element;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Form element dependencies mapper
  * Assumes that one element may depend on other element values.
  * Will toggle as "enabled" only if all elements it depends from toggle as true.
+ *
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Form\Element;
-
 class Dependence extends \Magento\Backend\Block\AbstractBlock
 {
     /**
      * name => id mapper
      * @var array
      */
-    protected $_fields = array();
+    protected $_fields = [];
 
     /**
      * Dependencies mapper (by names)
@@ -50,40 +36,48 @@ class Dependence extends \Magento\Backend\Block\AbstractBlock
      * )
      * @var array
      */
-    protected $_depends = array();
+    protected $_depends = [];
 
     /**
      * Additional configuration options for the dependencies javascript controller
      *
      * @var array
      */
-    protected $_configOptions = array();
+    protected $_configOptions = [];
 
     /**
-     * @var \Magento\Backend\Model\Config\Structure\Element\Dependency\FieldFactory
+     * @var \Magento\Config\Model\Config\Structure\Element\Dependency\FieldFactory
      */
     protected $_fieldFactory;
 
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
+     * @var SecureHtmlRenderer
+     */
+    protected $secureRenderer;
+
+    /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Backend\Model\Config\Structure\Element\Dependency\FieldFactory $fieldFactory
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Config\Model\Config\Structure\Element\Dependency\FieldFactory $fieldFactory
      * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\Backend\Model\Config\Structure\Element\Dependency\FieldFactory $fieldFactory,
-        array $data = array()
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Config\Model\Config\Structure\Element\Dependency\FieldFactory $fieldFactory,
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_fieldFactory = $fieldFactory;
         parent::__construct($context, $data);
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
     }
 
     /**
@@ -104,17 +98,16 @@ class Dependence extends \Magento\Backend\Block\AbstractBlock
      *
      * @param string $fieldName
      * @param string $fieldNameFrom
-     * @param \Magento\Backend\Model\Config\Structure\Element\Dependency\Field|string $refField
+     * @param \Magento\Config\Model\Config\Structure\Element\Dependency\Field|string $refField
      * @return \Magento\Backend\Block\Widget\Form\Element\Dependence
      */
     public function addFieldDependence($fieldName, $fieldNameFrom, $refField)
     {
         if (!is_object($refField)) {
-            /** @var $refField \Magento\Backend\Model\Config\Structure\Element\Dependency\Field */
-            $refField = $this->_fieldFactory->create(array(
-                'fieldData' => array('value' => (string)$refField),
-                'fieldPrefix' => '',
-            ));
+            /** @var $refField \Magento\Config\Model\Config\Structure\Element\Dependency\Field */
+            $refField = $this->_fieldFactory->create(
+                ['fieldData' => ['value' => (string)$refField], 'fieldPrefix' => '']
+            );
         }
         $this->_depends[$fieldName][$fieldNameFrom] = $refField;
         return $this;
@@ -134,6 +127,7 @@ class Dependence extends \Magento\Backend\Block\AbstractBlock
 
     /**
      * HTML output getter
+     *
      * @return string
      */
     protected function _toHtml()
@@ -141,27 +135,35 @@ class Dependence extends \Magento\Backend\Block\AbstractBlock
         if (!$this->_depends) {
             return '';
         }
-        return '<script type="text/javascript"> new FormElementDependenceController('
-            . $this->_getDependsJson()
-            . ($this->_configOptions ? ', '
-            . $this->_jsonEncoder->encode($this->_configOptions) : '')
-            . '); </script>';
+
+        $params = $this->_getDependsJson();
+
+        if ($this->_configOptions) {
+            $params .= ', ' .  $this->_jsonEncoder->encode($this->_configOptions);
+        }
+
+        $scriptString = 'require([\'mage/adminhtml/form\'], function(){
+    new FormElementDependenceController(' . $params . ');
+});';
+
+        return /* @noEscape */ $this->secureRenderer->renderTag('script', [], $scriptString, false);
     }
 
     /**
-     * Field dependences JSON map generator
+     * Field dependencies JSON map generator
+     *
      * @return string
      */
     protected function _getDependsJson()
     {
-        $result = array();
+        $result = [];
         foreach ($this->_depends as $to => $row) {
             foreach ($row as $from => $field) {
-                /** @var $field \Magento\Backend\Model\Config\Structure\Element\Dependency\Field */
-                $result[$this->_fields[$to]][$this->_fields[$from]] = array(
+                /** @var $field \Magento\Config\Model\Config\Structure\Element\Dependency\Field */
+                $result[$this->_fields[$to]][$this->_fields[$from]] = [
                     'values' => $field->getValues(),
                     'negative' => $field->isNegative(),
-                );
+                ];
             }
         }
         return $this->_jsonEncoder->encode($result);

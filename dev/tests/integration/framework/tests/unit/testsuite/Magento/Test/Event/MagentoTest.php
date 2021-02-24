@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,7 +9,7 @@
  */
 namespace Magento\Test\Event;
 
-class MagentoTest extends \PHPUnit_Framework_TestCase
+class MagentoTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\TestFramework\Event\Magento
@@ -38,17 +17,20 @@ class MagentoTest extends \PHPUnit_Framework_TestCase
     protected $_object;
 
     /**
-     * @var \Magento\TestFramework\EventManager|\PHPUnit_Framework_MockObject_MockObject
+     * @var \Magento\TestFramework\EventManager|\PHPUnit\Framework\MockObject\MockObject
      */
     protected $_eventManager;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_eventManager = $this->getMock('Magento\TestFramework\EventManager', array('fireEvent'), array(array()));
+        $this->_eventManager = $this->getMockBuilder(\Magento\TestFramework\EventManager::class)
+            ->setMethods(['fireEvent'])
+            ->setConstructorArgs([[]])
+            ->getMock();
         $this->_object = new \Magento\TestFramework\Event\Magento($this->_eventManager);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         \Magento\TestFramework\Event\Magento::setDefaultEventManager(null);
     }
@@ -62,29 +44,23 @@ class MagentoTest extends \PHPUnit_Framework_TestCase
 
     /**
      * @dataProvider constructorExceptionDataProvider
-     * @expectedException \Magento\Exception
      * @param mixed $eventManager
      */
     public function testConstructorException($eventManager)
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+
         new \Magento\TestFramework\Event\Magento($eventManager);
     }
 
     public function constructorExceptionDataProvider()
     {
-        return array(
-            'no event manager'     => array(null),
-            'not an event manager' => array(new \stdClass()),
-        );
+        return ['no event manager' => [null], 'not an event manager' => [new \stdClass()]];
     }
 
     public function testInitStoreAfter()
     {
-        $this->_eventManager
-            ->expects($this->once())
-            ->method('fireEvent')
-            ->with('initStoreAfter')
-        ;
-        $this->_object->initStoreAfter();
+        $this->_eventManager->expects($this->once())->method('fireEvent')->with('initStoreAfter');
+        $this->_object->execute($this->createMock(\Magento\Framework\Event\Observer::class));
     }
 }

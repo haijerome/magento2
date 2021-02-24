@@ -1,137 +1,107 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Shopping cart abstract block
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Checkout\Block\Cart;
 
-class AbstractCart extends \Magento\View\Element\Template
+use Magento\Quote\Model\Quote;
+
+/**
+ * Shopping cart abstract block
+ */
+class AbstractCart extends \Magento\Framework\View\Element\Template
 {
     /**
      * Block alias fallback
      */
     const DEFAULT_TYPE = 'default';
 
-    protected $_customer = null;
-    protected $_quote    = null;
-    protected $_totals;
-    protected $_itemRenders = array();
-
     /**
-     * Catalog data
-     *
-     * @var \Magento\Catalog\Helper\Data
+     * @var Quote|null
      */
-    protected $_catalogData = null;
+    protected $_quote = null;
 
     /**
+     * @var array
+     */
+    protected $_totals;
+
+    /**
+     * @var array
+     */
+    protected $_itemRenders = [];
+
+    /**
+     * TODO: MAGETWO-34827: unused object?
+     *
      * @var \Magento\Customer\Model\Session
      */
     protected $_customerSession;
 
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var \Magento\Checkout\Model\Session
      */
     protected $_checkoutSession;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Helper\Data $catalogData
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Checkout\Model\Session $checkoutSession
      * @param array $data
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Helper\Data $catalogData,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Checkout\Model\Session $checkoutSession,
-        array $data = array()
+        array $data = []
     ) {
         $this->_customerSession = $customerSession;
         $this->_checkoutSession = $checkoutSession;
-        $this->_catalogData = $catalogData;
         parent::__construct($context, $data);
+        $this->_isScopePrivate = true;
     }
 
     /**
-     * Initialize default item renderer
-     */
-    protected function _prepareLayout()
-    {
-        if (!$this->getChildBlock(self::DEFAULT_TYPE)) {
-            $this->addChild(
-                self::DEFAULT_TYPE,
-                'Magento\Checkout\Block\Cart\Item\Renderer',
-                array('template' => 'cart/item/default.phtml')
-            );
-        }
-        return parent::_prepareLayout();
-    }
-
-    /**
-     * Get renderer block instance by product type code
+     * Retrieve renderer list
      *
-     * @param  string $type
+     * @return \Magento\Framework\View\Element\RendererList
+     */
+    protected function _getRendererList()
+    {
+        return $this->getRendererListName() ? $this->getLayout()->getBlock(
+            $this->getRendererListName()
+        ) : $this->getChildBlock(
+            'renderer.list'
+        );
+    }
+
+    /**
+     * Retrieve item renderer block
+     *
+     * @param string|null $type
+     * @return \Magento\Framework\View\Element\Template
      * @throws \RuntimeException
-     * @return \Magento\View\Element\AbstractBlock
      */
-    public function getItemRenderer($type)
+    public function getItemRenderer($type = null)
     {
-        $renderer = $this->getChildBlock($type) ?: $this->getChildBlock(self::DEFAULT_TYPE);
-        if (!$renderer instanceof \Magento\View\Element\BlockInterface) {
-            throw new \RuntimeException('Renderer for type "' . $type . '" does not exist.');
+        if ($type === null) {
+            $type = self::DEFAULT_TYPE;
         }
-        $renderer->setRenderedBlock($this);
-        return $renderer;
-    }
-
-
-    /**
-     * Get logged in customer
-     *
-     * @return \Magento\Customer\Model\Customer
-     */
-    public function getCustomer()
-    {
-        if (null === $this->_customer) {
-            $this->_customer = $this->_customerSession->getCustomer();
+        $rendererList = $this->_getRendererList();
+        if (!$rendererList) {
+            throw new \RuntimeException('Renderer list for block "' . $this->getNameInLayout() . '" is not defined');
         }
-        return $this->_customer;
+        $overriddenTemplates = $this->getOverriddenTemplates() ?: [];
+        $template = isset($overriddenTemplates[$type]) ? $overriddenTemplates[$type] : $this->getRendererTemplate();
+        return $rendererList->getRenderer($type, self::DEFAULT_TYPE, $template);
     }
 
     /**
      * Get active quote
      *
-     * @return \Magento\Sales\Model\Quote
+     * @return Quote
      */
     public function getQuote()
     {
@@ -145,6 +115,7 @@ class AbstractCart extends \Magento\View\Element\Template
      * Get all cart items
      *
      * @return array
+     * @codeCoverageIgnore
      */
     public function getItems()
     {
@@ -154,38 +125,36 @@ class AbstractCart extends \Magento\View\Element\Template
     /**
      * Get item row html
      *
-     * @param   \Magento\Sales\Model\Quote\Item $item
+     * @param   \Magento\Quote\Model\Quote\Item $item
      * @return  string
      */
-    public function getItemHtml(\Magento\Sales\Model\Quote\Item $item)
+    public function getItemHtml(\Magento\Quote\Model\Quote\Item $item)
     {
         $renderer = $this->getItemRenderer($item->getProductType())->setItem($item);
         return $renderer->toHtml();
     }
 
+    /**
+     * @return array
+     * @codeCoverageIgnore
+     */
     public function getTotals()
     {
         return $this->getTotalsCache();
     }
 
+    /**
+     * @return array
+     */
     public function getTotalsCache()
     {
         if (empty($this->_totals)) {
-            $this->_totals = $this->getQuote()->getTotals();
+            if ($this->getQuote()->isVirtual()) {
+                $this->_totals = $this->getQuote()->getBillingAddress()->getTotals();
+            } else {
+                $this->_totals = $this->getQuote()->getShippingAddress()->getTotals();
+            }
         }
         return $this->_totals;
-    }
-
-    /**
-     * Check if can apply msrp to totals
-     *
-     * @return bool
-     */
-    public function canApplyMsrp()
-    {
-        if (!$this->getQuote()->hasCanApplyMsrp() && $this->_catalogData->isMsrpEnabled()) {
-            $this->getQuote()->collectTotals();
-        }
-        return $this->getQuote()->getCanApplyMsrp();
     }
 }

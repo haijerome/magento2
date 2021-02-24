@@ -1,57 +1,52 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Backend Inline Translation config
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Model\Translate\Inline;
 
-class Config implements \Magento\Core\Model\Translate\Inline\ConfigInterface
+/**
+ * Backend Inline Translation config
+ * @api
+ * @since 100.0.2
+ */
+class Config implements \Magento\Framework\Translate\Inline\ConfigInterface
 {
     /**
      * @var \Magento\Backend\App\ConfigInterface
      */
-    protected $_config;
+    protected $config;
+
+    /**
+     * @var \Magento\Developer\Helper\Data
+     */
+    protected $devHelper;
 
     /**
      * @param \Magento\Backend\App\ConfigInterface $config
+     * @param \Magento\Developer\Helper\Data $devHelper
      */
-    public function __construct(\Magento\Backend\App\ConfigInterface $config)
-    {
-        $this->_config = $config;
+    public function __construct(
+        \Magento\Backend\App\ConfigInterface $config,
+        \Magento\Developer\Helper\Data $devHelper
+    ) {
+        $this->config = $config;
+        $this->devHelper = $devHelper;
     }
 
     /**
-     * Check whether inline translation is enabled
-     *
-     * @param int|null $store
-     * @return bool
+     * {@inheritdoc}
      */
-    public function isActive($store = null)
+    public function isActive($scope = null)
     {
-        return $this->_config->getFlag('dev/translate_inline/active_admin');
+        return $this->config->isSetFlag('dev/translate_inline/active_admin');
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isDevAllowed($scope = null)
+    {
+        return $this->devHelper->isDevAllowed($scope);
     }
 }

@@ -1,60 +1,90 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
 
 namespace Magento\Sales\Model\Order;
 
-class InvoiceTest extends \PHPUnit_Framework_TestCase
+use PHPUnit\Framework\TestCase;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
+use Magento\Sales\Api\InvoiceManagementInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Framework\Api\SearchCriteriaBuilder;
+
+/**
+ * Invoice model test.
+ */
+class InvoiceTest extends TestCase
 {
     /**
-     * @magentoDataFixture Magento/Sales/_files/order.php
+     * @var \Magento\Framework\ObjectManagerInterface
      */
-    public function testSendEmail()
+    private $objectManager;
+
+    /**
+     * @var OrderCollection
+     */
+    private $collection;
+
+    /**
+     * @var InvoiceManagementInterface
+     */
+    private $invoiceManagement;
+
+    /**
+     * @var OrderRepositoryInterface
+     */
+    private $orderRepository;
+
+    /**
+     * @var SearchCriteriaBuilder
+     */
+    private $searchCriteriaBuilder;
+
+    /**
+     * @inheritDoc
+     */
+    protected function setUp(): void
     {
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\App')
-            ->loadArea(\Magento\Core\Model\App\Area::AREA_FRONTEND);
-        $order = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Sales\Model\Order');
-        $order->loadByIncrementId('100000001');
-        $order->setCustomerEmail('customer@example.com');
+        $this->objectManager = Bootstrap::getObjectManager();
+        $this->collection = $this->objectManager->create(OrderCollection::class);
+        $this->invoiceManagement = $this->objectManager->get(InvoiceManagementInterface::class);
+        $this->orderRepository = $this->objectManager->get(OrderRepositoryInterface::class);
+        $this->searchCriteriaBuilder = $this->objectManager->get(SearchCriteriaBuilder::class);
+    }
 
-        $invoice = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Sales\Model\Order\Invoice');
-        $invoice->setOrder($order);
+    /**
+     * @magentoDataFixture Magento/Sales/_files/invoice.php
+     */
+    public function testOrderTotalItemCount()
+    {
+        $expectedResult = [['total_item_count' => 1]];
+        $actualResult = [];
+        /** @var \Magento\Sales\Model\Order $order */
+        foreach ($this->collection->getItems() as $order) {
+            $actualResult[] = ['total_item_count' => $order->getData('total_item_count')];
+        }
+        $this->assertEquals($expectedResult, $actualResult);
+    }
 
-        $payment = $order->getPayment();
-        $paymentInfoBlock = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->get('Magento\Payment\Helper\Data')
-            ->getInfoBlock($payment);
-        $paymentInfoBlock->setArea('invalid-area');
-        $payment->setBlockMock($paymentInfoBlock);
+    /**
+     * Test order with exactly one configurable.
+     *
+     * @return void
+     * @magentoDataFixture Magento/Sales/_files/order_configurable_product.php
+     */
+    public function testLastInvoiceWithConfigurable(): void
+    {
+        $searchCriteria = $this->searchCriteriaBuilder->addFilter('increment_id', '100000001')
+            ->create();
+        $orders = $this->orderRepository->getList($searchCriteria);
+        $orders = $orders->getItems();
+        $order = array_shift($orders);
+        $invoice = $this->invoiceManagement->prepareInvoice($order);
 
-        $this->assertEmpty($invoice->getEmailSent());
-        $invoice->sendEmail(true);
-        $this->assertNotEmpty($invoice->getEmailSent());
-        $this->assertEquals('frontend', $paymentInfoBlock->getArea());
+        self::assertEquals($invoice->isLast(), true);
     }
 }

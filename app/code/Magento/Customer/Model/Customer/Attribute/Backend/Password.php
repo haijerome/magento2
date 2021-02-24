@@ -1,32 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Customer\Model\Customer\Attribute\Backend;
 
+use Magento\Framework\Exception\LocalizedException;
+
 /**
+ * @deprecated 101.0.0
  * Customer password attribute backend
  */
 class Password extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
@@ -39,20 +22,16 @@ class Password extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBacke
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @param \Magento\Logger $logger
-     * @param \Magento\Stdlib\String $string
+     * @param \Magento\Framework\Stdlib\StringUtils $string
      */
-    public function __construct(
-        \Magento\Logger $logger,
-        \Magento\Stdlib\String $string
-    ) {
+    public function __construct(\Magento\Framework\Stdlib\StringUtils $string)
+    {
         $this->string = $string;
-        parent::__construct($logger);
     }
 
     /**
@@ -60,7 +39,9 @@ class Password extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBacke
      * a) check some rules for password
      * b) transform temporary attribute 'password' into real attribute 'password_hash'
      *
-     * @param \Magento\Object $object
+     * @param \Magento\Framework\DataObject $object
+     * @return void
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function beforeSave($object)
     {
@@ -69,14 +50,18 @@ class Password extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBacke
         $length = $this->string->strlen($password);
         if ($length > 0) {
             if ($length < self::MIN_PASSWORD_LENGTH) {
-                throw new \Magento\Core\Exception(
-                    __('The password must have at least %1 characters.', self::MIN_PASSWORD_LENGTH)
+                throw new LocalizedException(
+                    __(
+                        'The password needs at least %1 characters. Create a new password and try again.',
+                        self::MIN_PASSWORD_LENGTH
+                    )
                 );
             }
 
-            if ($this->string->substr($password, 0, 1) == ' ' ||
-                $this->string->substr($password, $length - 1, 1) == ' ') {
-                throw new \Magento\Core\Exception(__('The password can not begin or end with a space.'));
+            if (trim($password) !== $password) {
+                throw new LocalizedException(
+                    __("The password can't begin or end with a space. Verify the password and try again.")
+                );
             }
 
             $object->setPasswordHash($object->hashPassword($password));
@@ -84,13 +69,14 @@ class Password extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBacke
     }
 
     /**
-     * @param \Magento\Object $object
+     * @deprecated 101.0.0
+     * @param \Magento\Framework\DataObject $object
      * @return bool
      */
     public function validate($object)
     {
         $password = $object->getPassword();
-        if ($password && $password == $object->getPasswordConfirm()) {
+        if ($password && $password === $object->getPasswordConfirm()) {
             return true;
         }
 

@@ -1,76 +1,64 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Order;
+
+use Magento\Customer\Model\Context;
 
 /**
  * Sales order view block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Order;
-
 class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
 {
     /**
      * @var string
      */
-    protected $_template = 'order/creditmemo.phtml';
+    protected $_template = 'Magento_Sales::order/creditmemo.phtml';
 
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var \Magento\Framework\App\Http\Context
      */
-    protected $_customerSession;
+    protected $httpContext;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Customer\Model\Session $customerSession
+     * @var \Magento\Payment\Helper\Data
+     */
+    protected $_paymentHelper;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\App\Http\Context $httpContext
+     * @param \Magento\Payment\Helper\Data $paymentHelper
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Customer\Model\Session $customerSession,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\App\Http\Context $httpContext,
+        \Magento\Payment\Helper\Data $paymentHelper,
+        array $data = []
     ) {
-        $this->_customerSession = $customerSession;
+        $this->_paymentHelper = $paymentHelper;
+        $this->httpContext = $httpContext;
         parent::__construct($context, $registry, $data);
+        $this->_isScopePrivate = true;
     }
 
+    /**
+     * @return void
+     */
     protected function _prepareLayout()
     {
-        $headBlock = $this->getLayout()->getBlock('head');
-        if ($headBlock) {
-            $headBlock->setTitle(__('Order # %1', $this->getOrder()->getRealOrderId()));
-        }
-        $this->setChild(
-            'payment_info',
-            $this->helper('Magento\Payment\Helper\Data')->getInfoBlock($this->getOrder()->getPayment())
-        );
+        $this->pageConfig->getTitle()->set(__('Order # %1', $this->getOrder()->getRealOrderId()));
+        $infoBlock = $this->_paymentHelper->getInfoBlock($this->getOrder()->getPayment(), $this->getLayout());
+        $this->setChild('payment_info', $infoBlock);
     }
 
     /**
@@ -98,7 +86,7 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getBackUrl()
     {
-        if ($this->_customerSession->isLoggedIn()) {
+        if ($this->httpContext->getValue(Context::CONTEXT_AUTH)) {
             return $this->getUrl('*/*/history');
         }
         return $this->getUrl('*/*/form');
@@ -107,11 +95,11 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
     /**
      * Return back title for logged in and guest users
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getBackTitle()
     {
-        if ($this->_customerSession->isLoggedIn()) {
+        if ($this->httpContext->getValue(Context::CONTEXT_AUTH)) {
             return __('Back to My Orders');
         }
         return __('View Another Order');
@@ -123,7 +111,7 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getInvoiceUrl($order)
     {
-        return $this->getUrl('*/*/invoice', array('order_id' => $order->getId()));
+        return $this->getUrl('*/*/invoice', ['order_id' => $order->getId()]);
     }
 
     /**
@@ -132,7 +120,7 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getShipmentUrl($order)
     {
-        return $this->getUrl('*/*/shipment', array('order_id' => $order->getId()));
+        return $this->getUrl('*/*/shipment', ['order_id' => $order->getId()]);
     }
 
     /**
@@ -141,7 +129,7 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getViewUrl($order)
     {
-        return $this->getUrl('*/*/view', array('order_id' => $order->getId()));
+        return $this->getUrl('*/*/view', ['order_id' => $order->getId()]);
     }
 
     /**
@@ -150,7 +138,7 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getPrintCreditmemoUrl($creditmemo)
     {
-        return $this->getUrl('*/*/printCreditmemo', array('creditmemo_id' => $creditmemo->getId()));
+        return $this->getUrl('*/*/printCreditmemo', ['creditmemo_id' => $creditmemo->getId()]);
     }
 
     /**
@@ -159,6 +147,6 @@ class Creditmemo extends \Magento\Sales\Block\Order\Creditmemo\Items
      */
     public function getPrintAllCreditmemosUrl($order)
     {
-        return $this->getUrl('*/*/printCreditmemo', array('order_id' => $order->getId()));
+        return $this->getUrl('*/*/printCreditmemo', ['order_id' => $order->getId()]);
     }
 }

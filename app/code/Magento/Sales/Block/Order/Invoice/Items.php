@@ -1,56 +1,40 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Sales order view items block
  *
- * @category   Magento
- * @package    Magento_Sales
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Sales\Block\Order\Invoice;
 
+/**
+ * Sales order invoice items block
+ *
+ * @api
+ * @since 100.0.2
+ */
 class Items extends \Magento\Sales\Block\Items\AbstractItems
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
         parent::__construct($context, $data);
@@ -67,21 +51,25 @@ class Items extends \Magento\Sales\Block\Items\AbstractItems
     }
 
     /**
+     * Get Print Invoice url
+     *
      * @param object $invoice
      * @return string
      */
     public function getPrintInvoiceUrl($invoice)
     {
-        return $this->getUrl('*/*/printInvoice', array('invoice_id' => $invoice->getId()));
+        return $this->getUrl('*/*/printInvoice', ['invoice_id' => $invoice->getId()]);
     }
 
     /**
+     * Get PrintAll Invoice url
+     *
      * @param object $order
      * @return string
      */
     public function getPrintAllInvoicesUrl($order)
     {
-        return $this->getUrl('*/*/printInvoice', array('order_id' => $order->getId()));
+        return $this->getUrl('*/*/printInvoice', ['order_id' => $order->getId()]);
     }
 
     /**
@@ -112,8 +100,7 @@ class Items extends \Magento\Sales\Block\Items\AbstractItems
         $html = '';
         $comments = $this->getChildBlock('invoice_comments');
         if ($comments) {
-            $comments->setEntity($invoice)
-                ->setTitle(__('About Your Invoice'));
+            $comments->setEntity($invoice)->setTitle($this->escapeHtmlAttr(__('About Your Invoice')));
             $html = $comments->toHtml();
         }
         return $html;

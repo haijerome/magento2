@@ -1,90 +1,73 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Catalog product tier price backend attribute model
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Model\Product\Attribute\Backend;
 
-class Tierprice
-    extends \Magento\Catalog\Model\Product\Attribute\Backend\Groupprice\AbstractGroupprice
+use Magento\Catalog\Model\Attribute\ScopeOverriddenValue;
+
+/**
+ * Backend model for Tierprice attribute
+ */
+class Tierprice extends \Magento\Catalog\Model\Product\Attribute\Backend\GroupPrice\AbstractGroupPrice
 {
     /**
      * Catalog product attribute backend tierprice
      *
-     * @var \Magento\Catalog\Model\Resource\Product\Attribute\Backend\Tierprice
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Attribute\Backend\Tierprice
      */
     protected $_productAttributeBackendTierprice;
 
     /**
-     * @param \Magento\Logger $logger
      * @param \Magento\Directory\Model\CurrencyFactory $currencyFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Core\Model\Config $config
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $config
+     * @param \Magento\Framework\Locale\FormatInterface $localeFormat
      * @param \Magento\Catalog\Model\Product\Type $catalogProductType
-     * @param \Magento\Catalog\Model\Resource\Product\Attribute\Backend\Tierprice $productAttributeTierprice
+     * @param \Magento\Customer\Api\GroupManagementInterface $groupManagement
+     * @param \Magento\Catalog\Model\ResourceModel\Product\Attribute\Backend\Tierprice $productAttributeTierprice
+     * @param ScopeOverriddenValue|null $scopeOverriddenValue
      */
     public function __construct(
-        \Magento\Logger $logger,
         \Magento\Directory\Model\CurrencyFactory $currencyFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Core\Model\Config $config,
+        \Magento\Framework\App\Config\ScopeConfigInterface $config,
+        \Magento\Framework\Locale\FormatInterface $localeFormat,
         \Magento\Catalog\Model\Product\Type $catalogProductType,
-        \Magento\Catalog\Model\Resource\Product\Attribute\Backend\Tierprice $productAttributeTierprice
+        \Magento\Customer\Api\GroupManagementInterface $groupManagement,
+        \Magento\Catalog\Model\ResourceModel\Product\Attribute\Backend\Tierprice $productAttributeTierprice,
+        ScopeOverriddenValue $scopeOverriddenValue = null
     ) {
         $this->_productAttributeBackendTierprice = $productAttributeTierprice;
-        parent::__construct($logger, $currencyFactory, $storeManager, $catalogData, $config, $catalogProductType);
+        parent::__construct(
+            $currencyFactory,
+            $storeManager,
+            $catalogData,
+            $config,
+            $localeFormat,
+            $catalogProductType,
+            $groupManagement,
+            $scopeOverriddenValue
+        );
     }
 
     /**
      * Retrieve resource instance
      *
-     * @return \Magento\Catalog\Model\Resource\Product\Attribute\Backend\Tierprice
+     * @return \Magento\Catalog\Model\ResourceModel\Product\Attribute\Backend\Tierprice
      */
     protected function _getResource()
     {
         return $this->_productAttributeBackendTierprice;
-    }
-
-    /**
-     * Retrieve websites rates and base currency codes
-     *
-     * @deprecated since 1.12.0.0
-     * @return array
-     */
-    public function _getWebsiteRates()
-    {
-        return $this->_getWebsiteCurrencyRates();
     }
 
     /**
@@ -101,9 +84,21 @@ class Tierprice
     }
 
     /**
+     * @inheritdoc
+     */
+    protected function getAdditionalFields($objectArray)
+    {
+        $percentageValue = $this->getPercentage($objectArray);
+        return [
+            'value' => $percentageValue ? null : $objectArray['price'],
+            'percentage_value' => $percentageValue ?: null,
+        ];
+    }
+
+    /**
      * Error message when duplicates
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     protected function _getDuplicateErrorMessage()
     {
@@ -119,5 +114,108 @@ class Tierprice
     protected function _isPriceFixed($priceObject)
     {
         return $priceObject->isTierPriceFixed();
+    }
+
+    /**
+     * By default attribute value is considered non-scalar that can be stored in a generic way
+     *
+     * @return bool
+     */
+    public function isScalar()
+    {
+        return false;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function validate($object)
+    {
+        $attribute = $this->getAttribute();
+        $priceRows = $object->getData($attribute->getName());
+        $priceRows = array_filter((array)$priceRows);
+
+        foreach ($priceRows as $priceRow) {
+            $percentage = $this->getPercentage($priceRow);
+            if ($percentage !== null && (!$this->isPositiveOrZero($percentage) || $percentage > 100)) {
+                throw new \Magento\Framework\Exception\LocalizedException(
+                    __('Percentage value must be a number between 0 and 100.')
+                );
+            }
+        }
+
+        return parent::validate($object);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function validatePrice(array $priceRow)
+    {
+        if (!$this->getPercentage($priceRow)) {
+            parent::validatePrice($priceRow);
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function modifyPriceData($object, $data)
+    {
+        /** @var \Magento\Catalog\Model\Product $object */
+        $data = parent::modifyPriceData($object, $data);
+        $price = $object->getPrice();
+        foreach ($data as $key => $tierPrice) {
+            $percentageValue = $this->getPercentage($tierPrice);
+            if ($percentageValue) {
+                $data[$key]['price'] = $price * (1 - $percentageValue / 100);
+                $data[$key]['website_price'] = $data[$key]['price'];
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Update Price values in DB
+     *
+     * Updates price values in DB from array comparing to old values. Returns bool if updated
+     *
+     * @param array $valuesToUpdate
+     * @param array $oldValues
+     * @return boolean
+     */
+    protected function updateValues(array $valuesToUpdate, array $oldValues)
+    {
+        $isChanged = false;
+        foreach ($valuesToUpdate as $key => $value) {
+            if ((!empty($value['value']) && $oldValues[$key]['price'] != $value['value'])
+                || $this->getPercentage($oldValues[$key]) != $this->getPercentage($value)
+            ) {
+                $price = new \Magento\Framework\DataObject(
+                    [
+                        'value_id' => $oldValues[$key]['price_id'],
+                        'value' => $value['value'],
+                        'percentage_value' => $this->getPercentage($value)
+                    ]
+                );
+                $this->_getResource()->savePriceData($price);
+
+                $isChanged = true;
+            }
+        }
+        return $isChanged;
+    }
+
+    /**
+     * Check whether price has percentage value.
+     *
+     * @param array $priceRow
+     * @return null
+     */
+    private function getPercentage($priceRow)
+    {
+        return isset($priceRow['percentage_value']) && is_numeric($priceRow['percentage_value'])
+            ? $priceRow['percentage_value']
+            : null;
     }
 }

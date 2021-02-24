@@ -1,161 +1,233 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Customer edit block
- *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Block\Adminhtml;
 
-class Edit extends \Magento\Adminhtml\Block\Widget\Form\Container
+use Magento\Customer\Api\AccountManagementInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Customer\Controller\RegistryConstants;
+
+/**
+ * @deprecated 100.2.0 for UiComponent replacement
+ * @see app/code/Magento/Customer/view/base/ui_component/customer_form.xml
+ */
+class Edit extends \Magento\Backend\Block\Widget\Form\Container
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @var AccountManagementInterface
+     */
+    protected $customerAccountManagement;
+
+    /**
+     * @var CustomerRepositoryInterface
+     */
+    protected $customerRepository;
+
+    /**
+     * Customer view helper
+     *
+     * @var \Magento\Customer\Helper\View
+     */
+    protected $_viewHelper;
+
+    /**
+     * Constructor
+     *
+     * @param \Magento\Backend\Block\Widget\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param AccountManagementInterface $customerAccountManagement
+     * @param CustomerRepositoryInterface $customerRepository
+     * @param \Magento\Customer\Helper\View $viewHelper
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Backend\Block\Widget\Context $context,
+        \Magento\Framework\Registry $registry,
+        AccountManagementInterface $customerAccountManagement,
+        CustomerRepositoryInterface $customerRepository,
+        \Magento\Customer\Helper\View $viewHelper,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
+        $this->customerAccountManagement = $customerAccountManagement;
+        $this->customerRepository = $customerRepository;
+        $this->_viewHelper = $viewHelper;
         parent::__construct($context, $data);
     }
 
+    /**
+     * @return void
+     */
     protected function _construct()
     {
         $this->_objectId = 'id';
         $this->_controller = 'adminhtml';
         $this->_blockGroup = 'Magento_Customer';
 
-        if ($this->getCustomerId() && $this->_authorization->isAllowed('Magento_Sales::create')) {
-            $this->_addButton('order', array(
-                'label' => __('Create Order'),
-                'onclick' => 'setLocation(\'' . $this->getCreateOrderUrl() . '\')',
-                'class' => 'add',
-            ), 0);
+        $customerId = $this->getCustomerId();
+
+        if ($customerId && $this->_authorization->isAllowed('Magento_Sales::create')) {
+            $this->buttonList->add(
+                'order',
+                [
+                    'label' => __('Create Order'),
+                    'onclick' => 'setLocation(\'' . $this->getCreateOrderUrl() . '\')',
+                    'class' => 'add'
+                ],
+                0
+            );
         }
 
         parent::_construct();
 
-        $this->_updateButton('save', 'label', __('Save Customer'));
-        $this->_updateButton('delete', 'label', __('Delete Customer'));
+        $this->buttonList->update('save', 'label', __('Save Customer'));
+        $this->buttonList->update('delete', 'label', __('Delete Customer'));
 
-        $customer = $this->_coreRegistry->registry('current_customer');
-        if ($customer && $this->_coreRegistry->registry('current_customer')->isReadonly()) {
-            $this->_removeButton('save');
-            $this->_removeButton('reset');
+        if ($customerId && $this->customerAccountManagement->isReadonly($customerId)) {
+            $this->buttonList->remove('save');
+            $this->buttonList->remove('reset');
         }
 
-        if (!$customer || !$this->_coreRegistry->registry('current_customer')->isDeleteable()) {
-            $this->_removeButton('delete');
+        if (!$customerId || $this->customerAccountManagement->isReadonly($customerId)) {
+            $this->buttonList->remove('delete');
         }
 
-        if ($customer && $customer->getId()) {
-            $url = $this->getUrl('customer/index/resetPassword', array('customer_id' => $customer->getId()));
-            $this->_addButton('reset_password', array(
-                'label' => __('Reset Password'),
-                'onclick' => 'setLocation(\'' . $url . '\')',
-                'class' => 'save',
-            ), 0);
+        if ($customerId) {
+            $url = $this->getUrl('customer/index/resetPassword', ['customer_id' => $customerId]);
+            $this->buttonList->add(
+                'reset_password',
+                [
+                    'label' => __('Reset Password'),
+                    'onclick' => 'setLocation(\'' . $url . '\')',
+                    'class' => 'reset reset-password'
+                ],
+                0
+            );
+        }
+
+        if ($customerId) {
+            $url = $this->getUrl('customer/customer/invalidateToken', ['customer_id' => $customerId]);
+            $deleteConfirmMsg = __("Are you sure you want to revoke the customer's tokens?");
+            $this->buttonList->add(
+                'invalidate_token',
+                [
+                    'label' => __('Force Sign-In'),
+                    'onclick' => 'deleteConfirm(\'' . $this->escapeJs($this->escapeHtml($deleteConfirmMsg)) .
+                        '\', \'' . $url . '\')',
+                    'class' => 'invalidate-token'
+                ],
+                10
+            );
         }
     }
 
+    /**
+     * Retrieve the Url for creating an order.
+     *
+     * @return string
+     */
     public function getCreateOrderUrl()
     {
-        return $this->getUrl('sales/order_create/start', array('customer_id' => $this->getCustomerId()));
+        return $this->getUrl('sales/order_create/start', ['customer_id' => $this->getCustomerId()]);
     }
 
+    /**
+     * Return the customer Id.
+     *
+     * @return int|null
+     */
     public function getCustomerId()
     {
-        $customer = $this->_coreRegistry->registry('current_customer');
-        return $customer ? $customer->getId() : false;
+        $customerId = $this->_coreRegistry->registry(RegistryConstants::CURRENT_CUSTOMER_ID);
+        return $customerId;
     }
 
+    /**
+     * Retrieve the header text, either the name of an existing customer or 'New Customer'.
+     *
+     * @return \Magento\Framework\Phrase|string
+     */
     public function getHeaderText()
     {
-        if ($this->_coreRegistry->registry('current_customer')->getId()) {
-            return $this->escapeHtml($this->_coreRegistry->registry('current_customer')->getName());
+        $customerId = $this->getCustomerId();
+        if ($customerId) {
+            $customerData = $this->customerRepository->getById($customerId);
+            return $this->escapeHtml($this->_viewHelper->getCustomerName($customerData));
         } else {
             return __('New Customer');
         }
     }
 
     /**
-     * Prepare form html. Add block for configurable product modification interface
+     * Prepare form Html. Add block for configurable product modification interface.
      *
      * @return string
      */
     public function getFormHtml()
     {
         $html = parent::getFormHtml();
-        $html .= $this->getLayout()->createBlock('Magento\Catalog\Block\Adminhtml\Product\Composite\Configure')
-            ->toHtml();
+        $html .= $this->getLayout()->createBlock(
+            \Magento\Catalog\Block\Adminhtml\Product\Composite\Configure::class
+        )->toHtml();
         return $html;
     }
 
+    /**
+     * Retrieve customer validation Url.
+     *
+     * @return string
+     */
     public function getValidationUrl()
     {
-        return $this->getUrl('customer/*/validate', array('_current' => true));
+        return $this->getUrl('customer/*/validate', ['_current' => true]);
     }
 
+    /**
+     * Prepare the layout.
+     *
+     * @return $this
+     */
     protected function _prepareLayout()
     {
-        if (!$this->_coreRegistry->registry('current_customer')->isReadonly()) {
-            $this->_addButton('save_and_continue', array(
-                'label'     => __('Save and Continue Edit'),
-                'class'     => 'save',
-                'data_attribute'  => array(
-                    'mage-init' => array(
-                        'button' => array('event' => 'saveAndContinueEdit', 'target' => '#edit_form'),
-                    ),
-                ),
-            ), 10);
+        $customerId = $this->getCustomerId();
+        if (!$customerId || !$this->customerAccountManagement->isReadonly($customerId)) {
+            $this->buttonList->add(
+                'save_and_continue',
+                [
+                    'label' => __('Save and Continue Edit'),
+                    'class' => 'save',
+                    'data_attribute' => [
+                        'mage-init' => [
+                            'button' => ['event' => 'saveAndContinueEdit', 'target' => '#edit_form'],
+                        ],
+                    ]
+                ],
+                10
+            );
         }
 
         return parent::_prepareLayout();
     }
 
+    /**
+     * Retrieve the save and continue edit Url.
+     *
+     * @return string
+     */
     protected function _getSaveAndContinueUrl()
     {
-        return $this->getUrl('customer/index/save', array(
-            '_current'  => true,
-            'back'      => 'edit',
-            'tab'       => '{{tab_id}}'
-        ));
+        return $this->getUrl(
+            'customer/index/save',
+            ['_current' => true, 'back' => 'edit', 'tab' => '{{tab_id}}']
+        );
     }
 }

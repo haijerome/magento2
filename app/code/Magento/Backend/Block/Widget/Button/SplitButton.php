@@ -1,28 +1,14 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Block\Widget\Button;
+
+use Magento\Backend\Block\Template\Context;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Math\Random;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Split button widget
@@ -32,16 +18,45 @@
  * @method string getClass()
  * @method string getLabel()
  * @method string getTitle()
- * @method string getDisabled()
+ * @method bool getDisabled()
  * @method string getStyle()
  * @method array getDataAttribute()
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Button;
-
 class SplitButton extends \Magento\Backend\Block\Widget
 {
     /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
+     * @var Random
+     */
+    private $random;
+
+    /**
+     * @param Context $context
+     * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
+     * @param Random|null $random
+     */
+    public function __construct(
+        Context $context,
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null,
+        ?Random $random = null
+    ) {
+        parent::__construct($context, $data);
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+        $this->random = $random ?? ObjectManager::getInstance()->get(Random::class);
+    }
+
+    /**
      * Define block template
+     *
+     * @return void
      */
     protected function _construct()
     {
@@ -62,7 +77,7 @@ class SplitButton extends \Magento\Backend\Block\Widget
         if (!$title) {
             $title = $this->getLabel();
         }
-        $classes = array();
+        $classes = [];
         if ($this->hasSplit()) {
             $classes[] = 'actions-split';
         }
@@ -71,15 +86,21 @@ class SplitButton extends \Magento\Backend\Block\Widget
             $classes[] = $this->getButtonClass();
         }
 
-        $attributes = array(
-            'id'        => $this->getId(),
-            'title'     => $title,
-            'class'     => join(' ', $classes),
-        );
+        $attributes = ['id' => $this->getId(), 'title' => $title, 'class' => join(' ', $classes)];
 
         $html = $this->_getAttributesString($attributes);
 
         return $html;
+    }
+
+    /**
+     * Get main button's "id" attribute value.
+     *
+     * @return string
+     */
+    private function getButtonId(): string
+    {
+        return $this->getId() .'-button';
     }
 
     /**
@@ -94,7 +115,7 @@ class SplitButton extends \Magento\Backend\Block\Widget
         if (!$title) {
             $title = $this->getLabel();
         }
-        $classes = array();
+        $classes = [];
         $classes[] = 'action-default';
         $classes[] = 'primary';
         // @TODO Perhaps use $this->getButtonClass() instead
@@ -104,13 +125,12 @@ class SplitButton extends \Magento\Backend\Block\Widget
         if ($disabled) {
             $classes[] = $disabled;
         }
-        $attributes = array(
-            'id'        => $this->getId() . '-button',
-            'title'     => $title,
-            'class'     => join(' ', $classes),
-            'disabled'  => $disabled,
-            'style'     => $this->getStyle(),
-        );
+        $attributes = [
+            'id' => $this->getButtonId(),
+            'title' => $title,
+            'class' => join(' ', $classes),
+            'disabled' => $disabled
+        ];
 
         //TODO perhaps we need to skip data-mage-init when disabled="disabled"
         if ($this->getDataAttribute()) {
@@ -135,7 +155,7 @@ class SplitButton extends \Magento\Backend\Block\Widget
         if (!$title) {
             $title = $this->getLabel();
         }
-        $classes = array();
+        $classes = [];
         $classes[] = 'action-toggle';
         $classes[] = 'primary';
         if ($this->getClass()) {
@@ -145,12 +165,8 @@ class SplitButton extends \Magento\Backend\Block\Widget
             $classes[] = $disabled;
         }
 
-        $attributes = array(
-            'title'     => $title,
-            'class'     => join(' ', $classes),
-            'disabled'  => $disabled
-        );
-        $this->_getDataAttributes(array('toggle' => 'dropdown'), $attributes);
+        $attributes = ['title' => $title, 'class' => join(' ', $classes), 'disabled' => $disabled];
+        $this->_getDataAttributes(['mage-init' => '{"dropdown": {}}', 'toggle' => 'dropdown'], $attributes);
 
         $html = $this->_getAttributesString($attributes);
         $html .= $this->getUiId('dropdown');
@@ -168,13 +184,13 @@ class SplitButton extends \Magento\Backend\Block\Widget
      */
     public function getOptionAttributesHtml($key, $option)
     {
-        $disabled = (isset($option['disabled']) && $option['disabled']) ? 'disabled' : '';
+        $disabled = isset($option['disabled']) && $option['disabled'] ? 'disabled' : '';
         if (isset($option['title'])) {
             $title = $option['title'];
         } else {
             $title = $option['label'];
         }
-        $classes = array();
+        $classes = [];
         $classes[] = 'item';
         if (!empty($option['default'])) {
             $classes[] = 'item-default';
@@ -206,12 +222,28 @@ class SplitButton extends \Magento\Backend\Block\Widget
      *
      * @param array $data
      * @param array $attributes
+     * @return void
      */
     protected function _getDataAttributes($data, &$attributes)
     {
         foreach ($data as $key => $attr) {
             $attributes['data-' . $key] = is_scalar($attr) ? $attr : json_encode($attr);
         }
+    }
+
+    /**
+     * Retrieve "id" attribute value for an option.
+     *
+     * @param array $option
+     * @return string
+     */
+    private function identifyOption(array $option): string
+    {
+        return isset($option['id'])
+            ? $this->getId() .'-' .$option['id']
+            : (isset($option['id_attribute']) ?
+                $option['id_attribute']
+                : $this->getId() .'-optId' .$this->random->getRandomString(10));
     }
 
     /**
@@ -226,14 +258,12 @@ class SplitButton extends \Magento\Backend\Block\Widget
      */
     protected function _prepareOptionAttributes($option, $title, $classes, $disabled)
     {
-        $attributes = array(
-            'id'        => isset($option['id']) ? $this->getId() . '-' . $option['id'] : '',
-            'title'     => $title,
-            'class'     => join(' ', $classes),
-            'onclick'   => isset($option['onclick']) ? $option['onclick'] : '',
-            'style'     => isset($option['style']) ? $option['style'] : '',
-            'disabled'  => $disabled,
-        );
+        $attributes = [
+            'id' => $this->identifyOption($option),
+            'title' => $title,
+            'class' => join(' ', $classes),
+            'disabled' => $disabled,
+        ];
 
         if (isset($option['data_attribute'])) {
             $this->_getDataAttributes($option['data_attribute'], $attributes);
@@ -250,13 +280,38 @@ class SplitButton extends \Magento\Backend\Block\Widget
      */
     protected function _getAttributesString($attributes)
     {
-        $html = array();
+        $html = [];
         foreach ($attributes as $attributeKey => $attributeValue) {
             if ($attributeValue === null || $attributeValue == '') {
                 continue;
             }
-            $html[] = $attributeKey . '="' . $this->escapeHtml($attributeValue) . '"';
+            $html[] = $attributeKey . '="' . $this->escapeHtmlAttr($attributeValue, false) . '"';
         }
         return join(' ', $html);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function _beforeToHtml()
+    {
+        parent::_beforeToHtml();
+
+        $afterHtml = $this->getAfterHtml();
+        /** @var array|null $options */
+        $options = $this->getOptions() ?? [];
+        foreach ($options as &$option) {
+            $id = $option['id_attribute'] = $this->identifyOption($option);
+            if (!empty($option['onclick'])) {
+                $afterHtml .= $this->secureRenderer->renderEventListenerAsTag('onclick', $option['onclick'], "#$id");
+            }
+            if (!empty($option['style'])) {
+                $afterHtml .= $this->secureRenderer->renderStyleAsTag($option['style'], "#$id");
+            }
+        }
+        $this->setOptions($options);
+        $this->setAfterHtml($afterHtml);
+
+        return $this;
     }
 }

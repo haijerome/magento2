@@ -1,63 +1,111 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * PayPal Direct Module
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Paypal\Model;
 
+use Magento\Quote\Api\Data\PaymentInterface;
+use Magento\Sales\Model\Order\Payment;
+
+/**
+ * PayPal Direct Module
+ * @SuppressWarnings(PHPMD.TooManyFields)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
 class Direct extends \Magento\Payment\Model\Method\Cc
 {
     /**
      * @var string
      */
-    protected $_code  = \Magento\Paypal\Model\Config::METHOD_WPP_DIRECT;
+    protected $_code = \Magento\Paypal\Model\Config::METHOD_WPP_DIRECT;
 
     /**
      * @var string
      */
-    protected $_infoBlockType = 'Magento\Paypal\Block\Payment\Info';
+    protected $_infoBlockType = \Magento\Paypal\Block\Payment\Info::class;
 
-    /**#@+
-     * Availability options
+    /**
+     * Availability option
+     *
+     * @var bool
      */
-    protected $_isGateway               = true;
-    protected $_canAuthorize            = true;
-    protected $_canCapture              = true;
-    protected $_canCapturePartial       = true;
-    protected $_canRefund               = true;
+    protected $_isGateway = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canAuthorize = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canCapture = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canCapturePartial = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canRefund = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
     protected $_canRefundInvoicePartial = true;
-    protected $_canVoid                 = true;
-    protected $_canUseInternal          = true;
-    protected $_canUseCheckout          = true;
-    protected $_canUseForMultishipping  = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canVoid = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseInternal = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseCheckout = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
     protected $_canSaveCc = false;
+
+    /**
+     * @var bool
+     */
     protected $_canFetchTransactionInfo = true;
-    protected $_canReviewPayment        = true;
-    /**#@-*/
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canReviewPayment = true;
 
     /**
      * Website Payments Pro instance
@@ -67,29 +115,17 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     protected $_pro;
 
     /**
-     * Website Payments Pro instance type
-     *
-     * @var $_proType string
-     */
-    protected $_proType = 'Magento\Paypal\Model\Pro';
-
-    /**
-     * @var \Magento\Paypal\Model\Method\ProTypeFactory
-     */
-    protected $_proTypeFactory;
-
-    /**
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
     /**
-     * @var \Magento\UrlInterface
+     * @var \Magento\Framework\UrlInterface
      */
     protected $_urlBuilder;
 
     /**
-     * @var \Magento\App\RequestInterface
+     * @var \Magento\Framework\App\RequestInterface
      */
     protected $_requestHttp;
 
@@ -99,61 +135,68 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     protected $_cartFactory;
 
     /**
-     * @param \Magento\Event\ManagerInterface $eventManager
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory
      * @param \Magento\Payment\Helper\Data $paymentData
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory
-     * @param \Magento\Logger $logger
-     * @param \Magento\Module\ModuleListInterface $moduleList
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\Centinel\Model\Service $centinelService
-     * @param \Magento\Paypal\Model\Method\ProTypeFactory $proTypeFactory
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\UrlInterface $urlBuilder
-     * @param \Magento\App\RequestInterface $requestHttp
-     * @param \Magento\Paypal\Model\CartFactory $cartFactory
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Payment\Model\Method\Logger $logger
+     * @param \Magento\Framework\Module\ModuleListInterface $moduleList
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param ProFactory $proFactory
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\UrlInterface $urlBuilder
+     * @param \Magento\Framework\App\RequestInterface $requestHttp
+     * @param CartFactory $cartFactory
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
-     * 
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Event\ManagerInterface $eventManager,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
         \Magento\Payment\Helper\Data $paymentData,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory,
-        \Magento\Logger $logger,
-        \Magento\Module\ModuleListInterface $moduleList,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\Centinel\Model\Service $centinelService,
-        \Magento\Paypal\Model\Method\ProTypeFactory $proTypeFactory,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\UrlInterface $urlBuilder,
-        \Magento\App\RequestInterface $requestHttp,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Payment\Model\Method\Logger $logger,
+        \Magento\Framework\Module\ModuleListInterface $moduleList,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Paypal\Model\ProFactory $proFactory,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\UrlInterface $urlBuilder,
+        \Magento\Framework\App\RequestInterface $requestHttp,
         \Magento\Paypal\Model\CartFactory $cartFactory,
-        array $data = array()
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         parent::__construct(
-            $eventManager,
+            $context,
+            $registry,
+            $extensionFactory,
+            $customAttributeFactory,
             $paymentData,
-            $coreStoreConfig,
-            $logAdapterFactory,
+            $scopeConfig,
             $logger,
             $moduleList,
-            $locale,
-            $centinelService,
+            $localeDate,
+            $resource,
+            $resourceCollection,
             $data
         );
-        $this->_proTypeFactory = $proTypeFactory;
         $this->_storeManager = $storeManager;
         $this->_urlBuilder = $urlBuilder;
         $this->_requestHttp = $requestHttp;
         $this->_cartFactory = $cartFactory;
 
         $proInstance = array_shift($data);
-        if ($proInstance && ($proInstance instanceof \Magento\Paypal\Model\Pro)) {
+        if ($proInstance && $proInstance instanceof \Magento\Paypal\Model\Pro) {
             $this->_pro = $proInstance;
         } else {
-            $this->_pro = $this->_proTypeFactory->create($this->_proType);
+            $this->_pro = $proFactory->create();
         }
         $this->_pro->setMethod($this->_code);
     }
@@ -162,7 +205,7 @@ class Direct extends \Magento\Payment\Model\Method\Cc
      * Store setter
      * Also updates store ID in config object
      *
-     * @param \Magento\Core\Model\Store|int $store
+     * @param \Magento\Store\Model\Store|int $store
      * @return $this
      */
     public function setStore($store)
@@ -204,47 +247,48 @@ class Direct extends \Magento\Payment\Model\Method\Cc
      */
     public function getAllowedCcTypes()
     {
-        $ccTypes = explode(',', $this->_pro->getConfig()->cctypes);
+        $ccTypes = explode(',', $this->_pro->getConfig()->getValue('cctypes'));
         $country = $this->_pro->getConfig()->getMerchantCountry();
 
         if ($country == 'GB') {
-            $ccTypes = array_intersect(array('SM', 'SO', 'MC', 'DI', 'VI'), $ccTypes);
+            $ccTypes = array_intersect(['SM', 'SO', 'MC', 'DI', 'VI'], $ccTypes);
         } elseif ($country == 'CA') {
-            $ccTypes = array_intersect(array('MC', 'VI'), $ccTypes);
+            $ccTypes = array_intersect(['MC', 'VI'], $ccTypes);
         }
         return implode(',', $ccTypes);
     }
 
     /**
      * Check whether payment method can be used
-     * @param \Magento\Sales\Model\Quote
+     *
+     * @param \Magento\Quote\Api\Data\CartInterface|\Magento\Quote\Model\Quote|null $quote
      * @return bool
      */
-    public function isAvailable($quote = null)
+    public function isAvailable(\Magento\Quote\Api\Data\CartInterface $quote = null)
     {
-        if (parent::isAvailable($quote) && $this->_pro->getConfig()->isMethodAvailable()) {
-            return true;
-        }
-        return false;
+        return parent::isAvailable($quote) && $this->_pro->getConfig()->isMethodAvailable();
     }
 
     /**
      * Custom getter for payment configuration
      *
      * @param string $field
-     * @param int $storeId
-     * @return mixed
+     * @param int|null $storeId
+     * @return null|string
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function getConfigData($field, $storeId = null)
     {
         $value = null;
-        switch ($field)
-        {
+        switch ($field) {
             case 'cctypes':
                 $value = $this->getAllowedCcTypes();
                 break;
+            case 'order_place_redirect_url':
+                $value = $this->getOrderPlaceRedirectUrl();
+                break;
             default:
-                $value = $this->_pro->getConfig()->$field;
+                $value = $this->_pro->getConfig()->getValue($field);
         }
         return $value;
     }
@@ -252,11 +296,11 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Authorize payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param \Magento\Framework\DataObject|\Magento\Payment\Model\InfoInterface|Payment $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Direct
+     * @return $this
      */
-    public function authorize(\Magento\Object $payment, $amount)
+    public function authorize(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
         return $this->_placeOrder($payment, $amount);
     }
@@ -264,10 +308,11 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Void payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
-     * @return \Magento\Paypal\Model\Direct
+     * @param \Magento\Framework\DataObject|\Magento\Payment\Model\InfoInterface|Payment $payment
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
-    public function void(\Magento\Object $payment)
+    public function void(\Magento\Payment\Model\InfoInterface $payment)
     {
         $this->_pro->void($payment);
         return $this;
@@ -276,11 +321,11 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Capture payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param \Magento\Framework\DataObject|\Magento\Payment\Model\InfoInterface|Payment $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Direct
+     * @return $this
      */
-    public function capture(\Magento\Object $payment, $amount)
+    public function capture(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
         if (false === $this->_pro->capture($payment, $amount)) {
             $this->_placeOrder($payment, $amount);
@@ -291,11 +336,12 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Refund capture
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param \Magento\Framework\DataObject|\Magento\Payment\Model\InfoInterface|Payment $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Direct
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
-    public function refund(\Magento\Object $payment, $amount)
+    public function refund(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
         $this->_pro->refund($payment, $amount);
         return $this;
@@ -304,10 +350,10 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Cancel payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
-     * @return \Magento\Paypal\Model\Direct
+     * @param \Magento\Framework\DataObject|\Magento\Payment\Model\InfoInterface|Payment $payment
+     * @return $this
      */
-    public function cancel(\Magento\Object $payment)
+    public function cancel(\Magento\Payment\Model\InfoInterface $payment)
     {
         $this->void($payment);
 
@@ -316,22 +362,20 @@ class Direct extends \Magento\Payment\Model\Method\Cc
 
     /**
      * Whether payment can be reviewed
-     *
-     * @param \Magento\Payment\Model\Info|\Magento\Sales\Model\Order\Payment $payment
      * @return bool
      */
-    public function canReviewPayment(\Magento\Payment\Model\Info $payment)
+    public function canReviewPayment()
     {
-        return parent::canReviewPayment($payment) && $this->_pro->canReviewPayment($payment);
+        return parent::canReviewPayment() && $this->_pro->canReviewPayment($this->getInfoInstance());
     }
 
     /**
      * Attempt to accept a pending payment
      *
-     * @param \Magento\Payment\Model\Info|\Magento\Sales\Model\Order\Payment $payment
+     * @param \Magento\Payment\Model\Info|Payment $payment
      * @return bool
      */
-    public function acceptPayment(\Magento\Payment\Model\Info $payment)
+    public function acceptPayment(\Magento\Payment\Model\InfoInterface $payment)
     {
         parent::acceptPayment($payment);
         return $this->_pro->reviewPayment($payment, \Magento\Paypal\Model\Pro::PAYMENT_REVIEW_ACCEPT);
@@ -340,37 +384,23 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Attempt to deny a pending payment
      *
-     * @param \Magento\Payment\Model\Info|\Magento\Sales\Model\Order\Payment $payment
+     * @param \Magento\Payment\Model\Info|PaymentInterface $payment
      * @return bool
      */
-    public function denyPayment(\Magento\Payment\Model\Info $payment)
+    public function denyPayment(\Magento\Payment\Model\InfoInterface $payment)
     {
         parent::denyPayment($payment);
         return $this->_pro->reviewPayment($payment, \Magento\Paypal\Model\Pro::PAYMENT_REVIEW_DENY);
     }
 
     /**
-     * Set fallback API URL if not defined in configuration
-     *
-     * @return \Magento\Centinel\Model\Service
-     */
-    public function getCentinelValidator()
-    {
-        $validator = parent::getCentinelValidator();
-        if (!$validator->getCustomApiEndpointUrl()) {
-            $validator->setCustomApiEndpointUrl($this->_pro->getConfig()->centinelDefaultApiUrl);
-        }
-        return $validator;
-    }
-
-    /**
      * Fetch transaction details info
      *
-     * @param \Magento\Payment\Model\Info $payment
+     * @param \Magento\Payment\Model\InfoInterface $payment
      * @param string $transactionId
      * @return array
      */
-    public function fetchTransactionInfo(\Magento\Payment\Model\Info $payment, $transactionId)
+    public function fetchTransactionInfo(\Magento\Payment\Model\InfoInterface $payment, $transactionId)
     {
         return $this->_pro->fetchTransactionInfo($payment, $transactionId);
     }
@@ -378,38 +408,36 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Place an order with authorization or capture action
      *
-     * @param \Magento\Sales\Model\Order\Payment $payment
+     * @param Payment $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Direct
+     * @return $this
      */
-    protected function _placeOrder(\Magento\Sales\Model\Order\Payment $payment, $amount)
+    protected function _placeOrder(Payment $payment, $amount)
     {
         $order = $payment->getOrder();
-        $api = $this->_pro->getApi()
-            ->setPaymentAction($this->_pro->getConfig()->paymentAction)
-            ->setIpAddress($this->_requestHttp->getClientIp(false))
-            ->setAmount($amount)
-            ->setCurrencyCode($order->getBaseCurrencyCode())
-            ->setInvNum($order->getIncrementId())
-            ->setEmail($order->getCustomerEmail())
-            ->setNotifyUrl($this->_urlBuilder->getUrl('paypal/ipn/'))
-            ->setCreditCardType($payment->getCcType())
-            ->setCreditCardNumber($payment->getCcNumber())
-            ->setCreditCardExpirationDate(
-                $this->_getFormattedCcExpirationDate($payment->getCcExpMonth(), $payment->getCcExpYear())
-            )
-            ->setCreditCardCvv2($payment->getCcCid())
-            ->setMaestroSoloIssueNumber($payment->getCcSsIssue());
-
-        if ($payment->getCcSsStartMonth() && $payment->getCcSsStartYear()) {
-            $year = sprintf('%02d', substr($payment->getCcSsStartYear(), -2, 2));
-            $api->setMaestroSoloIssueDate(
-                $this->_getFormattedCcExpirationDate($payment->getCcSsStartMonth(), $year)
-            );
-        }
-        if ($this->getIsCentinelValidationEnabled()) {
-            $this->getCentinelValidator()->exportCmpiData($api);
-        }
+        $api = $this->_pro->getApi()->setPaymentAction(
+            $this->_pro->getConfig()->getValue('paymentAction')
+        )->setIpAddress(
+            $this->_requestHttp->getClientIp(false)
+        )->setAmount(
+            $amount
+        )->setCurrencyCode(
+            $order->getBaseCurrencyCode()
+        )->setInvNum(
+            $order->getIncrementId()
+        )->setEmail(
+            $order->getCustomerEmail()
+        )->setNotifyUrl(
+            $this->_urlBuilder->getUrl('paypal/ipn/')
+        )->setCreditCardType(
+            $payment->getCcType()
+        )->setCreditCardNumber(
+            $payment->getCcNumber()
+        )->setCreditCardExpirationDate(
+            $this->_getFormattedCcExpirationDate($payment->getCcExpMonth(), $payment->getCcExpYear())
+        )->setCreditCardCvv2(
+            $payment->getCcCid()
+        );
 
         // add shipping and billing addresses
         if ($order->getIsVirtual()) {
@@ -420,9 +448,9 @@ class Direct extends \Magento\Payment\Model\Method\Cc
         }
 
         // add line items
-        $parameters = array('params' => array($order));
-        $api->setPaypalCart($this->_cartFactory->create($parameters))
-            ->setIsLineItemsEnabled($this->_pro->getConfig()->lineItemsEnabled);
+        $cart = $this->_cartFactory->create(['salesModel' => $order]);
+
+        $api->setPaypalCart($cart)->setIsLineItemsEnabled($this->_pro->getConfig()->getValue('lineItemsEnabled'));
 
         // call api and import transaction and other payment information
         $api->callDoDirectPayment();
@@ -430,7 +458,7 @@ class Direct extends \Magento\Payment\Model\Method\Cc
 
         try {
             $api->callGetTransactionDetails();
-        } catch (\Magento\Core\Exception $e) {
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
             // if we receive errors, but DoDirectPayment response is Success, then set Pending status for transaction
             $payment->setIsTransactionPending(true);
         }
@@ -454,8 +482,9 @@ class Direct extends \Magento\Payment\Model\Method\Cc
     /**
      * Import direct payment results to payment
      *
-     * @param \Magento\Paypal\Model\Api\Nvp
-     * @param \Magento\Sales\Model\Order\Payment
+     * @param \Magento\Paypal\Model\Api\Nvp $api
+     * @param Payment $payment
+     * @return void
      */
     protected function _importResultToPayment($api, $payment)
     {
@@ -465,18 +494,11 @@ class Direct extends \Magento\Payment\Model\Method\Cc
 
     /**
      * Check void availability
-     *
-     * @param   \Magento\Object $payment
-     * @return  bool
+     * @return bool
+     * @internal param \Magento\Framework\DataObject $payment
      */
-    public function canVoid(\Magento\Object $payment)
+    public function canVoid()
     {
-        if ($payment instanceof \Magento\Sales\Model\Order\Invoice
-            || $payment instanceof \Magento\Sales\Model\Order\Creditmemo
-        ) {
-            return false;
-        }
-
         return $this->_canVoid;
     }
 }

@@ -1,64 +1,76 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Admin abstract reports controller
  *
- * @category   Magento
- * @package    Magento_Reports
  * @author     Magento Core Team <core@magentocommerce.com>
  */
+
 namespace Magento\Reports\Controller\Adminhtml\Report;
 
+use Magento\Backend\Helper\Data as BackendHelper;
+use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
+
+/**
+ * Reports api controller
+ *
+ * phpcs:disable Magento2.Classes.AbstractApi
+ * @api
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.AllPurposeAction)
+ */
 abstract class AbstractReport extends \Magento\Backend\App\Action
 {
     /**
-     * @var \Magento\App\Response\Http\FileFactory
+     * Authorization level of a basic admin session
+     *
+     * @see _isAllowed()
+     */
+    const ADMIN_RESOURCE = 'Magento_Reports::report';
+
+    /**
+     * @var \Magento\Framework\App\Response\Http\FileFactory
      */
     protected $_fileFactory;
 
     /**
-     * @var \Magento\Core\Filter\Date
+     * @var \Magento\Framework\Stdlib\DateTime\Filter\Date
      */
     protected $_dateFilter;
 
     /**
+     * @var TimezoneInterface
+     */
+    protected $timezone;
+
+    /**
+     * @var BackendHelper
+     */
+    private $backendHelper;
+
+    /**
      * @param \Magento\Backend\App\Action\Context $context
-     * @param \Magento\App\Response\Http\FileFactory $fileFactory
-     * @param \Magento\Core\Filter\Date $dateFilter
+     * @param \Magento\Framework\App\Response\Http\FileFactory $fileFactory
+     * @param \Magento\Framework\Stdlib\DateTime\Filter\Date $dateFilter
+     * @param TimezoneInterface $timezone
+     * @param BackendHelper|null $backendHelperData
      */
     public function __construct(
         \Magento\Backend\App\Action\Context $context,
-        \Magento\App\Response\Http\FileFactory $fileFactory,
-        \Magento\Core\Filter\Date $dateFilter
+        \Magento\Framework\App\Response\Http\FileFactory $fileFactory,
+        \Magento\Framework\Stdlib\DateTime\Filter\Date $dateFilter,
+        TimezoneInterface $timezone,
+        BackendHelper $backendHelperData = null
     ) {
         parent::__construct($context);
         $this->_fileFactory = $fileFactory;
         $this->_dateFilter = $dateFilter;
+        $this->timezone = $timezone;
+        $this->backendHelper = $backendHelperData ?: $this->_objectManager->get(BackendHelper::class);
     }
 
     /**
@@ -75,8 +87,8 @@ abstract class AbstractReport extends \Magento\Backend\App\Action
      */
     protected function _getSession()
     {
-        if (is_null($this->_adminSession)) {
-            $this->_adminSession = $this->_objectManager->get('Magento\Backend\Model\Auth\Session');
+        if ($this->_adminSession === null) {
+            $this->_adminSession = $this->_objectManager->get(\Magento\Backend\Model\Auth\Session::class);
         }
         return $this->_adminSession;
     }
@@ -84,7 +96,7 @@ abstract class AbstractReport extends \Magento\Backend\App\Action
     /**
      * Add report breadcrumbs
      *
-     * @return \Magento\Reports\Controller\Adminhtml\Report\AbstractReport
+     * @return $this
      */
     public function _initAction()
     {
@@ -96,28 +108,16 @@ abstract class AbstractReport extends \Magento\Backend\App\Action
     /**
      * Report action init operations
      *
-     * @param array|\Magento\Object $blocks
-     * @return \Magento\Reports\Controller\Adminhtml\Report\AbstractReport
+     * @param array|\Magento\Framework\DataObject $blocks
+     * @return $this
      */
     public function _initReportAction($blocks)
     {
         if (!is_array($blocks)) {
-            $blocks = array($blocks);
+            $blocks = [$blocks];
         }
 
-        $requestData = $this->_objectManager->get('Magento\Backend\Helper\Data')
-            ->prepareFilterString($this->getRequest()->getParam('filter'));
-        $inputFilter = new \Zend_Filter_Input(array('from' => $this->_dateFilter, 'to' => $this->_dateFilter),
-            array(), $requestData);
-        $requestData = $inputFilter->getUnescaped();
-        $requestData['store_ids'] = $this->getRequest()->getParam('store_ids');
-        $params = new \Magento\Object();
-
-        foreach ($requestData as $key => $value) {
-            if (!empty($value)) {
-                $params->setData($key, $value);
-            }
-        }
+        $params = $this->initFilterData();
 
         foreach ($blocks as $block) {
             if ($block) {
@@ -134,23 +134,68 @@ abstract class AbstractReport extends \Magento\Backend\App\Action
      *
      * @param string $flagCode
      * @param string $refreshCode
-     * @return \Magento\Reports\Controller\Adminhtml\Report\AbstractReport
+     * @return $this
      */
     protected function _showLastExecutionTime($flagCode, $refreshCode)
     {
-        $flag = $this->_objectManager->create('Magento\Reports\Model\Flag')->setReportFlagCode($flagCode)->loadSelf();
-        $updatedAt = ($flag->hasData())
-            ? $this->_objectManager->get('Magento\Core\Model\LocaleInterface')->storeDate(
-                0, new \Zend_Date($flag->getLastUpdate(), \Magento\Stdlib\DateTime::DATETIME_INTERNAL_FORMAT), true
-            )
-            : 'undefined';
+        $flag = $this->_objectManager->create(\Magento\Reports\Model\Flag::class)
+            ->setReportFlagCode($flagCode)
+            ->loadSelf();
+        $updatedAt = __('Never');
+        if ($flag->hasData()) {
+            $updatedAt = $this->timezone->formatDate(
+                $flag->getLastUpdate(),
+                \IntlDateFormatter::MEDIUM,
+                true
+            );
+        }
 
         $refreshStatsLink = $this->getUrl('reports/report_statistics');
-        $directRefreshLink = $this->getUrl('reports/report_statistics/refreshRecent', array('code' => $refreshCode));
+        $directRefreshLink = $this->getUrl('reports/report_statistics/refreshRecent');
 
-        $this->_objectManager->get('Magento\Adminhtml\Model\Session')
-            ->addNotice(__('Last updated: %1. To refresh last day\'s <a href="%2">statistics</a>, '
-                . 'click <a href="%3">here</a>.', $updatedAt, $refreshStatsLink, $directRefreshLink));
+        $this->messageManager->addNotice(
+            __(
+                'Last updated: %1. To refresh last day\'s <a href="%2">statistics</a>, ' .
+                'click <a href="#2" data-post="%3">here</a>.',
+                $updatedAt,
+                $refreshStatsLink,
+                str_replace(
+                    '"',
+                    '&quot;',
+                    json_encode(['action' => $directRefreshLink, 'data' => ['code' => $refreshCode]])
+                )
+            )
+        );
         return $this;
+    }
+
+    /**
+     * Init filter data
+     *
+     * @return \Magento\Framework\DataObject
+     */
+    private function initFilterData(): \Magento\Framework\DataObject
+    {
+        $requestData = $this->backendHelper
+            ->prepareFilterString(
+                $this->getRequest()->getParam('filter')
+            );
+
+        $filterRules = ['from' => $this->_dateFilter, 'to' => $this->_dateFilter];
+        $inputFilter = new \Zend_Filter_Input($filterRules, [], $requestData);
+
+        $requestData = $inputFilter->getUnescaped();
+        $requestData['store_ids'] = $this->getRequest()->getParam('store_ids');
+        $requestData['group'] = $this->getRequest()->getParam('group');
+        $requestData['website'] = $this->getRequest()->getParam('website');
+
+        $params = new \Magento\Framework\DataObject();
+
+        foreach ($requestData as $key => $value) {
+            if (!empty($value)) {
+                $params->setData($key, $value);
+            }
+        }
+        return $params;
     }
 }

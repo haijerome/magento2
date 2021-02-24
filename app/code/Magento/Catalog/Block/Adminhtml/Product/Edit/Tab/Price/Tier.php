@@ -1,43 +1,64 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Price;
+
+use Magento\Customer\Api\GroupManagementInterface;
+use Magento\Customer\Api\GroupRepositoryInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Json\Helper\Data as JsonHelper;
 
 /**
  * Adminhtml tier price item renderer
  *
- * @category   Magento
- * @package    Magento_Catalog
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.ExcessiveParameterList)
  */
-namespace Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Price;
-
-class Tier
-    extends \Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Price\Group\AbstractGroup
+class Tier extends Group\AbstractGroup
 {
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Catalog::catalog/product/edit/price/tier.phtml';
 
-    protected $_template = 'catalog/product/edit/price/tier.phtml';
+    /**
+     * @param \Magento\Backend\Block\Template\Context $context
+     * @param GroupRepositoryInterface $groupRepository
+     * @param \Magento\Directory\Helper\Data $directoryHelper
+     * @param \Magento\Framework\Module\Manager $moduleManager
+     * @param \Magento\Framework\Registry $registry
+     * @param GroupManagementInterface $groupManagement
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param \Magento\Framework\Locale\CurrencyInterface $localeCurrency
+     * @param array $data
+     * @param JsonHelper|null $jsonHelper
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        GroupRepositoryInterface $groupRepository,
+        \Magento\Directory\Helper\Data $directoryHelper,
+        \Magento\Framework\Module\Manager $moduleManager,
+        \Magento\Framework\Registry $registry,
+        GroupManagementInterface $groupManagement,
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
+        \Magento\Framework\Locale\CurrencyInterface $localeCurrency,
+        array $data = [],
+        ?JsonHelper $jsonHelper = null
+    ) {
+        $data['jsonHelper'] = $jsonHelper ?? ObjectManager::getInstance()->get(JsonHelper::class);
+        parent::__construct(
+            $context,
+            $groupRepository,
+            $directoryHelper,
+            $moduleManager,
+            $registry,
+            $groupManagement,
+            $searchCriteriaBuilder,
+            $localeCurrency,
+            $data
+        );
+    }
 
     /**
      * Retrieve list of initial customer groups
@@ -46,7 +67,7 @@ class Tier
      */
     protected function _getInitialCustomerGroups()
     {
-        return array(\Magento\Customer\Model\Group::CUST_GROUP_ALL => __('ALL GROUPS'));
+        return [$this->_groupManagement->getAllCustomersGroup()->getId() => __('ALL GROUPS')];
     }
 
     /**
@@ -57,7 +78,7 @@ class Tier
      */
     protected function _sortValues($data)
     {
-        usort($data, array($this, '_sortTierPrices'));
+        usort($data, [$this, '_sortTierPrices']);
         return $data;
     }
 
@@ -67,6 +88,7 @@ class Tier
      * @param array $a
      * @param array $b
      * @return int
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     protected function _sortTierPrices($a, $b)
     {
@@ -85,22 +107,21 @@ class Tier
 
     /**
      * Prepare global layout
+     *
      * Add "Add tier" button to layout
      *
-     * @return \Magento\Catalog\Block\Adminhtml\Product\Edit\Tab\Price\Tier
+     * @return $this
      */
     protected function _prepareLayout()
     {
-        $button = $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button')
-            ->setData(array(
-                'label' => __('Add Tier'),
-                'onclick' => 'return tierPriceControl.addItem()',
-                'class' => 'add'
-            ));
+        $button = $this->getLayout()->createBlock(
+            \Magento\Backend\Block\Widget\Button::class
+        )->setData(
+            ['label' => __('Add Price'), 'onclick' => 'return tierPriceControl.addItem()', 'class' => 'add']
+        );
         $button->setName('add_tier_price_item_button');
 
         $this->setChild('add_button', $button);
         return parent::_prepareLayout();
     }
-
 }

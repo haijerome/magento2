@@ -1,128 +1,101 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-
-/**
- * Catalog Product visibilite model and attribute source model
- *
- * @category   Magento
- * @package    Magento_Catalog
- * @author     Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Product;
 
-class Visibility extends \Magento\Object
+use Magento\Framework\Data\OptionSourceInterface;
+use Magento\Framework\DB\Ddl\Table;
+
+/**
+ * Catalog Product visibility model and attribute source model
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Visibility extends \Magento\Framework\DataObject implements OptionSourceInterface
 {
-    const VISIBILITY_NOT_VISIBLE    = 1;
-    const VISIBILITY_IN_CATALOG     = 2;
-    const VISIBILITY_IN_SEARCH      = 3;
-    const VISIBILITY_BOTH           = 4;
+    const VISIBILITY_NOT_VISIBLE = 1;
+
+    const VISIBILITY_IN_CATALOG = 2;
+
+    const VISIBILITY_IN_SEARCH = 3;
+
+    const VISIBILITY_BOTH = 4;
 
     /**
      * Reference to the attribute instance
      *
-     * @var \Magento\Catalog\Model\Resource\Eav\Attribute
+     * @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute
      */
     protected $_attribute;
 
     /**
-     * Core data
-     *
-     * @var \Magento\Core\Helper\Data
-     */
-    protected $_coreData = null;
-
-    /**
      * Eav entity attribute
      *
-     * @var \Magento\Eav\Model\Resource\Entity\Attribute
+     * @var \Magento\Eav\Model\ResourceModel\Entity\Attribute
      */
     protected $_eavEntityAttribute;
 
     /**
      * Construct
      *
-     * @param \Magento\Eav\Model\Resource\Entity\Attribute $eavEntityAttribute
-     * @param \Magento\Core\Helper\Data $coreData
+     * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute $eavEntityAttribute
      * @param array $data
      */
     public function __construct(
-        \Magento\Eav\Model\Resource\Entity\Attribute $eavEntityAttribute,
-        \Magento\Core\Helper\Data $coreData,
-        array $data = array()
+        \Magento\Eav\Model\ResourceModel\Entity\Attribute $eavEntityAttribute,
+        array $data = []
     ) {
         $this->_eavEntityAttribute = $eavEntityAttribute;
-        $this->_coreData = $coreData;
         parent::__construct($data);
-        $this->setIdFieldName('visibility_id');
     }
 
     /**
      * Retrieve visible in catalog ids array
      *
-     * @return array
+     * @return int[]
      */
     public function getVisibleInCatalogIds()
     {
-        return array(self::VISIBILITY_IN_CATALOG, self::VISIBILITY_BOTH);
+        return [self::VISIBILITY_IN_CATALOG, self::VISIBILITY_BOTH];
     }
 
     /**
      * Retrieve visible in search ids array
      *
-     * @return array
+     * @return int[]
      */
     public function getVisibleInSearchIds()
     {
-        return array(self::VISIBILITY_IN_SEARCH, self::VISIBILITY_BOTH);
+        return [self::VISIBILITY_IN_SEARCH, self::VISIBILITY_BOTH];
     }
 
     /**
      * Retrieve visible in site ids array
      *
-     * @return array
+     * @return int[]
      */
     public function getVisibleInSiteIds()
     {
-        return array(self::VISIBILITY_IN_SEARCH, self::VISIBILITY_IN_CATALOG, self::VISIBILITY_BOTH);
+        return [self::VISIBILITY_IN_SEARCH, self::VISIBILITY_IN_CATALOG, self::VISIBILITY_BOTH];
     }
 
     /**
      * Retrieve option array
      *
      * @return array
+     * phpcs:disable Magento2.Functions.StaticFunction
      */
-    static public function getOptionArray()
+    public static function getOptionArray()
     {
-        return array(
-            self::VISIBILITY_NOT_VISIBLE=> __('Not Visible Individually'),
+        return [
+            self::VISIBILITY_NOT_VISIBLE => __('Not Visible Individually'),
             self::VISIBILITY_IN_CATALOG => __('Catalog'),
-            self::VISIBILITY_IN_SEARCH  => __('Search'),
-            self::VISIBILITY_BOTH       => __('Catalog, Search')
-        );
+            self::VISIBILITY_IN_SEARCH => __('Search'),
+            self::VISIBILITY_BOTH => __('Catalog, Search')
+        ];
     }
 
     /**
@@ -130,26 +103,23 @@ class Visibility extends \Magento\Object
      *
      * @return array
      */
-    static public function getAllOption()
+    public static function getAllOption()
     {
         $options = self::getOptionArray();
-        array_unshift($options, array('value'=>'', 'label'=>''));
+        array_unshift($options, ['value' => '', 'label' => '']);
         return $options;
     }
 
     /**
-     * Retireve all options
+     * Retrieve all options
      *
      * @return array
      */
-    static public function getAllOptions()
+    public static function getAllOptions()
     {
-        $res = array();
+        $res = [];
         foreach (self::getOptionArray() as $index => $value) {
-            $res[] = array(
-               'value' => $index,
-               'label' => $value
-            );
+            $res[] = ['value' => $index, 'label' => $value];
         }
         return $res;
     }
@@ -160,36 +130,32 @@ class Visibility extends \Magento\Object
      * @param int $optionId
      * @return string
      */
-    static public function getOptionText($optionId)
+    public static function getOptionText($optionId)
     {
         $options = self::getOptionArray();
-        return isset($options[$optionId]) ? $options[$optionId] : null;
+        return $options[$optionId] ?? null;
     }
+    //phpcs:enable Magento2.Functions.StaticFunction
 
     /**
      * Retrieve flat column definition
      *
      * @return array
      */
-    public function getFlatColums()
+    public function getFlatColumns()
     {
         $attributeCode = $this->getAttribute()->getAttributeCode();
-        $column = array(
-            'unsigned'  => true,
-            'default'   => null,
-            'extra'     => null
-        );
 
-        if ($this->_coreData->useDbCompatibleMode()) {
-            $column['type']     = 'tinyint';
-            $column['is_null']  = true;
-        } else {
-            $column['type']     = \Magento\DB\Ddl\Table::TYPE_SMALLINT;
-            $column['nullable'] = true;
-            $column['comment']  = 'Catalog Product Visibility ' . $attributeCode . ' column';
-        }
-
-        return array($attributeCode => $column);
+        return [
+            $attributeCode => [
+                'unsigned' => true,
+                'default' => null,
+                'extra' => null,
+                'type' => Table::TYPE_SMALLINT,
+                'nullable' => true,
+                'comment' => 'Catalog Product Visibility ' . $attributeCode . ' column',
+            ],
+        ];
     }
 
     /**
@@ -199,27 +165,25 @@ class Visibility extends \Magento\Object
      */
     public function getFlatIndexes()
     {
-        return array();
+        return [];
     }
 
     /**
      * Retrieve Select For Flat Attribute update
      *
-     * @param \Magento\Catalog\Model\Resource\Eav\Attribute $attribute
      * @param int $store
-     * @return \Magento\DB\Select|null
+     * @return \Magento\Framework\DB\Select|null
      */
     public function getFlatUpdateSelect($store)
     {
-        return $this->_eavEntityAttribute
-            ->getFlatUpdateSelect($this->getAttribute(), $store);
+        return $this->_eavEntityAttribute->getFlatUpdateSelect($this->getAttribute(), $store);
     }
 
     /**
      * Set attribute instance
      *
-     * @param \Magento\Catalog\Model\Resource\Eav\Attribute $attribute
-     * @return \Magento\Eav\Model\Entity\Attribute\Frontend\AbstractFrontend
+     * @param \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute
+     * @return $this
      */
     public function setAttribute($attribute)
     {
@@ -230,7 +194,7 @@ class Visibility extends \Magento\Object
     /**
      * Get attribute instance
      *
-     * @return \Magento\Catalog\Model\Resource\Eav\Attribute
+     * @return \Magento\Catalog\Model\ResourceModel\Eav\Attribute
      */
     public function getAttribute()
     {
@@ -242,50 +206,57 @@ class Visibility extends \Magento\Object
      *
      * @param \Magento\Eav\Model\Entity\Collection\AbstractCollection $collection
      * @param string $dir direction
-     * @return \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
+     * @return $this
      */
     public function addValueSortToCollection($collection, $dir = 'asc')
     {
-        $attributeCode  = $this->getAttribute()->getAttributeCode();
-        $attributeId    = $this->getAttribute()->getId();
+        $attributeCode = $this->getAttribute()->getAttributeCode();
+        $attributeId = $this->getAttribute()->getId();
         $attributeTable = $this->getAttribute()->getBackend()->getTable();
+        $linkField = $this->getAttribute()->getEntity()->getLinkField();
 
         if ($this->getAttribute()->isScopeGlobal()) {
             $tableName = $attributeCode . '_t';
-            $collection->getSelect()
-                ->joinLeft(
-                    array($tableName => $attributeTable),
-                    "e.entity_id={$tableName}.entity_id"
-                        . " AND {$tableName}.attribute_id='{$attributeId}'"
-                        . " AND {$tableName}.store_id='0'",
-                    array());
+            $collection->getSelect()->joinLeft(
+                [$tableName => $attributeTable],
+                "e.{$linkField}={$tableName}.{$linkField}" .
+                " AND {$tableName}.attribute_id='{$attributeId}'" .
+                " AND {$tableName}.store_id='0'",
+                []
+            );
             $valueExpr = $tableName . '.value';
-        }
-        else {
+        } else {
             $valueTable1 = $attributeCode . '_t1';
             $valueTable2 = $attributeCode . '_t2';
-            $collection->getSelect()
-                ->joinLeft(
-                    array($valueTable1 => $attributeTable),
-                    "e.entity_id={$valueTable1}.entity_id"
-                        . " AND {$valueTable1}.attribute_id='{$attributeId}'"
-                        . " AND {$valueTable1}.store_id='0'",
-                    array())
-                ->joinLeft(
-                    array($valueTable2 => $attributeTable),
-                    "e.entity_id={$valueTable2}.entity_id"
-                        . " AND {$valueTable2}.attribute_id='{$attributeId}'"
-                        . " AND {$valueTable2}.store_id='{$collection->getStoreId()}'",
-                    array()
-                );
-                $valueExpr = $collection->getConnection()->getCheckSql(
-                    $valueTable2 . '.value_id > 0',
-                    $valueTable2 . '.value',
-                    $valueTable1 . '.value'
-                );
+            $collection->getSelect()->joinLeft(
+                [$valueTable1 => $attributeTable],
+                "e.{$linkField}={$valueTable1}.{$linkField}" .
+                " AND {$valueTable1}.attribute_id='{$attributeId}'" .
+                " AND {$valueTable1}.store_id='0'",
+                []
+            )->joinLeft(
+                [$valueTable2 => $attributeTable],
+                "e.{$linkField}={$valueTable2}.{$linkField}" .
+                " AND {$valueTable2}.attribute_id='{$attributeId}'" .
+                " AND {$valueTable2}.store_id='{$collection->getStoreId()}'",
+                []
+            );
+            $valueExpr = $collection->getConnection()->getCheckSql(
+                $valueTable2 . '.value_id > 0',
+                $valueTable2 . '.value',
+                $valueTable1 . '.value'
+            );
         }
 
         $collection->getSelect()->order($valueExpr . ' ' . $dir);
         return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function toOptionArray()
+    {
+        return $this->getAllOptions();
     }
 }

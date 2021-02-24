@@ -1,53 +1,86 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Bundle
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Bundle\Block\Adminhtml\Catalog\Product\Composite\Fieldset\Options\Type;
 
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Bundle option radiobox type renderer
  *
- * @category    Magento
- * @package     Magento_Bundle
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Bundle\Block\Adminhtml\Catalog\Product\Composite\Fieldset\Options\Type;
-
-class Radio
-    extends \Magento\Bundle\Block\Catalog\Product\View\Type\Bundle\Option\Radio
+class Radio extends \Magento\Bundle\Block\Catalog\Product\View\Type\Bundle\Option\Radio
 {
-    protected $_template = 'product/composite/fieldset/options/type/radio.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Bundle::product/composite/fieldset/options/type/radio.phtml';
 
     /**
-     * @param  string $elementId
-     * @param  string $containerId
-     * @return string
+     * @var SecureHtmlRenderer
+     */
+    protected $secureRenderer;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Catalog\Helper\Data $catalogData
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Stdlib\StringUtils $string
+     * @param \Magento\Framework\Math\Random $mathRandom
+     * @param \Magento\Checkout\Helper\Cart $cartHelper
+     * @param \Magento\Tax\Helper\Data $taxData
+     * @param \Magento\Framework\Pricing\Helper\Data $pricingHelper
+     * @param array $data
+     * @param SecureHtmlRenderer|null $htmlRenderer
+     *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+     */
+    public function __construct(
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Catalog\Helper\Data $catalogData,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        \Magento\Framework\Math\Random $mathRandom,
+        \Magento\Checkout\Helper\Cart $cartHelper,
+        \Magento\Tax\Helper\Data $taxData,
+        \Magento\Framework\Pricing\Helper\Data $pricingHelper,
+        array $data = [],
+        ?SecureHtmlRenderer $htmlRenderer = null
+    ) {
+        parent::__construct(
+            $context,
+            $jsonEncoder,
+            $catalogData,
+            $registry,
+            $string,
+            $mathRandom,
+            $cartHelper,
+            $taxData,
+            $pricingHelper,
+            $data
+        );
+        $this->secureRenderer = $htmlRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+    }
+
+    /**
+     * @inheritdoc
      */
     public function setValidationContainer($elementId, $containerId)
     {
-        return '<script type="text/javascript">
-            $(\'' . $elementId . '\').advaiceContainer = \'' . $containerId . '\';
-            </script>';
+        $scriptString = 'document.getElementById(\'' .
+            $elementId .
+            '\').advaiceContainer = \'' .
+            $containerId .
+            '\';';
+
+        return $this->secureRenderer->renderTag('script', [], $scriptString, false);
     }
 }

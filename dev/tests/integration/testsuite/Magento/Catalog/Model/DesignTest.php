@@ -1,69 +1,131 @@
 <?php
+
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Catalog\Model;
+
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Framework\TranslateInterface;
+use Magento\Framework\View\Design\ThemeInterface;
+use Magento\Framework\View\DesignInterface;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\Theme\Model\Theme;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Test class for \Magento\Catalog\Model\Design.
  */
-namespace Magento\Catalog\Model;
-
-class DesignTest extends \PHPUnit_Framework_TestCase
+class DesignTest extends TestCase
 {
     /**
-     * @var \Magento\Catalog\Model\Design
+     * @var Design
      */
-    protected $_model;
+    private $model;
 
-    protected function setUp()
+    /**
+     * @var ProductRepositoryInterface
+     */
+    private $productRepository;
+
+    /**
+     * @inheriDoc
+     */
+    protected function setUp(): void
     {
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Catalog\Model\Design');
+        $this->model = Bootstrap::getObjectManager()->create(Design::class);
+        $this->productRepository = Bootstrap::getObjectManager()->get(ProductRepositoryInterface::class);
     }
 
     /**
      * @dataProvider getThemeModel
+     * @param Theme $theme
+     * @return void
      */
-    public function testApplyCustomDesign($theme)
+    public function testApplyCustomDesign(Theme $theme): void
     {
-        $this->_model->applyCustomDesign($theme);
-        $design = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->get('Magento\View\DesignInterface');
+        $this->model->applyCustomDesign($theme);
+        $design = Bootstrap::getObjectManager()->get(DesignInterface::class);
+        $translate = Bootstrap::getObjectManager()->get(TranslateInterface::class);
         $this->assertEquals('package', $design->getDesignTheme()->getPackageCode());
         $this->assertEquals('theme', $design->getDesignTheme()->getThemeCode());
+        $this->assertEquals('themepackage/theme', $translate->getTheme());
     }
 
     /**
-     * @return \Magento\Core\Model\Theme
+     * Verify design product settings will be generated correctly for PDP.
+     *
+     * @magentoDataFixture Magento/Catalog/_files/simple_product_with_custom_design.php
+     * @param array $designSettings
+     * @param array $expectedSetting
+     * @dataProvider getDesignSettingsForProductWithScheduleDesignTest
+     * @return void
      */
-    public function getThemeModel()
+    public function testGetDesignSettingsForProductWithScheduleDesign(
+        array $designSettings,
+        array $expectedSetting
+    ): void {
+        $product = $this->productRepository->get('simple_with_custom_design', false, null, true);
+        $this->applyScheduleDesignUpdate($product, $designSettings);
+        $settings = $this->model->getDesignSettings($product);
+        self::assertEquals($expectedSetting['page_layout'], $settings->getData('page_layout'));
+        self::assertEquals($expectedSetting['custom_design'], $settings->getData('custom_design'));
+    }
+
+    /**
+     * @return array[]
+     */
+    public function getDesignSettingsForProductWithScheduleDesignTest(): array
     {
-        $theme = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\View\Design\ThemeInterface');
+        $datetime = new \DateTime();
+        $datetime->modify('-10 day');
+        $fromApplied = $datetime->format('Y-m-d');
+        $datetime->modify('+20 day');
+        $fromNotApplied = $datetime->format('Y-m-d');
+        $datetime->modify('+30 day');
+        $to = $datetime->format('Y-m-d');
+
+        return [
+            'schedule_design_applied' => [
+                'design_settings' => [
+                    'custom_layout' => '2columns-left',
+                    'custom_design' => '2',
+                    'custom_design_from' => $fromApplied,
+                    'custom_design_to' => $to,
+                ],
+                'expected_settings' => [
+                    'page_layout' => '2columns-left',
+                    'custom_design' => '2',
+                ]
+            ],
+            'schedule_design_not_applied' => [
+                'design_settings' => [
+                    'custom_layout' => '2columns-left',
+                    'custom_design' => '2',
+                    'custom_design_from' => $fromNotApplied,
+                    'custom_design_to' => $to,
+                ],
+                'expected_settings' => [
+                    'page_layout' => '3columns',
+                    'custom_design' => null,
+                ]
+            ],
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function getThemeModel(): array
+    {
+        $theme = Bootstrap::getObjectManager()->create(ThemeInterface::class);
         $theme->setData($this->_getThemeData());
-        return array(array($theme));
+
+        return [[$theme]];
     }
 
     /**
@@ -71,18 +133,30 @@ class DesignTest extends \PHPUnit_Framework_TestCase
      */
     protected function _getThemeData()
     {
-        return array(
-            'theme_title'          => 'Magento Theme',
-            'theme_code'           => 'theme',
-            'package_code'         => 'package',
-            'theme_path'           => 'package/theme',
-            'theme_version'        => '2.0.0.0',
-            'parent_theme'         => null,
-            'is_featured'          => true,
-            'preview_image'        => '',
-            'theme_directory'      => implode(
-                DIRECTORY_SEPARATOR, array(__DIR__, '_files', 'design', 'frontend', 'default', 'default')
-            )
-        );
+        return [
+            'theme_title' => 'Magento Theme',
+            'theme_code' => 'theme',
+            'package_code' => 'package',
+            'theme_path' => 'package/theme',
+            'parent_theme' => null,
+            'is_featured' => true,
+            'preview_image' => '',
+            'theme_directory' => __DIR__ . '_files/design/frontend/default/default',
+        ];
+    }
+
+    /**
+     * Apply provided setting to product scheduled design update.
+     *
+     * @param ProductInterface $product
+     * @param array $designSettings
+     * @return void
+     */
+    private function applyScheduleDesignUpdate(ProductInterface $product, array $designSettings): void
+    {
+        $product->setCustomLayout($designSettings['custom_layout']);
+        $product->setCustomDesign($designSettings['custom_design']);
+        $product->setCustomDesignFrom($designSettings['custom_design_from']);
+        $product->setCustomDesignTo($designSettings['custom_design_to']);
     }
 }

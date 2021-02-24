@@ -1,62 +1,37 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Backend grid item renderer currency
- *
- * @category   Magento
- * @package    Magento_Backend
- * @author     Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Backend\Block\Widget\Grid\Column\Renderer;
 
-class Currency
-    extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+/**
+ * Backend grid item renderer currency
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Currency extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
+    /**
+     * @var int
+     */
     protected $_defaultWidth = 100;
 
     /**
      * Currency objects cache
+     *
+     * @var \Magento\Framework\DataObject[]
      */
-    protected static $_currencies = array();
+    protected static $_currencies = [];
 
     /**
      * Application object
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
-
-    /**
-     * Locale
-     *
-     * @var \Magento\Core\Model\LocaleInterface
-     */
-    protected $_locale;
 
     /**
      * @var \Magento\Directory\Model\Currency\DefaultLocator
@@ -64,36 +39,53 @@ class Currency
     protected $_currencyLocator;
 
     /**
+     * @var \Magento\Directory\Model\Currency
+     */
+    protected $_defaultBaseCurrency;
+
+    /**
+     * @var \Magento\Framework\Locale\CurrencyInterface
+     */
+    protected $_localeCurrency;
+
+    /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param \Magento\Directory\Model\Currency\DefaultLocator $currencyLocator
+     * @param \Magento\Directory\Model\CurrencyFactory $currencyFactory
+     * @param \Magento\Framework\Locale\CurrencyInterface $localeCurrency
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Magento\Directory\Model\Currency\DefaultLocator $currencyLocator,
-        array $data = array()
+        \Magento\Directory\Model\CurrencyFactory $currencyFactory,
+        \Magento\Framework\Locale\CurrencyInterface $localeCurrency,
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_storeManager = $storeManager;
         $this->_currencyLocator = $currencyLocator;
+        $this->_localeCurrency = $localeCurrency;
+        $defaultBaseCurrencyCode = $currencyLocator->getDefaultCurrency($this->_request);
+        $this->_defaultBaseCurrency = $currencyFactory->create()->load($defaultBaseCurrencyCode);
     }
 
     /**
      * Renders grid column
      *
-     * @param   \Magento\Object $row
+     * @param   \Magento\Framework\DataObject $row
      * @return  string
      */
-    public function render(\Magento\Object $row)
+    public function render(\Magento\Framework\DataObject $row)
     {
-        if ($data = (string)$row->getData($this->getColumn()->getIndex())) {
+        if ($data = (string)$this->_getValue($row)) {
             $currency_code = $this->_getCurrencyCode($row);
-            $data = floatval($data) * $this->_getRate($row);
-            $sign = (bool)(int)$this->getColumn()->getShowNumberSign() && ($data > 0) ? '+' : '';
+            $data = (float)$data * $this->_getRate($row);
+            $sign = (bool)(int)$this->getColumn()->getShowNumberSign() && $data > 0 ? '+' : '';
             $data = sprintf("%f", $data);
-            $data = $this->_locale->currency($currency_code)->toCurrency($data);
+            $data = $this->_localeCurrency->getCurrency($currency_code)->toCurrency($data);
             return $sign . $data;
         }
         return $this->getColumn()->getDefault();
@@ -102,7 +94,7 @@ class Currency
     /**
      * Returns currency code, false on error
      *
-     * @param $row
+     * @param \Magento\Framework\DataObject $row
      * @return string
      */
     protected function _getCurrencyCode($row)
@@ -120,18 +112,18 @@ class Currency
     /**
      * Get rate for current row, 1 by default
      *
-     * @param $row
+     * @param \Magento\Framework\DataObject $row
      * @return float|int
      */
     protected function _getRate($row)
     {
         if ($rate = $this->getColumn()->getRate()) {
-            return floatval($rate);
+            return (float)$rate;
         }
         if ($rate = $row->getData($this->getColumn()->getRateField())) {
-            return floatval($rate);
+            return (float)$rate;
         }
-        return $this->_storeManager->getStore()->getBaseCurrency()->getRate($this->_getCurrencyCode($row));
+        return $this->_defaultBaseCurrency->getRate($this->_getCurrencyCode($row));
     }
 
     /**

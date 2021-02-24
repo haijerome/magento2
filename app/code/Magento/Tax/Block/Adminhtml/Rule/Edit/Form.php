@@ -1,27 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -29,39 +9,79 @@
  */
 namespace Magento\Tax\Block\Adminhtml\Rule\Edit;
 
+use Magento\Tax\Api\TaxClassManagementInterface;
+
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Form extends \Magento\Backend\Block\Widget\Form\Generic
 {
     /**
-     * @var \Magento\Tax\Model\Calculation\RateFactory
+     * @var \Magento\Tax\Model\Rate\Source
      */
-    protected $_rateFactory;
+    protected $rateSource;
 
     /**
-     * @var \Magento\Data\Form\FormKey
+     * @var \Magento\Framework\Data\Form\FormKey
      */
     protected $formKey;
-    
+
+    /**
+     * @var \Magento\Tax\Api\TaxRuleRepositoryInterface
+     */
+    protected $ruleService;
+
+    /**
+     * @var \Magento\Tax\Api\TaxClassRepositoryInterface
+     */
+    protected $taxClassService;
+
+    /**
+     * @var \Magento\Tax\Model\TaxClass\Source\Customer
+     */
+    protected $customerTaxClassSource;
+
+    /**
+     * @var \Magento\Tax\Model\TaxClass\Source\Product
+     */
+    protected $productTaxClassSource;
+
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Data\FormFactory $formFactory
-     * @param \Magento\Tax\Model\Calculation\RateFactory $rateFactory
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Data\FormFactory $formFactory
+     * @param \Magento\Tax\Model\Rate\Source $rateSource
+     * @param \Magento\Tax\Api\TaxRuleRepositoryInterface $ruleService
+     * @param \Magento\Tax\Api\TaxClassRepositoryInterface $taxClassService
+     * @param \Magento\Tax\Model\TaxClass\Source\Customer $customerTaxClassSource
+     * @param \Magento\Tax\Model\TaxClass\Source\Product $productTaxClassSource
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Data\FormFactory $formFactory,
-        \Magento\Tax\Model\Calculation\RateFactory $rateFactory,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Data\FormFactory $formFactory,
+        \Magento\Tax\Model\Rate\Source $rateSource,
+        \Magento\Tax\Api\TaxRuleRepositoryInterface $ruleService,
+        \Magento\Tax\Api\TaxClassRepositoryInterface $taxClassService,
+        \Magento\Tax\Model\TaxClass\Source\Customer $customerTaxClassSource,
+        \Magento\Tax\Model\TaxClass\Source\Product $productTaxClassSource,
+        array $data = []
     ) {
-        $this->_rateFactory = $rateFactory;
+        $this->rateSource = $rateSource;
         $this->formKey = $context->getFormKey();
+        $this->ruleService = $ruleService;
+        $this->taxClassService = $taxClassService;
+        $this->customerTaxClassSource = $customerTaxClassSource;
+        $this->productTaxClassSource = $productTaxClassSource;
         parent::__construct($context, $registry, $formFactory, $data);
     }
 
     /**
      * Init class
+     *
+     * @return void
      */
     protected function _construct()
     {
@@ -73,126 +93,165 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     }
 
     /**
-     * return \Magento\Adminhtml\Block\Widget\Form
+     * @return $this
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     protected function _prepareForm()
     {
-        $model  = $this->_coreRegistry->registry('tax_rule');
-        /** @var \Magento\Data\Form $form */
-        $form = $this->_formFactory->create(array(
-            'data' => array(
-                'id'        => 'edit_form',
-                'action'    => $this->getData('action'),
-                'method'    => 'post',
-            ))
+        $taxRuleId = $this->_coreRegistry->registry('tax_rule_id');
+        try {
+            $taxRule = $this->ruleService->get($taxRuleId);
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+            /** Tax rule not found */
+        }
+        /** @var \Magento\Framework\Data\Form $form */
+        $form = $this->_formFactory->create(
+            ['data' => ['id' => 'edit_form', 'action' => $this->getData('action'), 'method' => 'post']]
         );
+        $sessionFormValues = (array)$this->_coreRegistry->registry('tax_rule_form_data');
+        $taxRuleData = isset($taxRule) ? $this->extractTaxRuleData($taxRule) : [];
+        $formValues = array_merge($taxRuleData, $sessionFormValues);
 
-        $fieldset   = $form->addFieldset('base_fieldset', array(
-            'legend' => __('Tax Rule Information')
-        ));
+        $fieldset = $form->addFieldset('base_fieldset', ['legend' => __('Tax Rule Information')]);
 
-        $rates = $this->_rateFactory->create()
-            ->getCollection()
-            ->toOptionArray();
-
-         $fieldset->addField('code', 'text',
-            array(
-                'name'      => 'code',
-                'label'     => __('Name'),
-                'class'     => 'required-entry',
-                'required'  => true,
-            )
+        $fieldset->addField(
+            'code',
+            'text',
+            [
+                'name' => 'code',
+                'value' => isset($formValues['code']) ? $formValues['code'] : '',
+                'label' => __('Name'),
+                'class' => 'required-entry',
+                'required' => true
+            ]
         );
 
         // Editable multiselect for customer tax class
-        $selectConfig = $this->getTaxClassSelectConfig(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_CUSTOMER);
-        $selectedCustomerTax = $model->getId()
-            ? $model->getCustomerTaxClasses()
-            : $model->getCustomerTaxClassWithDefault();
-        $fieldset->addField($this->getTaxClassSelectHtmlId(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_CUSTOMER),
+        $selectConfig = $this->getTaxClassSelectConfig(TaxClassManagementInterface::TYPE_CUSTOMER);
+        $options = $this->customerTaxClassSource->getAllOptions(false);
+        if (!empty($options)) {
+            $selected = $options[0];
+        } else {
+            $selected = null;
+        }
+
+        // Use the rule data or pick the first class in the list
+        $selectedCustomerTax = isset($formValues['tax_customer_class'])
+            ? $formValues['tax_customer_class']
+            : $selected;
+        $fieldset->addField(
+            'tax_customer_class',
             'editablemultiselect',
-            array(
-                'name' => $this->getTaxClassSelectHtmlId(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_CUSTOMER),
+            [
+                'name' => 'tax_customer_class',
                 'label' => __('Customer Tax Class'),
                 'class' => 'required-entry',
-                'values' => $model->getAllOptionsForClass(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_CUSTOMER),
+                'values' => $options,
                 'value' => $selectedCustomerTax,
                 'required' => true,
-                'select_config' => $selectConfig,
-            ),
+                'select_config' => $selectConfig
+            ],
             false,
             true
         );
 
         // Editable multiselect for product tax class
-        $selectConfig = $this->getTaxClassSelectConfig(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_PRODUCT);
-        $selectedProductTax = $model->getId()
-            ? $model->getProductTaxClasses()
-            : $model->getProductTaxClassWithDefault();
-        $fieldset->addField($this->getTaxClassSelectHtmlId(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_PRODUCT),
+        $selectConfig = $this->getTaxClassSelectConfig(TaxClassManagementInterface::TYPE_PRODUCT);
+        $options = $this->productTaxClassSource->getAllOptions(false);
+        if (!empty($options)) {
+            $selected = $options[0];
+        } else {
+            $selected = null;
+        }
+
+        // Use the rule data or pick the first class in the list
+        $selectedProductTax = isset($formValues['tax_product_class'])
+            ? $formValues['tax_product_class']
+            : $selected;
+        $fieldset->addField(
+            'tax_product_class',
             'editablemultiselect',
-            array(
-                'name' => $this->getTaxClassSelectHtmlId(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_PRODUCT),
+            [
+                'name' => 'tax_product_class',
                 'label' => __('Product Tax Class'),
                 'class' => 'required-entry',
-                'values' => $model->getAllOptionsForClass(\Magento\Tax\Model\ClassModel::TAX_CLASS_TYPE_PRODUCT),
+                'values' => $options,
                 'value' => $selectedProductTax,
                 'required' => true,
                 'select_config' => $selectConfig
-            ),
+            ],
             false,
             true
         );
 
-        $fieldset->addField('tax_rate',
+        $selectConfig = $this->getTaxRatesSelectConfig($formValues);
+        $fieldset->addField(
+            'tax_rate',
             'editablemultiselect',
-            array(
+            [
                 'name' => 'tax_rate',
                 'label' => __('Tax Rate'),
                 'class' => 'required-entry',
-                'values' => $rates,
-                'value' => $model->getRates(),
+                'values' => $this->rateSource->toOptionArray(),
+                'value' => isset($formValues['tax_rate']) ? $formValues['tax_rate'] : [],
                 'required' => true,
                 'element_js_class' => 'TaxRateEditableMultiselect',
-                'select_config' => array('is_entity_editable' => true),
-            )
+                'select_config' => $selectConfig
+            ]
         );
 
-        $fieldset->addField('priority', 'text',
-            array(
-                'name'      => 'priority',
-                'label'     => __('Priority'),
-                'class'     => 'validate-not-negative-number',
-                'value'     => (int) $model->getPriority(),
-                'required'  => true,
-                'note'      => __('Tax rates at the same priority are added, others are compounded.'),
-            ),
-            false,
-            true
-        );
-        $fieldset->addField('position', 'text',
-            array(
-                'name'      => 'position',
-                'label'     => __('Sort Order'),
-                'class'     => 'validate-not-negative-number',
-                'value'     => (int) $model->getPosition(),
-                'required'  => true,
-            ),
+        $fieldset->addField(
+            'priority',
+            'text',
+            [
+                'name' => 'priority',
+                'label' => __('Priority'),
+                'class' => 'validate-not-negative-number',
+                'value' => isset($formValues['priority']) ? $formValues['priority'] : 0,
+                'required' => true,
+                'note' => __('Tax rates at the same priority are added, others are compounded.')
+            ],
             false,
             true
         );
 
-        if ($model->getId() > 0 ) {
-            $fieldset->addField('tax_calculation_rule_id', 'hidden',
-                array(
-                    'name'      => 'tax_calculation_rule_id',
-                    'value'     => $model->getId(),
-                    'no_span'   => true
-                )
+        $fieldset->addField(
+            'calculate_subtotal',
+            'checkbox',
+            [
+                'name'  => 'calculate_subtotal',
+                'label' => __('Calculate Off Subtotal Only'),
+                'onclick' => 'this.value = this.checked ? 1 : 0;',
+                'checked' => isset($formValues['calculate_subtotal']) ? $formValues['calculate_subtotal'] : 0
+            ],
+            false,
+            true
+        );
+
+        $fieldset->addField(
+            'position',
+            'text',
+            [
+                'name' => 'position',
+                'label' => __('Sort Order'),
+                'class' => 'validate-not-negative-number',
+                'value' => isset($formValues['position']) ? $formValues['position'] : 0,
+                'required' => true
+            ],
+            false,
+            true
+        );
+
+        if (isset($taxRule)) {
+            $fieldset->addField(
+                'tax_calculation_rule_id',
+                'hidden',
+                ['name' => 'tax_calculation_rule_id', 'value' => $taxRule->getId(), 'no_span' => true]
             );
         }
 
-        $form->addValues($model->getData());
         $form->setAction($this->getUrl('tax/rule/save'));
         $form->setUseContainer($this->getUseContainer());
         $this->setForm($form);
@@ -201,16 +260,21 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     }
 
     /**
-     * Retrieve HTML element ID for corresponding tax class selector
+     * Retrieve configuration options for tax rates editable multiselect
      *
-     * @param string $classType
-     * @return string
+     * @param array $formValues
+     * @return array
+     * @since 100.2.0
      */
-    public function getTaxClassSelectHtmlId($classType)
+    public function getTaxRatesSelectConfig($formValues)
     {
-        return 'tax_' . strtolower($classType) . '_class';
-    }
+        $config = [
+            'is_entity_editable' => true,
+            'selected_values' => isset($formValues['tax_rate']) ? $formValues['tax_rate'] : []
+        ];
 
+        return $config;
+    }
 
     /**
      * Retrieve configuration options for tax class editable multiselect
@@ -220,21 +284,18 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
      */
     public function getTaxClassSelectConfig($classType)
     {
-        $config = array(
+        $config = [
             'new_url' => $this->getUrl('tax/tax/ajaxSave/'),
             'save_url' => $this->getUrl('tax/tax/ajaxSave/'),
             'delete_url' => $this->getUrl('tax/tax/ajaxDelete/'),
             'delete_confirm_message' => __('Do you really want to delete this tax class?'),
-            'target_select_id' => $this->getTaxClassSelectHtmlId($classType),
+            'target_select_id' => 'tax_' . strtolower($classType) . '_class',
             'add_button_caption' => __('Add New Tax Class'),
-            'submit_data' => array(
-                'class_type' => $classType,
-                'form_key' => $this->formKey->getFormKey(),
-            ),
+            'submit_data' => ['class_type' => $classType, 'form_key' => $this->formKey->getFormKey()],
             'entity_id_name' => 'class_id',
             'entity_value_name' => 'class_name',
-            'is_entity_editable' => true
-        );
+            'is_entity_editable' => true,
+        ];
         return $config;
     }
 
@@ -256,5 +317,46 @@ class Form extends \Magento\Backend\Block\Widget\Form\Generic
     public function getTaxRateSaveUrl()
     {
         return $this->getUrl('tax/rate/ajaxSave/');
+    }
+
+    /**
+     * Retrieve Tax Rate load URL
+     *
+     * @return string
+     */
+    public function getTaxRateLoadUrl()
+    {
+        return $this->getUrl('tax/rate/ajaxLoad/');
+    }
+
+    /**
+     * Retrieve next Tax Rates page URL
+     *
+     * @return string
+     * @since 100.2.0
+     */
+    public function getTaxRatesPageUrl()
+    {
+        return $this->getUrl('tax/rule/ajaxLoadRates/');
+    }
+
+    /**
+     * Extract tax rule data in a format which is
+     *
+     * @param \Magento\Tax\Api\Data\TaxRuleInterface $taxRule
+     * @return array
+     */
+    protected function extractTaxRuleData($taxRule)
+    {
+        $taxRuleData = [
+            'code' => $taxRule->getCode(),
+            'tax_customer_class' => $taxRule->getCustomerTaxClassIds(),
+            'tax_product_class' => $taxRule->getProductTaxClassIds(),
+            'tax_rate' => $taxRule->getTaxRateIds(),
+            'priority' => $taxRule->getPriority(),
+            'position' => $taxRule->getPosition(),
+            'calculate_subtotal' => $taxRule->getCalculateSubtotal(),
+        ];
+        return $taxRuleData;
     }
 }

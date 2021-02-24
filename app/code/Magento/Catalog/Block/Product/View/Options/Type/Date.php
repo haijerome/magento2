@@ -1,39 +1,23 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Block\Product\View\Options\Type;
+
+use DateTimeZone;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Data\Form\FilterFactory;
+use Magento\Framework\Stdlib\DateTime;
 
 /**
  * Product options text type block
  *
- * @SuppressWarnings(PHPMD.LongVariable)
+ * @api
+ * @since 100.0.2
  */
 class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
 {
-
     /**
      * Fill date and time options with leading zeros or not
      *
@@ -49,27 +33,29 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
     protected $_catalogProductOptionTypeDate;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Tax\Helper\Data $taxData
+     * @var FilterFactory
+     */
+    private $filterFactory;
+
+    /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Pricing\Helper\Data $pricingHelper
+     * @param \Magento\Catalog\Helper\Data $catalogData
      * @param \Magento\Catalog\Model\Product\Option\Type\Date $catalogProductOptionTypeDate
      * @param array $data
+     * @param FilterFactory|null $filterFactory
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Tax\Helper\Data $taxData,
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Pricing\Helper\Data $pricingHelper,
+        \Magento\Catalog\Helper\Data $catalogData,
         \Magento\Catalog\Model\Product\Option\Type\Date $catalogProductOptionTypeDate,
-        array $data = array()
+        array $data = [],
+        ?FilterFactory $filterFactory = null
     ) {
         $this->_catalogProductOptionTypeDate = $catalogProductOptionTypeDate;
-        parent::__construct($context, $taxData, $data);
-    }
-
-    protected function _prepareLayout()
-    {
-        if ($head = $this->getLayout()->getBlock('head')) {
-            $head->setCanLoadCalendarJs(true);
-        }
-        return parent::_prepareLayout();
+        parent::__construct($context, $pricingHelper, $catalogData, $data);
+        $this->filterFactory = $filterFactory ?? ObjectManager::getInstance()->get(FilterFactory::class);
     }
 
     /**
@@ -104,20 +90,41 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
     public function getCalendarDateHtml()
     {
         $option = $this->getOption();
-        $value = $this->getProduct()->getPreconfiguredValues()->getData('options/' . $option->getId() . '/date');
+        $values = $this->getProduct()->getPreconfiguredValues()->getData('options/' . $option->getId());
 
         $yearStart = $this->_catalogProductOptionTypeDate->getYearStart();
         $yearEnd = $this->_catalogProductOptionTypeDate->getYearEnd();
 
-        $calendar = $this->getLayout()
-            ->createBlock('Magento\View\Element\Html\Date')
-            ->setId('options_'.$this->getOption()->getId().'_date')
-            ->setName('options['.$this->getOption()->getId().'][date]')
-            ->setClass('product-custom-option datetime-picker input-text')
-            ->setImage($this->getViewFileUrl('Magento_Core::calendar.gif'))
-            ->setDateFormat($this->_locale->getDateFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT))
-            ->setValue($value)
-            ->setYearsRange($yearStart . ':' . $yearEnd);
+        $dateFormat = $this->_localeDate->getDateFormatWithLongYear();
+        /** Escape RTL characters which are present in some locales and corrupt formatting */
+        $escapedDateFormat = preg_replace('/[^MmDdYy\/\.\-]/', '', $dateFormat);
+        $value = null;
+        if (is_array($values)) {
+            $date = $this->getInternalDateString($values);
+            if ($date !== null) {
+                $dateFilter = $this->filterFactory->create('date', ['format' => $escapedDateFormat]);
+                $value = $dateFilter->outputFilter($date);
+            } elseif (isset($values['date'])) {
+                $value = $values['date'];
+            }
+        }
+        $calendar = $this->getLayout()->createBlock(
+            \Magento\Framework\View\Element\Html\Date::class
+        )->setId(
+            'options_' . $this->getOption()->getId() . '_date'
+        )->setName(
+            'options[' . $this->getOption()->getId() . '][date]'
+        )->setClass(
+            'product-custom-option datetime-picker input-text'
+        )->setImage(
+            $this->getViewFileUrl('Magento_Theme::calendar.png')
+        )->setDateFormat(
+            $escapedDateFormat
+        )->setValue(
+            $value
+        )->setYearsRange(
+            $yearStart . ':' . $yearEnd
+        );
 
         return $calendar->getHtml();
     }
@@ -140,11 +147,7 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
         $yearEnd = $this->_catalogProductOptionTypeDate->getYearEnd();
         $yearsHtml = $this->_getSelectFromToHtml('year', $yearStart, $yearEnd);
 
-        $translations = array(
-            'd' => $daysHtml,
-            'm' => $monthsHtml,
-            'y' => $yearsHtml
-        );
+        $translations = ['d' => $daysHtml, 'm' => $monthsHtml, 'y' => $yearsHtml];
         return strtr($fieldsOrder, $translations);
     }
 
@@ -162,12 +165,14 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
         } else {
             $hourStart = 1;
             $hourEnd = 12;
-            $dayPartHtml = $this->_getHtmlSelect('day_part')
-                ->setOptions(array(
-                    'am' => __('AM'),
-                    'pm' => __('PM')
-                ))
-                ->getHtml();
+            $dayPartHtml = $this->_getHtmlSelect(
+                'day_part'
+            )->setOptions(
+                [
+                    'am' => $this->escapeHtml(__('AM')),
+                    'pm' => $this->escapeHtml(__('PM'))
+                ]
+            )->getHtml();
         }
         $hoursHtml = $this->_getSelectFromToHtml('hour', $hourStart, $hourEnd);
         $minutesHtml = $this->_getSelectFromToHtml('minute', 0, 59);
@@ -179,29 +184,26 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
      * Return drop-down html with range of values
      *
      * @param string $name Id/name of html select element
-     * @param int $from  Start position
-     * @param int $to    End position
-     * @param int $value Value selected
+     * @param int $from Start position
+     * @param int $to End position
+     * @param int|null $value Value selected
      * @return string Formatted Html
      */
     protected function _getSelectFromToHtml($name, $from, $to, $value = null)
     {
-        $options = array(
-            array('value' => '', 'label' => '-')
-        );
+        $options = [['value' => '', 'label' => '-']];
         for ($i = $from; $i <= $to; $i++) {
-            $options[] = array('value' => $i, 'label' => $this->_getValueWithLeadingZeros($i));
+            $options[] = ['value' => $i, 'label' => $this->_getValueWithLeadingZeros($i)];
         }
-        return $this->_getHtmlSelect($name, $value)
-            ->setOptions($options)
-            ->getHtml();
+        return $this->_getHtmlSelect($name, $value)->setOptions($options)->getHtml();
     }
 
     /**
      * HTML select element
      *
      * @param string $name Id/name of html select element
-     * @return \Magento\View\Element\Html\Select
+     * @param int|null $value
+     * @return mixed
      */
     protected function _getHtmlSelect($name, $value = null)
     {
@@ -211,22 +213,32 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
 
         // $require = $this->getOption()->getIsRequire() ? ' required-entry' : '';
         $require = '';
-        $select = $this->getLayout()->createBlock('Magento\View\Element\Html\Select')
-            ->setId('options_' . $this->getOption()->getId() . '_' . $name)
-            ->setClass('product-custom-option datetime-picker' . $require)
-            ->setExtraParams()
-            ->setName('options[' . $option->getId() . '][' . $name . ']');
+        $select = $this->getLayout()->createBlock(
+            \Magento\Framework\View\Element\Html\Select::class
+        )->setId(
+            'options_' . $this->getOption()->getId() . '_' . $name
+        )->setClass(
+            'product-custom-option admin__control-select datetime-picker' . $require
+        )->setExtraParams()->setName(
+            'options[' . $option->getId() . '][' . $name . ']'
+        );
 
         $extraParams = 'style="width:auto"';
         if (!$this->getSkipJsReloadPrice()) {
             $extraParams .= ' onchange="opConfig.reloadPrice()"';
         }
-        $select->setExtraParams($extraParams);
-
-        if (is_null($value)) {
-            $value = $this->getProduct()->getPreconfiguredValues()->getData('options/' . $option->getId() . '/' . $name);
+        $extraParams .= ' data-role="calendar-dropdown" data-calendar-role="' . $name . '"';
+        $extraParams .= ' data-selector="' . $select->getName() . '"';
+        if ($this->getOption()->getIsRequire()) {
+            $extraParams .= ' data-validate=\'{"datetime-validation": true}\'';
         }
-        if (!is_null($value)) {
+
+        $select->setExtraParams($extraParams);
+        if ($value === null) {
+            $values = $this->getProduct()->getPreconfiguredValues()->getData('options/' . $option->getId());
+            $value = is_array($values) ? $this->parseDate($values, $name) : null;
+        }
+        if ($value !== null) {
             $select->setValue($value);
         }
 
@@ -236,14 +248,66 @@ class Date extends \Magento\Catalog\Block\Product\View\Options\AbstractOptions
     /**
      * Add Leading Zeros to number less than 10
      *
-     * @param int
-     * @return string
+     * @param int $value
+     * @return string|int
      */
     protected function _getValueWithLeadingZeros($value)
     {
         if (!$this->_fillLeadingZeros) {
             return $value;
         }
-        return $value < 10 ? '0'.$value : $value;
+        return $value < 10 ? '0' . $value : $value;
+    }
+
+    /**
+     * Get internal date format of provided value
+     *
+     * @param array $value
+     * @return string|null
+     */
+    private function getInternalDateString(array $value): ?string
+    {
+        $result = null;
+        if (!empty($value['date']) && !empty($value['date_internal'])) {
+            $dateTimeZone = new DateTimeZone($this->_localeDate->getConfigTimezone());
+            $dateTimeObject = date_create_from_format(
+                DateTime::DATETIME_PHP_FORMAT,
+                $value['date_internal'],
+                $dateTimeZone
+            );
+            if ($dateTimeObject !== false) {
+                $result = $dateTimeObject->format(DateTime::DATE_PHP_FORMAT);
+            }
+        } elseif (!empty($value['day']) && !empty($value['month']) && !empty($value['year'])) {
+            $dateTimeObject = $this->_localeDate->date();
+            $dateTimeObject->setDate((int) $value['year'], (int) $value['month'], (int) $value['day']);
+            $result = $dateTimeObject->format(DateTime::DATE_PHP_FORMAT);
+        }
+        return $result;
+    }
+
+    /**
+     * Parse option value and return the requested part
+     *
+     * @param array $value
+     * @param string $part [year, month, day, hour, minute, day_part]
+     * @return string|null
+     */
+    private function parseDate(array $value, string $part): ?string
+    {
+        $result = null;
+        if (!empty($value['date']) && !empty($value['date_internal'])) {
+            $formatDate = explode(' ', $value['date_internal']);
+            $date = explode('-', $formatDate[0]);
+            $value['year'] = $date[0];
+            $value['month'] = $date[1];
+            $value['day'] = $date[2];
+        }
+
+        if (isset($value[$part])) {
+            $result = (string) $value[$part];
+        }
+
+        return $result;
     }
 }

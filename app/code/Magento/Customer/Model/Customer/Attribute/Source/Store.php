@@ -1,70 +1,48 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Model\Customer\Attribute\Source;
 
 /**
  * Customer store attribute source
  *
- * @category   Magento
- * @package    Magento_Customer
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Customer\Model\Customer\Attribute\Source;
-
 class Store extends \Magento\Eav\Model\Entity\Attribute\Source\Table
 {
     /**
-     * @var \Magento\Core\Model\System\Store
+     * @var \Magento\Store\Model\System\Store
      */
     protected $_store;
 
     /**
-     * @var \Magento\Core\Model\Resource\Store\CollectionFactory
+     * @var \Magento\Store\Model\ResourceModel\Store\CollectionFactory
      */
     protected $_storesFactory;
 
     /**
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Eav\Model\Resource\Entity\Attribute\Option\CollectionFactory $attrOptCollFactory
-     * @param \Magento\Eav\Model\Resource\Entity\Attribute\OptionFactory $attrOptionFactory
-     * @param \Magento\Core\Model\System\Store $store
-     * @param \Magento\Core\Model\Resource\Store\CollectionFactory $storesFactory
+     * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\Option\CollectionFactory $attrOptionCollectionFactory
+     * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\OptionFactory $attrOptionFactory
+     * @param \Magento\Store\Model\System\Store $store
+     * @param \Magento\Store\Model\ResourceModel\Store\CollectionFactory $storesFactory
      */
     public function __construct(
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Eav\Model\Resource\Entity\Attribute\Option\CollectionFactory $attrOptCollFactory,
-        \Magento\Eav\Model\Resource\Entity\Attribute\OptionFactory $attrOptionFactory,
-        \Magento\Core\Model\System\Store $store,
-        \Magento\Core\Model\Resource\Store\CollectionFactory $storesFactory
+        \Magento\Eav\Model\ResourceModel\Entity\Attribute\Option\CollectionFactory $attrOptionCollectionFactory,
+        \Magento\Eav\Model\ResourceModel\Entity\Attribute\OptionFactory $attrOptionFactory,
+        \Magento\Store\Model\System\Store $store,
+        \Magento\Store\Model\ResourceModel\Store\CollectionFactory $storesFactory
     ) {
-        parent::__construct($coreData, $attrOptCollFactory, $attrOptionFactory);
+        parent::__construct($attrOptionCollectionFactory, $attrOptionFactory);
         $this->_store = $store;
         $this->_storesFactory = $storesFactory;
     }
 
-    public function getAllOptions()
+    /**
+     * @inheritdoc
+     */
+    public function getAllOptions($withEmpty = true, $defaultValues = false)
     {
         if (!$this->_options) {
             $collection = $this->_createStoresCollection();
@@ -73,17 +51,23 @@ class Store extends \Magento\Eav\Model\Entity\Attribute\Source\Table
             }
             $this->_options = $this->_store->getStoreValuesForForm();
             if ('created_in' == $this->getAttribute()->getAttributeCode()) {
-                array_unshift($this->_options, array('value' => '0', 'label' => __('Admin')));
+                array_unshift($this->_options, ['value' => '0', 'label' => __('Admin')]);
             }
         }
         return $this->_options;
     }
 
+    /**
+     * @param string $value
+     * @return array|string
+     */
     public function getOptionText($value)
     {
-        if(!$value)$value ='0';
+        if (!$value) {
+            $value = '0';
+        }
         $isMultiple = false;
-        if (strpos($value, ',')) {
+        if (strpos($value, ',') !== false) {
             $isMultiple = true;
             $value = explode(',', $value);
         }
@@ -95,25 +79,23 @@ class Store extends \Magento\Eav\Model\Entity\Attribute\Source\Table
             }
             $this->_options = $collection->load()->toOptionArray();
             if ('created_in' == $this->getAttribute()->getAttributeCode()) {
-                array_unshift($this->_options, array('value' => '0', 'label' => __('Admin')));
+                array_unshift($this->_options, ['value' => '0', 'label' => __('Admin')]);
             }
         }
 
         if ($isMultiple) {
-            $values = array();
+            $values = [];
             foreach ($value as $val) {
                 $values[] = $this->_options[$val];
             }
             return $values;
-        }
-        else {
+        } else {
             return $this->_options[$value];
         }
-        return false;
     }
 
     /**
-     * @return \Magento\Core\Model\Resource\Store\Collection
+     * @return \Magento\Store\Model\ResourceModel\Store\Collection
      */
     protected function _createStoresCollection()
     {

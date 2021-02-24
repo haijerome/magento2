@@ -1,95 +1,58 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Catalog\Controller\Adminhtml\Category;
+
+use Magento\Framework\View\Element\BlockInterface;
 
 /**
  * Catalog category widgets controller for CMS WYSIWYG
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Catalog\Controller\Adminhtml\Category;
-
-class Widget extends \Magento\Backend\App\Action
+abstract class Widget extends \Magento\Backend\App\Action
 {
     /**
-     * Core registry
+     * Authorization level of a basic admin session
      *
-     * @var \Magento\Core\Model\Registry
+     * @see _isAllowed()
      */
-    protected $_coreRegistry = null;
+    const ADMIN_RESOURCE = 'Magento_Catalog::categories';
+
+    /**
+     * @var \Magento\Framework\View\LayoutFactory
+     */
+    protected $layoutFactory;
 
     /**
      * @param \Magento\Backend\App\Action\Context $context
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * @param \Magento\Framework\View\LayoutFactory $layoutFactory
      */
     public function __construct(
         \Magento\Backend\App\Action\Context $context,
-        \Magento\Core\Model\Registry $coreRegistry
+        \Magento\Framework\View\LayoutFactory $layoutFactory
     ) {
-        $this->_coreRegistry = $coreRegistry;
         parent::__construct($context);
+        $this->layoutFactory = $layoutFactory;
     }
 
     /**
-     * Chooser Source action
+     * @return BlockInterface
      */
-    public function chooserAction()
-    {
-        $this->getResponse()->setBody(
-            $this->_getCategoryTreeBlock()->toHtml()
-        );
-    }
-
-    /**
-     * Categories tree node (Ajax version)
-     */
-    public function categoriesJsonAction()
-    {
-        $categoryId = (int)$this->getRequest()->getPost('id');
-        if ($categoryId) {
-
-            $category = $this->_objectManager->create('Magento\Catalog\Model\Category')->load($categoryId);
-            if ($category->getId()) {
-                $this->_coreRegistry->register('category', $category);
-                $this->_coreRegistry->register('current_category', $category);
-            }
-            $this->getResponse()->setBody(
-                $this->_getCategoryTreeBlock()->getTreeJson($category)
-            );
-        }
-    }
-
     protected function _getCategoryTreeBlock()
     {
-        return $this->_view->getLayout()->createBlock('Magento\Catalog\Block\Adminhtml\Category\Widget\Chooser', '', array(
-            'data' => array(
-                'id' => $this->getRequest()->getParam('uniq_id'),
-                'use_massaction' => $this->getRequest()->getParam('use_massaction', false)
-            )
-        ));
+        return $this->layoutFactory->create()
+            ->createBlock(
+                \Magento\Catalog\Block\Adminhtml\Category\Widget\Chooser::class,
+                '',
+                [
+                    'data' => [
+                        'id' => $this->getRequest()->getParam('uniq_id'),
+                        'use_massaction' => $this->getRequest()->getParam('use_massaction', false),
+                    ]
+                ]
+            );
     }
 }

@@ -1,65 +1,53 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-
-/**
- * Dashboard search query column renderer
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\Dashboard\Searches\Renderer;
 
-class Searchquery
-    extends \Magento\Adminhtml\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+/**
+ * Dashboard search query column renderer
+ * @api
+ * @since 100.0.2
+ */
+class Searchquery extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
     /**
      * String helper
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
-    protected $_stringHelper = null;
+    protected $stringHelper;
 
     /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Stdlib\String $stringHelper
+     * @param \Magento\Framework\Stdlib\StringUtils $stringHelper
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
-        \Magento\Stdlib\String $stringHelper,
-        array $data = array()
+        \Magento\Framework\Stdlib\StringUtils $stringHelper,
+        array $data = []
     ) {
-        $this->_stringHelper = $stringHelper;
+        $this->stringHelper = $stringHelper;
         parent::__construct($context, $data);
     }
 
-    public function render(\Magento\Object $row)
+    /**
+     * Renders a column
+     *
+     * @param   \Magento\Framework\DataObject $row
+     * @return  string
+     */
+    public function render(\Magento\Framework\DataObject $row)
     {
         $value = $row->getData($this->getColumn()->getIndex());
-        if ($this->_stringHelper->strlen($value) > 30) {
-            $value = '<span title="'. $this->escapeHtml($value) .'">'
-                . $this->escapeHtml($this->_stringHelper->truncate($value, 30)) . '</span>';
+        if ($this->stringHelper->strlen($value) > 30) {
+            $value = '<span title="' . $this->escapeHtml(
+                $value
+            ) . '">' . $this->escapeHtml(
+                $this->filterManager->truncate($value, ['length' => 30])
+            ) . '</span>';
         } else {
             $value = $this->escapeHtml($value);
         }

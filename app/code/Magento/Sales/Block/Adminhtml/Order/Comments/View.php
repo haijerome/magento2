@@ -1,38 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Comments;
 
 /**
  * Invoice view  comments form
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Comments;
-
 class View extends \Magento\Backend\Block\Template
 {
     /**
@@ -43,64 +22,100 @@ class View extends \Magento\Backend\Block\Template
     protected $_salesData = null;
 
     /**
+     * @var \Magento\Sales\Helper\Admin
+     */
+    private $adminHelper;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\Sales\Helper\Data $salesData
+     * @param \Magento\Sales\Helper\Admin $adminHelper
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Sales\Helper\Data $salesData,
-        array $data = array()
+        \Magento\Sales\Helper\Admin $adminHelper,
+        array $data = []
     ) {
         $this->_salesData = $salesData;
         parent::__construct($context, $data);
+        $this->adminHelper = $adminHelper;
     }
 
     /**
      * Retrieve required options from parent
+     *
+     * @return void
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     protected function _beforeToHtml()
     {
         if (!$this->getParentBlock()) {
-            throw new \Magento\Core\Exception(__('Please correct the parent block for this block.'));
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('Please correct the parent block for this block.')
+            );
         }
         $this->setEntity($this->getParentBlock()->getSource());
         parent::_beforeToHtml();
     }
 
     /**
-     * Prepare child blocks
+     * Preparing global layout
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Invoice\Create\Items
+     * @return $this
      */
     protected function _prepareLayout()
     {
-        $this->addChild('submit_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'id'      => 'submit_comment_button',
-            'label'   => __('Submit Comment'),
-            'class'   => 'save'
-        ));
+        $this->addChild(
+            'submit_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['id' => 'submit_comment_button', 'label' => __('Submit Comment'), 'class' => 'action-secondary save']
+        );
         return parent::_prepareLayout();
     }
 
+    /**
+     * Get submit url
+     *
+     * @return string|true
+     */
     public function getSubmitUrl()
     {
-        return $this->getUrl('sales/*/addComment', array('id' => $this->getEntity()->getId()));
+        return $this->getUrl('*/*/addComment', ['id' => $this->getEntity()->getId()]);
     }
 
+    /**
+     * @return bool
+     */
     public function canSendCommentEmail()
     {
         switch ($this->getParentType()) {
             case 'invoice':
-                return $this->_salesData
-                    ->canSendInvoiceCommentEmail($this->getEntity()->getOrder()->getStore()->getId());
+                return $this->_salesData->canSendInvoiceCommentEmail(
+                    $this->getEntity()->getOrder()->getStore()->getId()
+                );
             case 'shipment':
-                return $this->_salesData
-                    ->canSendShipmentCommentEmail($this->getEntity()->getOrder()->getStore()->getId());
+                return $this->_salesData->canSendShipmentCommentEmail(
+                    $this->getEntity()->getOrder()->getStore()->getId()
+                );
             case 'creditmemo':
-                return $this->_salesData
-                    ->canSendCreditmemoCommentEmail($this->getEntity()->getOrder()->getStore()->getId());
+                return $this->_salesData->canSendCreditmemoCommentEmail(
+                    $this->getEntity()->getOrder()->getStore()->getId()
+                );
         }
         return true;
+    }
+
+    /**
+     * Replace links in string
+     *
+     * @param array|string $data
+     * @param null|array $allowedTags
+     * @return string
+     */
+    public function escapeHtml($data, $allowedTags = null)
+    {
+        return $this->adminHelper->escapeHtmlWithLinks($data, $allowedTags);
     }
 }

@@ -1,38 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Backend\Block\Widget\Grid;
 
+use Magento\TestFramework\App\State;
+
 /**
- * @magentoDataFixture Magento/Backend/Block/_files/backend_theme.php
- *
  * @magentoAppArea adminhtml
+ * @magentoComponentsDir Magento/Backend/Block/_files/design
+ * @magentoDbIsolation enabled
  */
-class MassactionTest extends \PHPUnit_Framework_TestCase
+class MassactionTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Backend\Block\Widget\Grid\Massaction
@@ -40,52 +20,66 @@ class MassactionTest extends \PHPUnit_Framework_TestCase
     protected $_block;
 
     /**
-     * @var \Magento\View\LayoutInterface
+     * @var \Magento\Framework\View\LayoutInterface
      */
     protected $_layout;
 
-    protected function setUp()
-    {
-        $this->markTestIncomplete('MAGETWO-6406');
+    /**
+     * @var \Magento\Framework\ObjectManagerInterface
+     */
+    private $objectManager;
 
+    /**
+     * @var string
+     */
+    private $mageMode;
+
+    protected function setUp(): void
+    {
         parent::setUp();
 
-        $this->_setFixtureTheme();
+        $this->objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
 
-        $this->_layout = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\View\LayoutInterface', array('area' => 'adminhtml'));
+        $this->mageMode = $this->objectManager->get(State::class)->getMode();
+
+        /** @var \Magento\Theme\Model\Theme\Registration $registration */
+        $registration = $this->objectManager->get(\Magento\Theme\Model\Theme\Registration::class);
+        $registration->register();
+        $this->objectManager->get(\Magento\Framework\View\DesignInterface::class)
+            ->setDesignTheme('BackendTest/test_default');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->objectManager->get(State::class)->setMode($this->mageMode);
+    }
+
+    /**
+     * @param string $mageMode
+     */
+    private function loadLayout($mageMode = State::MODE_DEVELOPER)
+    {
+        $this->objectManager->get(State::class)->setMode($mageMode);
+        $this->_layout = $this->objectManager->create(
+            \Magento\Framework\View\LayoutInterface::class,
+            ['area' => 'adminhtml']
+        );
         $this->_layout->getUpdate()->load('layout_test_grid_handle');
         $this->_layout->generateXml();
         $this->_layout->generateElements();
 
         $this->_block = $this->_layout->getBlock('admin.test.grid.massaction');
+        $this->assertNotFalse($this->_block, 'Could not load the block for testing');
     }
 
-    /**
-     * Set fixture theme for admin backend area
-     */
-    protected function _setFixtureTheme()
-    {
-        \Magento\TestFramework\Helper\Bootstrap::getInstance()->reinitialize(array(
-            \Magento\Core\Model\App::PARAM_RUN_CODE => 'admin',
-            \Magento\Core\Model\App::PARAM_RUN_TYPE => 'store',
-            \Magento\App\Dir::PARAM_APP_DIRS => array(
-                \Magento\App\Dir::THEMES => __DIR__ . '/../../_files/design'
-            ),
-        ));
-    }
-
-    /**
-     * @covers \Magento\Backend\Block\Widget\Grid\Massaction::getItems
-     * @covers \Magento\Backend\Block\Widget\Grid\Massaction::getCount
-     * @covers \Magento\Backend\Block\Widget\Grid\Massaction::getItemsJson
-     * @covers \Magento\Backend\Block\Widget\Grid\Massaction::isAvailable
-     */
     public function testMassactionDefaultValues()
     {
+        $this->loadLayout();
+
         /** @var $blockEmpty \Magento\Backend\Block\Widget\Grid\Massaction */
-        $blockEmpty = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\View\LayoutInterface')
-            ->createBlock('Magento\Backend\Block\Widget\Grid\Massaction');
+        $blockEmpty = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
+            ->get(\Magento\Framework\View\LayoutInterface::class)
+            ->createBlock(\Magento\Backend\Block\Widget\Grid\Massaction::class);
         $this->assertEmpty($blockEmpty->getItems());
         $this->assertEquals(0, $blockEmpty->getCount());
         $this->assertSame('[]', $blockEmpty->getItemsJson());
@@ -93,57 +87,55 @@ class MassactionTest extends \PHPUnit_Framework_TestCase
         $this->assertFalse($blockEmpty->isAvailable());
     }
 
-    public function testGetJavaScript()
+    /**
+     * @param string $mageMode
+     * @param int $expectedCount
+     * @dataProvider getCountDataProvider
+     */
+    public function testGetCount($mageMode, $expectedCount)
     {
-        $javascript = $this->_block->getJavaScript();
-
-        $expectedItemFirst = '#"option_id1":{"label":"Option One",'
-            . '"url":"http:\\\/\\\/localhost\\\/index\.php\\\/(?:key\\\/([\w\d]+)\\\/)?",'
-            . '"complete":"Test","id":"option_id1"}#';
-        $this->assertRegExp($expectedItemFirst, $javascript);
-
-        $expectedItemSecond = '#"option_id2":{"label":"Option Two",'
-            . '"url":"http:\\\/\\\/localhost\\\/index\.php\\\/(?:key\\\/([\w\d]+)\\\/)?",'
-            . '"confirm":"Are you sure\?","id":"option_id2"}#';
-        $this->assertRegExp($expectedItemSecond, $javascript);
-    }
-
-    public function testGetJavaScriptWithAddedItem()
-    {
-        $input = array(
-            'id' => 'option_id3',
-            'label' => 'Option Three',
-            'url' => '*/*/option3',
-            'block_name' => 'admin.test.grid.massaction.option3'
-        );
-        $expected = '#"option_id3":{"id":"option_id3","label":"Option Three",'
-            . '"url":"http:\\\/\\\/localhost\\\/index\.php\\\/(?:key\\\/([\w\d]+)\\\/)?",'
-            . '"block_name":"admin.test.grid.massaction.option3"}#';
-
-        $this->_block->addItem($input['id'], $input);
-        $this->assertRegExp($expected, $this->_block->getJavaScript());
-    }
-
-    public function testGetCount()
-    {
-        $this->assertEquals(2, $this->_block->getCount());
+        $this->loadLayout($mageMode);
+        $this->assertEquals($expectedCount, $this->_block->getCount());
     }
 
     /**
-     * @param $itemId
-     * @param $expectedItem
+     * @return array
+     */
+    public function getCountDataProvider()
+    {
+        return [
+            [
+                'mageMode' => State::MODE_DEVELOPER,
+                'expectedCount' => 3,
+            ],
+            [
+                'mageMode' => State::MODE_DEFAULT,
+                'expectedCount' => 3,
+            ],
+            [
+                'mageMode' => State::MODE_PRODUCTION,
+                'expectedCount' => 2,
+            ],
+        ];
+    }
+
+    /**
+     * @param string $itemId
+     * @param array $expectedItem
      * @dataProvider getItemsDataProvider
      */
     public function testGetItems($itemId, $expectedItem)
     {
+        $this->loadLayout();
+
         $items = $this->_block->getItems();
-        $this->assertCount(2, $items);
+        $this->assertCount(3, $items);
         $this->assertArrayHasKey($itemId, $items);
 
         $actualItem = $items[$itemId];
         $this->assertEquals($expectedItem['id'], $actualItem->getId());
         $this->assertEquals($expectedItem['label'], $actualItem->getLabel());
-        $this->assertRegExp($expectedItem['url'], $actualItem->getUrl());
+        $this->assertMatchesRegularExpression($expectedItem['url'], $actualItem->getUrl());
         $this->assertEquals($expectedItem['selected'], $actualItem->getSelected());
         $this->assertEquals($expectedItem['blockname'], $actualItem->getBlockName());
     }
@@ -153,42 +145,37 @@ class MassactionTest extends \PHPUnit_Framework_TestCase
      */
     public function getItemsDataProvider()
     {
-        return array(
-            array(
+        return [
+            [
                 'option_id1',
-                array(
+                [
                     'id' => 'option_id1',
                     'label' => 'Option One',
                     'url' => '#http:\/\/localhost\/index\.php\/(?:key\/([\w\d]+)\/)?#',
                     'selected' => false,
                     'blockname' => ''
-                )
-            ),
-            array(
+                ],
+            ],
+            [
                 'option_id2',
-                array(
+                [
                     'id' => 'option_id2',
                     'label' => 'Option Two',
                     'url' => '#http:\/\/localhost\/index\.php\/(?:key\/([\w\d]+)\/)?#',
                     'selected' => false,
                     'blockname' => ''
-                )
-            )
-        );
-    }
-
-    public function testGridContainsMassactionColumn()
-    {
-        $this->_layout->getBlock('admin.test.grid')->toHtml();
-
-        $gridMassactionColumn = $this->_layout->getBlock('admin.test.grid')
-            ->getColumnSet()
-            ->getChildBlock('massaction');
-        $this->assertNotNull($gridMassactionColumn, 'Massaction column does not exist in the grid column set');
-        $this->assertInstanceOf(
-            'Magento\Backend\Block\Widget\Grid\Column',
-            $gridMassactionColumn,
-            'Massaction column is not an instance of \Magento\Backend\Block\Widget\Column'
-        );
+                ]
+            ],
+            [
+                'option_id3',
+                [
+                    'id' => 'option_id3',
+                    'label' => 'Option Three',
+                    'url' => '#http:\/\/localhost\/index\.php\/(?:key\/([\w\d]+)\/)?#',
+                    'selected' => false,
+                    'blockname' => ''
+                ]
+            ]
+        ];
     }
 }

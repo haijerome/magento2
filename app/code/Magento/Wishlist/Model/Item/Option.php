@@ -1,56 +1,83 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Wishlist\Model\Item;
+
+use Magento\Catalog\Model\Product;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Wishlist\Model\Item;
+use Magento\Catalog\Api\ProductRepositoryInterface;
 
 /**
  * Item option model
  *
- * @category    Magento
- * @package     Magento_Wishlist
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @method int getProductId()
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Wishlist\Model\Item;
-
-class Option extends \Magento\Core\Model\AbstractModel
-    implements \Magento\Catalog\Model\Product\Configuration\Item\Option\OptionInterface
+class Option extends \Magento\Framework\Model\AbstractModel implements
+    \Magento\Catalog\Model\Product\Configuration\Item\Option\OptionInterface
 {
+    /**
+     * @var Item
+     */
     protected $_item;
+
+    /**
+     * @var Product|null
+     */
     protected $_product;
 
     /**
+     * @var ProductRepositoryInterface
+     */
+    protected $productRepository;
+
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    private $logger;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param ProductRepositoryInterface $productRepository
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
+     * @param array $data
+     * @param \Psr\Log\LoggerInterface|null $logger
+     */
+    public function __construct(
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        ProductRepositoryInterface $productRepository,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = [],
+        \Psr\Log\LoggerInterface $logger = null
+    ) {
+        parent::__construct($context, $registry, $resource, $resourceCollection, $data);
+        $this->productRepository = $productRepository;
+        $this->logger = $logger ?? ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
+    }
+
+    /**
      * Initialize resource model
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\Wishlist\Model\Resource\Item\Option');
+        $this->_init(\Magento\Wishlist\Model\ResourceModel\Item\Option::class);
     }
 
     /**
      * Checks that item option model has data changes
      *
-     * @return boolean
+     * @return bool
      */
     protected function _hasModelChanged()
     {
@@ -64,8 +91,8 @@ class Option extends \Magento\Core\Model\AbstractModel
     /**
      * Set quote item
      *
-     * @param   \Magento\Wishlist\Model\Item $item
-     * @return  \Magento\Wishlist\Model\Item\Option
+     * @param   Item $item
+     * @return  $this
      */
     public function setItem($item)
     {
@@ -77,7 +104,7 @@ class Option extends \Magento\Core\Model\AbstractModel
     /**
      * Get option item
      *
-     * @return \Magento\Wishlist\Model\Item
+     * @return Item
      */
     public function getItem()
     {
@@ -87,8 +114,8 @@ class Option extends \Magento\Core\Model\AbstractModel
     /**
      * Set option product
      *
-     * @param   \Magento\Catalog\Model\Product $product
-     * @return  \Magento\Wishlist\Model\Item\Option
+     * @param   Product $product
+     * @return  $this
      */
     public function setProduct($product)
     {
@@ -100,10 +127,18 @@ class Option extends \Magento\Core\Model\AbstractModel
     /**
      * Get option product
      *
-     * @return \Magento\Catalog\Model\Product
+     * @return Product
      */
     public function getProduct()
     {
+        //In some cases product_id is present instead product instance
+        if (null === $this->_product && $this->getProductId()) {
+            try {
+                $this->_product = $this->productRepository->getById($this->getProductId());
+            } catch (NoSuchEntityException $exception) {
+                $this->logger->error($exception);
+            }
+        }
         return $this->_product;
     }
 
@@ -120,25 +155,25 @@ class Option extends \Magento\Core\Model\AbstractModel
     /**
      * Initialize item identifier before save data
      *
-     * @return \Magento\Wishlist\Model\Item\Option
+     * @return $this
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
         if ($this->getItem()) {
             $this->setWishlistItemId($this->getItem()->getId());
         }
-        return parent::_beforeSave();
+        return parent::beforeSave();
     }
 
     /**
      * Clone option object
      *
-     * @return \Magento\Wishlist\Model\Item\Option
+     * @return $this
      */
     public function __clone()
     {
         $this->setId(null);
-        $this->_item    = null;
+        $this->_item = null;
         return $this;
     }
 }

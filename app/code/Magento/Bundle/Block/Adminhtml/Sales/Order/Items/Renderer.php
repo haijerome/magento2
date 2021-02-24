@@ -1,75 +1,92 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Bundle
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Bundle\Block\Adminhtml\Sales\Order\Items;
+
+use Magento\Catalog\Model\Product\Type\AbstractType;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\App\ObjectManager;
+use Magento\Catalog\Helper\Data as CatalogHelper;
 
 /**
  * Adminhtml sales order item renderer
+ *
+ * @api
+ * @since 100.0.2
  */
 class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRenderer
 {
+    /**
+     * Serializer
+     *
+     * @var Json
+     */
+    private $serializer;
+
+    /**
+     * @param \Magento\Backend\Block\Template\Context $context
+     * @param \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry
+     * @param \Magento\CatalogInventory\Api\StockConfigurationInterface $stockConfiguration
+     * @param \Magento\Framework\Registry $registry
+     * @param array $data
+     * @param \Magento\Framework\Serialize\Serializer\Json $serializer
+     * @param CatalogHelper|null $catalogHelper
+     */
+    public function __construct(
+        \Magento\Backend\Block\Template\Context $context,
+        \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
+        \Magento\CatalogInventory\Api\StockConfigurationInterface $stockConfiguration,
+        \Magento\Framework\Registry $registry,
+        array $data = [],
+        Json $serializer = null,
+        ?CatalogHelper $catalogHelper = null
+    ) {
+        $this->serializer = $serializer ?: ObjectManager::getInstance()->get(Json::class);
+        $data['catalogHelper'] = $catalogHelper ?? ObjectManager::getInstance()->get(CatalogHelper::class);
+        parent::__construct($context, $stockRegistry, $stockConfiguration, $registry, $data);
+    }
+
     /**
      * Truncate string
      *
      * @param string $value
      * @param int $length
      * @param string $etc
-     * @param string &$remainder
+     * @param string $remainder
      * @param bool $breakWords
      * @return string
      */
     public function truncateString($value, $length = 80, $etc = '...', &$remainder = '', $breakWords = true)
     {
-        return $this->filterManager->truncate($value, array(
-            'length' => $length,
-            'etc' => $etc,
-            'remainder' => $remainder,
-            'breakWords' => $breakWords
-        ));
+        return $this->filterManager->truncate(
+            $value,
+            ['length' => $length, 'etc' => $etc, 'remainder' => $remainder, 'breakWords' => $breakWords]
+        );
     }
 
     /**
-     * Getting all available childs for Invoice, Shipmen or Creditmemo item
+     * Getting all available children for Invoice, Shipment or CreditMemo item
      *
-     * @param \Magento\Object $item
-     * @return array
+     * @param \Magento\Framework\DataObject $item
+     * @return array|null
      */
-    public function getChilds($item)
+    public function getChildren($item)
     {
-        $itemsArray = array();
+        $itemsArray = [];
 
+        $items = null;
         if ($item instanceof \Magento\Sales\Model\Order\Invoice\Item) {
             $items = $item->getInvoice()->getAllItems();
-        } else if ($item instanceof \Magento\Sales\Model\Order\Shipment\Item) {
+        } elseif ($item instanceof \Magento\Sales\Model\Order\Shipment\Item) {
             $items = $item->getShipment()->getAllItems();
-        } else if ($item instanceof \Magento\Sales\Model\Order\Creditmemo\Item) {
+        } elseif ($item instanceof \Magento\Sales\Model\Order\Creditmemo\Item) {
             $items = $item->getCreditmemo()->getAllItems();
         }
 
         if ($items) {
+            $itemsArray[$item->getOrderItem()->getId()][$item->getOrderItemId()] = $item;
             foreach ($items as $value) {
                 $parentItem = $value->getOrderItem()->getParentItem();
                 if ($parentItem) {
@@ -82,14 +99,16 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
 
         if (isset($itemsArray[$item->getOrderItem()->getId()])) {
             return $itemsArray[$item->getOrderItem()->getId()];
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
-     * @param null $item
+     * Check if item can be shipped separately
+     *
+     * @param mixed $item
      * @return bool
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function isShipmentSeparately($item = null)
     {
@@ -101,33 +120,21 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
             if ($parentItem) {
                 $options = $parentItem->getProductOptions();
                 if ($options) {
-                    if (isset($options['shipment_type'])
-                        && $options['shipment_type'] == \Magento\Catalog\Model\Product\Type\AbstractType::SHIPMENT_SEPARATELY
-                    ) {
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    return (isset($options['shipment_type'])
+                        && $options['shipment_type'] == AbstractType::SHIPMENT_SEPARATELY);
                 }
             } else {
                 $options = $item->getProductOptions();
                 if ($options) {
-                    if (isset($options['shipment_type'])
-                        && $options['shipment_type'] == \Magento\Catalog\Model\Product\Type\AbstractType::SHIPMENT_SEPARATELY
-                    ) {
-                        return false;
-                    } else {
-                        return true;
-                    }
+                    return !(isset($options['shipment_type'])
+                        && $options['shipment_type'] == AbstractType::SHIPMENT_SEPARATELY);
                 }
             }
         }
 
         $options = $this->getOrderItem()->getProductOptions();
         if ($options) {
-            if (isset($options['shipment_type'])
-                && $options['shipment_type'] == \Magento\Catalog\Model\Product\Type\AbstractType::SHIPMENT_SEPARATELY
-            ) {
+            if (isset($options['shipment_type']) && $options['shipment_type'] == AbstractType::SHIPMENT_SEPARATELY) {
                 return true;
             }
         }
@@ -135,8 +142,11 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
     }
 
     /**
-     * @param null $item
+     * Check if child items calculated
+     *
+     * @param mixed $item
      * @return bool
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function isChildCalculated($item = null)
     {
@@ -148,24 +158,14 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
             if ($parentItem) {
                 $options = $parentItem->getProductOptions();
                 if ($options) {
-                    if (isset($options['product_calculations'])
-                        && $options['product_calculations'] == \Magento\Catalog\Model\Product\Type\AbstractType::CALCULATE_CHILD
-                    ) {
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    return (isset($options['product_calculations'])
+                        && $options['product_calculations'] == AbstractType::CALCULATE_CHILD);
                 }
             } else {
                 $options = $item->getProductOptions();
                 if ($options) {
-                    if (isset($options['product_calculations'])
-                        && $options['product_calculations'] == \Magento\Catalog\Model\Product\Type\AbstractType::CALCULATE_CHILD
-                    ) {
-                        return false;
-                    } else {
-                        return true;
-                    }
+                    return !(isset($options['product_calculations'])
+                        && $options['product_calculations'] == AbstractType::CALCULATE_CHILD);
                 }
             }
         }
@@ -173,7 +173,7 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
         $options = $this->getOrderItem()->getProductOptions();
         if ($options) {
             if (isset($options['product_calculations'])
-                && $options['product_calculations'] == \Magento\Catalog\Model\Product\Type\AbstractType::CALCULATE_CHILD
+                && $options['product_calculations'] == AbstractType::CALCULATE_CHILD
             ) {
                 return true;
             }
@@ -181,6 +181,12 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
         return false;
     }
 
+    /**
+     * Retrieve selection attributes values
+     *
+     * @param mixed $item
+     * @return mixed|null
+     */
     public function getSelectionAttributes($item)
     {
         if ($item instanceof \Magento\Sales\Model\Order\Item) {
@@ -189,14 +195,19 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
             $options = $item->getOrderItem()->getProductOptions();
         }
         if (isset($options['bundle_selection_attributes'])) {
-            return unserialize($options['bundle_selection_attributes']);
+            return $this->serializer->unserialize($options['bundle_selection_attributes']);
         }
         return null;
     }
 
-    public function getOrderOptions($item = null)
+    /**
+     * Retrieve order item options array
+     *
+     * @return array
+     */
+    public function getOrderOptions()
     {
-        $result = array();
+        $result = [];
         $options = $this->getOrderItem()->getProductOptions();
         if ($options) {
             if (isset($options['options'])) {
@@ -212,22 +223,32 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
         return $result;
     }
 
+    /**
+     * Retrieve order item
+     *
+     * @return mixed
+     */
     public function getOrderItem()
     {
         if ($this->getItem() instanceof \Magento\Sales\Model\Order\Item) {
             return $this->getItem();
-        } else {
-            return $this->getItem()->getOrderItem();
         }
+        return $this->getItem()->getOrderItem();
     }
 
+    /**
+     * Get html info for item
+     *
+     * @param mixed $item
+     * @return string
+     */
     public function getValueHtml($item)
     {
         $result = $this->escapeHtml($item->getName());
         if (!$this->isShipmentSeparately($item)) {
             $attributes = $this->getSelectionAttributes($item);
             if ($attributes) {
-                $result =  sprintf('%d', $attributes['qty']) . ' x ' . $result;
+                $result = sprintf('%d', $attributes['qty']) . ' x ' . $result;
             }
         }
         if (!$this->isChildCalculated($item)) {
@@ -240,13 +261,15 @@ class Renderer extends \Magento\Sales\Block\Adminhtml\Items\Renderer\DefaultRend
     }
 
     /**
+     * Check if we can show price info for this item
+     *
      * @param object $item
      * @return bool
      */
     public function canShowPriceInfo($item)
     {
-        if (($item->getOrderItem()->getParentItem() && $this->isChildCalculated())
-            || (!$item->getOrderItem()->getParentItem() && !$this->isChildCalculated())
+        if ($item->getOrderItem()->getParentItem() && $this->isChildCalculated()
+            || !$item->getOrderItem()->getParentItem() && !$this->isChildCalculated()
         ) {
             return true;
         }

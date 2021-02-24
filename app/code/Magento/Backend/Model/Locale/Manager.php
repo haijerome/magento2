@@ -1,38 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Model\Locale;
 
 /**
  * Locale manager model
  *
- * @category   Magento
- * @package    Magento_Backend
  * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Model\Locale;
-
 class Manager
 {
     /**
@@ -46,44 +25,62 @@ class Manager
     protected $_authSession;
 
     /**
-     * @var \Magento\Core\Model\Translate
+     * @var \Magento\Framework\TranslateInterface
      */
     protected $_translator;
+
+    /**
+     * @var \Magento\Backend\App\ConfigInterface
+     * @since 100.1.0
+     */
+    protected $_backendConfig;
 
     /**
      * Constructor
      *
      * @param \Magento\Backend\Model\Session $session
      * @param \Magento\Backend\Model\Auth\Session $authSession
-     * @param \Magento\Core\Model\Translate $translator
+     * @param \Magento\Framework\TranslateInterface $translator
+     * @param \Magento\Backend\App\ConfigInterface $backendConfig
      */
     public function __construct(
         \Magento\Backend\Model\Session $session,
         \Magento\Backend\Model\Auth\Session $authSession,
-        \Magento\Core\Model\Translate $translator
+        \Magento\Framework\TranslateInterface $translator,
+        \Magento\Backend\App\ConfigInterface $backendConfig
     ) {
         $this->_session = $session;
         $this->_authSession = $authSession;
         $this->_translator = $translator;
+        $this->_backendConfig = $backendConfig;
     }
 
     /**
      * Switch backend locale according to locale code
      *
      * @param string $localeCode
-     * @return \Magento\Backend\Model\Locale\Manager
+     * @return $this
      */
     public function switchBackendInterfaceLocale($localeCode)
     {
         $this->_session->setSessionLocale(null);
 
-        $this->_authSession->getUser()
-            ->setInterfaceLocale($localeCode);
+        $this->_authSession->getUser()->setInterfaceLocale($localeCode);
 
-        $this->_translator->setLocale($localeCode)
-            ->init(null, true);
+        $this->_translator->setLocale($localeCode)->loadData(null, true);
 
         return $this;
+    }
+
+    /**
+     * Get general interface locale
+     *
+     * @return string
+     * @since 100.1.0
+     */
+    public function getGeneralLocale()
+    {
+        return $this->_backendConfig->getValue('general/locale/code');
     }
 
     /**
@@ -93,11 +90,13 @@ class Manager
      */
     public function getUserInterfaceLocale()
     {
-        $interfaceLocale = \Magento\Core\Model\LocaleInterface::DEFAULT_LOCALE;
-
         $userData = $this->_authSession->getUser();
+        $interfaceLocale = \Magento\Framework\Locale\Resolver::DEFAULT_LOCALE;
+
         if ($userData && $userData->getInterfaceLocale()) {
             $interfaceLocale = $userData->getInterfaceLocale();
+        } elseif ($this->getGeneralLocale()) {
+            $interfaceLocale = $this->getGeneralLocale();
         }
 
         return $interfaceLocale;

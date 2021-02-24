@@ -1,40 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
-
 namespace Magento\Sales\Model\Order\Invoice\Total;
 
-class Discount extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
+use Magento\Sales\Model\Order\Invoice;
+
+/**
+ * Discount invoice
+ */
+class Discount extends AbstractTotal
 {
-    public function collect(\Magento\Sales\Model\Order\Invoice $invoice)
+    /**
+     * Collect invoice
+     *
+     * @param Invoice $invoice
+     * @return $this
+     */
+    public function collect(Invoice $invoice)
     {
         $invoice->setDiscountAmount(0);
         $invoice->setBaseDiscountAmount(0);
 
-        $totalDiscountAmount     = 0;
+        $totalDiscountAmount = 0;
         $baseTotalDiscountAmount = 0;
 
         /**
@@ -42,28 +31,22 @@ class Discount extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
          * So basically if we have invoice with positive discount and it
          * was not canceled we don't add shipping discount to this one.
          */
-        $addShippingDiscount = true;
-        foreach ($invoice->getOrder()->getInvoiceCollection() as $previousInvoice) {
-            if ($previousInvoice->getDiscountAmount()) {
-                $addShippingDiscount = false;
-            }
-        }
-
-        if ($addShippingDiscount) {
-            $totalDiscountAmount     = $totalDiscountAmount + $invoice->getOrder()->getShippingDiscountAmount();
-            $baseTotalDiscountAmount = $baseTotalDiscountAmount + $invoice->getOrder()->getBaseShippingDiscountAmount();
+        if ($this->isShippingDiscount($invoice)) {
+            $totalDiscountAmount = $totalDiscountAmount + $invoice->getOrder()->getShippingDiscountAmount();
+            $baseTotalDiscountAmount = $baseTotalDiscountAmount +
+                $invoice->getOrder()->getBaseShippingDiscountAmount();
         }
 
         /** @var $item \Magento\Sales\Model\Order\Invoice\Item */
         foreach ($invoice->getAllItems() as $item) {
             $orderItem = $item->getOrderItem();
             if ($orderItem->isDummy()) {
-                 continue;
+                continue;
             }
 
-            $orderItemDiscount      = (float) $orderItem->getDiscountAmount();
-            $baseOrderItemDiscount  = (float) $orderItem->getBaseDiscountAmount();
-            $orderItemQty       = $orderItem->getQtyOrdered();
+            $orderItemDiscount = (double)$orderItem->getDiscountAmount();
+            $baseOrderItemDiscount = (double)$orderItem->getBaseDiscountAmount();
+            $orderItemQty = $orderItem->getQtyOrdered();
 
             if ($orderItemDiscount && $orderItemQty) {
                 /**
@@ -88,8 +71,29 @@ class Discount extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
         $invoice->setDiscountAmount(-$totalDiscountAmount);
         $invoice->setBaseDiscountAmount(-$baseTotalDiscountAmount);
 
-        $invoice->setGrandTotal($invoice->getGrandTotal() - $totalDiscountAmount);
-        $invoice->setBaseGrandTotal($invoice->getBaseGrandTotal() - $baseTotalDiscountAmount);
+        $grandTotal = $invoice->getGrandTotal() - $totalDiscountAmount < 0.0001
+            ? 0 : $invoice->getGrandTotal() - $totalDiscountAmount;
+        $baseGrandTotal = $invoice->getBaseGrandTotal() - $baseTotalDiscountAmount < 0.0001
+            ? 0 : $invoice->getBaseGrandTotal() - $baseTotalDiscountAmount;
+        $invoice->setGrandTotal($grandTotal);
+        $invoice->setBaseGrandTotal($baseGrandTotal);
         return $this;
+    }
+
+    /**
+     * Checking if shipping discount was added in previous invoices.
+     *
+     * @param Invoice $invoice
+     * @return bool
+     */
+    private function isShippingDiscount(Invoice $invoice): bool
+    {
+        $addShippingDiscount = true;
+        foreach ($invoice->getOrder()->getInvoiceCollection() as $previousInvoice) {
+            if ($previousInvoice->getDiscountAmount()) {
+                $addShippingDiscount = false;
+            }
+        }
+        return $addShippingDiscount;
     }
 }

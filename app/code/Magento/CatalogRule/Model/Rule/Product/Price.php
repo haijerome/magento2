@@ -1,35 +1,12 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_CatalogRule
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Catalog Rule Product Aggregated Price per date Model
  *
- * @method \Magento\CatalogRule\Model\Resource\Rule\Product\Price _getResource()
- * @method \Magento\CatalogRule\Model\Resource\Rule\Product\Price getResource()
  * @method string getRuleDate()
  * @method \Magento\CatalogRule\Model\Rule\Product\Price setRuleDate(string $value)
  * @method int getCustomerGroupId()
@@ -45,41 +22,54 @@
  * @method string getEarliestEndDate()
  * @method \Magento\CatalogRule\Model\Rule\Product\Price setEarliestEndDate(string $value)
  *
- * @category    Magento
- * @package     Magento_CatalogRule
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\CatalogRule\Model\Rule\Product;
 
-class Price extends \Magento\Core\Model\AbstractModel
+use Magento\Framework\DB\Select;
+
+class Price extends \Magento\Framework\Model\AbstractModel
 {
     /**
      * Initialize resource model
      *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_init('Magento\CatalogRule\Model\Resource\Rule\Product\Price');
+        $this->_init(\Magento\CatalogRule\Model\ResourceModel\Rule\Product\Price::class);
     }
 
     /**
      * Apply price rule price to price index table
      *
-     * @param \Magento\DB\Select $select
+     * @param Select $select
      * @param array|string $indexTable
      * @param string $entityId
      * @param string $customerGroupId
      * @param string $websiteId
      * @param array $updateFields       the array fields for compare with rule price and update
      * @param string $websiteDate
-     * @return \Magento\CatalogRule\Model\Rule\Product\Price
+     * @return $this
      */
-    public function applyPriceRuleToIndexTable(\Magento\DB\Select $select, $indexTable, $entityId, $customerGroupId,
-        $websiteId, $updateFields, $websiteDate)
-    {
-
-        $this->_getResource()->applyPriceRuleToIndexTable($select, $indexTable, $entityId, $customerGroupId, $websiteId,
-            $updateFields, $websiteDate);
+    public function applyPriceRuleToIndexTable(
+        Select $select,
+        $indexTable,
+        $entityId,
+        $customerGroupId,
+        $websiteId,
+        $updateFields,
+        $websiteDate
+    ) {
+        $this->_getResource()->applyPriceRuleToIndexTable(
+            $select,
+            $indexTable,
+            $entityId,
+            $customerGroupId,
+            $websiteId,
+            $updateFields,
+            $websiteDate
+        );
 
         return $this;
     }

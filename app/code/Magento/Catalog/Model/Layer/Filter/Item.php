@@ -1,44 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Filter item model
  *
- * @category    Magento
- * @package     Magento_Catalog
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Model\Layer\Filter;
 
-class Item extends \Magento\Object
+class Item extends \Magento\Framework\DataObject
 {
     /**
      * Url
      *
-     * @var \Magento\UrlInterface
+     * @var \Magento\Framework\UrlInterface
      */
     protected $_url;
 
@@ -52,14 +30,14 @@ class Item extends \Magento\Object
     /**
      * Construct
      *
-     * @param \Magento\UrlInterface $url
+     * @param \Magento\Framework\UrlInterface $url
      * @param \Magento\Theme\Block\Html\Pager $htmlPagerBlock
      * @param array $data
      */
     public function __construct(
-        \Magento\UrlInterface $url,
+        \Magento\Framework\UrlInterface $url,
         \Magento\Theme\Block\Html\Pager $htmlPagerBlock,
-        array $data = array()
+        array $data = []
     ) {
         $this->_url = $url;
         $this->_htmlPagerBlock = $htmlPagerBlock;
@@ -70,14 +48,14 @@ class Item extends \Magento\Object
      * Get filter instance
      *
      * @return \Magento\Catalog\Model\Layer\Filter\AbstractFilter
-     * @throws \Magento\Core\Exception
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getFilter()
     {
         $filter = $this->getData('filter');
         if (!is_object($filter)) {
-            throw new \Magento\Core\Exception(
-                __('The filter must be an object. Please set correct filter.')
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('The filter must be an object. Please set the correct filter.')
             );
         }
         return $filter;
@@ -90,11 +68,12 @@ class Item extends \Magento\Object
      */
     public function getUrl()
     {
-        $query = array(
-            $this->getFilter()->getRequestVar()=>$this->getValue(),
-            $this->_htmlPagerBlock->getPageVarName() => null // exclude current page from urls
-        );
-        return $this->_url->getUrl('*/*/*', array('_current'=>true, '_use_rewrite'=>true, '_query'=>$query));
+        $query = [
+            $this->getFilter()->getRequestVar() => $this->getValue(),
+            // exclude current page from urls
+            $this->_htmlPagerBlock->getPageVarName() => null,
+        ];
+        return $this->_url->getUrl('*/*/*', ['_current' => true, '_use_rewrite' => true, '_query' => $query]);
     }
 
     /**
@@ -104,11 +83,11 @@ class Item extends \Magento\Object
      */
     public function getRemoveUrl()
     {
-        $query = array($this->getFilter()->getRequestVar()=>$this->getFilter()->getResetValue());
-        $params['_current']     = true;
+        $query = [$this->getFilter()->getRequestVar() => $this->getFilter()->getResetValue()];
+        $params['_current'] = true;
         $params['_use_rewrite'] = true;
-        $params['_query']       = $query;
-        $params['_escape']      = true;
+        $params['_query'] = $query;
+        $params['_escape'] = true;
         return $this->_url->getUrl('*/*/*', $params);
     }
 
@@ -124,12 +103,12 @@ class Item extends \Magento\Object
             return false;
         }
 
-        $urlParams = array(
+        $urlParams = [
             '_current' => true,
             '_use_rewrite' => true,
-            '_query' => array($this->getFilter()->getRequestVar() => null),
+            '_query' => [$this->getFilter()->getRequestVar() => null],
             '_escape' => true,
-        );
+        ];
         return $this->_url->getUrl('*/*/*', $urlParams);
     }
 

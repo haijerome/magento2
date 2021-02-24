@@ -1,39 +1,25 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Catalog textarea attribute WYSIWYG button
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Adminhtml\Helper\Form;
 
-class Wysiwyg extends \Magento\Data\Form\Element\Textarea
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
+
+/**
+ * Wysiwyg helper.
+ *
+ * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+ */
+class Wysiwyg extends \Magento\Framework\Data\Form\Element\Textarea
 {
     /**
      * Adminhtml data
@@ -45,7 +31,7 @@ class Wysiwyg extends \Magento\Data\Form\Element\Textarea
     /**
      * Catalog data
      *
-     * @var \Magento\Module\Manager
+     * @var \Magento\Framework\Module\Manager
      */
     protected $_moduleManager = null;
 
@@ -55,35 +41,43 @@ class Wysiwyg extends \Magento\Data\Form\Element\Textarea
     protected $_wysiwygConfig;
 
     /**
-     * @var \Magento\View\LayoutInterface
+     * @var \Magento\Framework\View\LayoutInterface
      */
     protected $_layout;
 
     /**
-     * @param \Magento\Data\Form\Element\Factory $factoryElement
-     * @param \Magento\Data\Form\Element\CollectionFactory $factoryCollection
-     * @param \Magento\Escaper $escaper
+     * @var SecureHtmlRenderer
+     */
+    protected $secureRenderer;
+
+    /**
+     * @param \Magento\Framework\Data\Form\Element\Factory $factoryElement
+     * @param \Magento\Framework\Data\Form\Element\CollectionFactory $factoryCollection
+     * @param \Magento\Framework\Escaper $escaper
      * @param \Magento\Cms\Model\Wysiwyg\Config $wysiwygConfig
-     * @param \Magento\View\LayoutInterface $layout
-     * @param \Magento\Module\Manager $moduleManager
+     * @param \Magento\Framework\View\LayoutInterface $layout
+     * @param \Magento\Framework\Module\Manager $moduleManager
      * @param \Magento\Backend\Helper\Data $backendData
      * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
      */
     public function __construct(
-        \Magento\Data\Form\Element\Factory $factoryElement,
-        \Magento\Data\Form\Element\CollectionFactory $factoryCollection,
-        \Magento\Escaper $escaper,
+        \Magento\Framework\Data\Form\Element\Factory $factoryElement,
+        \Magento\Framework\Data\Form\Element\CollectionFactory $factoryCollection,
+        \Magento\Framework\Escaper $escaper,
         \Magento\Cms\Model\Wysiwyg\Config $wysiwygConfig,
-        \Magento\View\LayoutInterface $layout,
-        \Magento\Module\Manager $moduleManager,
+        \Magento\Framework\View\LayoutInterface $layout,
+        \Magento\Framework\Module\Manager $moduleManager,
         \Magento\Backend\Helper\Data $backendData,
-        array $data = array()
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null
     ) {
         $this->_wysiwygConfig = $wysiwygConfig;
         $this->_layout = $layout;
         $this->_moduleManager = $moduleManager;
         $this->_backendData = $backendData;
         parent::__construct($factoryElement, $factoryCollection, $escaper, $data);
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
     }
 
     /**
@@ -93,54 +87,67 @@ class Wysiwyg extends \Magento\Data\Form\Element\Textarea
      */
     public function getAfterElementHtml()
     {
+        $config = $this->_wysiwygConfig->getConfig();
+        $config = json_encode($config->getData());
+
         $html = parent::getAfterElementHtml();
         if ($this->getIsWysiwygEnabled()) {
-            $disabled = ($this->getDisabled() || $this->getReadonly());
-            $html .= $this->_layout->createBlock('Magento\Adminhtml\Block\Widget\Button', '', array('data' => array(
-                    'label'   => __('WYSIWYG Editor'),
-                    'type'    => 'button',
-                    'disabled' => $disabled,
-                    'class' => ($disabled) ? 'disabled action-wysiwyg' : 'action-wysiwyg',
-                    'onclick' => 'catalogWysiwygEditor.open(\''
-                        . $this->_backendData->getUrl('catalog/product/wysiwyg')
-                        . '\', \'' . $this->getHtmlId().'\')'
-                )))->toHtml();
-            $html .= <<<HTML
-<script type="text/javascript">
+            $disabled = $this->getDisabled() || $this->getReadonly();
+            $html .= $this->_layout->createBlock(
+                \Magento\Backend\Block\Widget\Button::class,
+                '',
+                [
+                    'data' => [
+                        'label' => __('WYSIWYG Editor'),
+                        'type' => 'button',
+                        'disabled' => $disabled,
+                        'class' => 'action-wysiwyg',
+                        'onclick' => 'catalogWysiwygEditor.open(\'' . $this->_backendData->getUrl(
+                            'catalog/product/wysiwyg'
+                        ) . '\', \'' . $this->getHtmlId() . '\')',
+                    ]
+                ]
+            )->toHtml();
+            $scriptString = <<<HTML
+require([
+    'jquery',
+    'mage/adminhtml/wysiwyg/tiny_mce/setup'
+], function(jQuery){
+
+var config = $config,
+    editor;
+
+editor = new wysiwygSetup(
+    '{$this->getHtmlId()}',
+    config
+);
+
+editor.turnOn();
+
 jQuery('#{$this->getHtmlId()}')
     .addClass('wysiwyg-editor')
     .data(
         'wysiwygEditor',
-        new tinyMceWysiwygSetup(
-            '{$this->getHtmlId()}',
-             {
-                settings: {
-                    theme_advanced_buttons1 : 'bold,italic,|,justifyleft,justifycenter,justifyright,|,' +
-                        'fontselect,fontsizeselect,|,forecolor,backcolor,|,link,unlink,image,|,bullist,numlist,|,code',
-                    theme_advanced_buttons2: null,
-                    theme_advanced_buttons3: null,
-                    theme_advanced_buttons4: null,
-                    theme_advanced_statusbar_location: null
-                }
-            }
-        ).turnOn()
+        editor
     );
-</script>
+});
 HTML;
+            $html .= /* @noEscape */ $this->secureRenderer->renderTag('script', [], $scriptString, false);
         }
+
         return $html;
     }
 
     /**
      * Check whether wysiwyg enabled or not
      *
-     * @return boolean
+     * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsWysiwygEnabled()
     {
         if ($this->_moduleManager->isEnabled('Magento_Cms')) {
-            return (bool)($this->_wysiwygConfig->isEnabled()
-                && $this->getEntityAttribute()->getIsWysiwygEnabled());
+            return (bool)($this->_wysiwygConfig->isEnabled() && $this->getEntityAttribute()->getIsWysiwygEnabled());
         }
 
         return false;

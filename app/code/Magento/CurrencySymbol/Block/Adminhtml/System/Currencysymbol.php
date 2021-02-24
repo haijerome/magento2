@@ -1,38 +1,20 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_CurrencySymbol
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Manage currency symbols block
  *
- * @category   Magento
- * @package    Magento_CurrencySymbol
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\CurrencySymbol\Block\Adminhtml\System;
 
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Currencysymbol extends \Magento\Backend\Block\Widget\Form
 {
     /**
@@ -48,7 +30,7 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
         \Magento\CurrencySymbol\Model\System\CurrencysymbolFactory $symbolSystemFactory,
-        array $data = array()
+        array $data = []
     ) {
         $this->_symbolSystemFactory = $symbolSystemFactory;
         parent::__construct($context, $data);
@@ -56,10 +38,11 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
 
     /**
      * Constructor. Initialization required variables for class instance.
+     *
+     * @return void
      */
     protected function _construct()
     {
-        $this->_blockGroup = 'Magento\CurrencySymbol\System';
         $this->_controller = 'adminhtml_system_currencysymbol';
         parent::_construct();
     }
@@ -69,22 +52,35 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
      *
      * @var array
      */
-    protected $_symbolsData = array();
+    protected $_symbolsData = [];
 
     /**
      * Prepares layout
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return \Magento\Framework\View\Element\AbstractBlock
      */
     protected function _prepareLayout()
     {
+        $this->getToolbar()->addChild(
+            'save_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'label' => __('Save Currency Symbols'),
+                'class' => 'save primary save-currency-symbols',
+                'data_attribute' => [
+                    'mage-init' => ['button' => ['event' => 'save', 'target' => '#currency-symbols-form']],
+                ]
+            ]
+        );
+
         return parent::_prepareLayout();
     }
 
     /**
      * Returns page header
      *
-     * @return bool|string
+     * @return \Magento\Framework\Phrase
+     * @codeCoverageIgnore
      */
     public function getHeader()
     {
@@ -92,31 +88,10 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
     }
 
     /**
-     * Returns 'Save Currency Symbol' button's HTML code
-     *
-     * @return string
-     */
-    public function getSaveButtonHtml()
-    {
-        /** @var $block \Magento\View\Element\AbstractBlock */
-        $block = $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button');
-        $block->setData(array(
-            'label'     => __('Save Currency Symbols'),
-            'class'     => 'save',
-            'data_attribute'  => array(
-                'mage-init' => array(
-                    'button' => array('event' => 'save', 'target' => '#currency-symbols-form'),
-                ),
-            ),
-        ));
-
-        return $block->toHtml();
-    }
-
-    /**
      * Returns URL for save action
      *
      * @return string
+     * @codeCoverageIgnore
      */
     public function getFormActionUrl()
     {
@@ -127,6 +102,7 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
      * Returns website id
      *
      * @return int
+     * @codeCoverageIgnore
      */
     public function getWebsiteId()
     {
@@ -137,6 +113,7 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
      * Returns store id
      *
      * @return int
+     * @codeCoverageIgnore
      */
     public function getStoreId()
     {
@@ -150,8 +127,8 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
      */
     public function getCurrencySymbolsData()
     {
-        if(!$this->_symbolsData) {
-            $this->_symbolsData =  $this->_symbolSystemFactory->create()->getCurrencySymbolsData();
+        if (!$this->_symbolsData) {
+            $this->_symbolsData = $this->_symbolSystemFactory->create()->getCurrencySymbolsData();
         }
         return $this->_symbolsData;
     }
@@ -159,7 +136,8 @@ class Currencysymbol extends \Magento\Backend\Block\Widget\Form
     /**
      * Returns inheritance text
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
+     * @codeCoverageIgnore
      */
     public function getInheritText()
     {

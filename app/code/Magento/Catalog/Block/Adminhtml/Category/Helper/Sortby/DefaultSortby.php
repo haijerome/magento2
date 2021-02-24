@@ -1,42 +1,51 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Adminhtml additional helper block for sort by
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Adminhtml\Category\Helper\Sortby;
 
-class DefaultSortby
-    extends \Magento\Data\Form\Element\Select
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Data\Form\Element\CollectionFactory;
+use Magento\Framework\Data\Form\Element\Factory;
+use Magento\Framework\Escaper;
+use Magento\Framework\Math\Random;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
+
+class DefaultSortby extends \Magento\Framework\Data\Form\Element\Select
 {
+    /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
+     * @param Factory $factoryElement
+     * @param CollectionFactory $factoryCollection
+     * @param Escaper $escaper
+     * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
+     * @param Random|null $random
+     */
+    public function __construct(
+        Factory $factoryElement,
+        CollectionFactory $factoryCollection,
+        Escaper $escaper,
+        $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null,
+        ?Random $random = null
+    ) {
+        $secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+        parent::__construct($factoryElement, $factoryCollection, $escaper, $data, $secureRenderer, $random);
+        $this->secureRenderer = $secureRenderer;
+    }
+
     /**
      * Returns js code that is used instead of default toggle code for "Use default config" checkbox
      *
@@ -45,8 +54,8 @@ class DefaultSortby
     public function getToggleCode()
     {
         $htmlId = 'use_config_' . $this->getHtmlId();
-        return "toggleValueElements(this, this.parentNode.parentNode);"
-            . "if (!this.checked) toggleValueElements($('$htmlId'), $('$htmlId').parentNode);";
+        return "toggleValueElements(this, this.parentNode.parentNode);" .
+            "if (!this.checked) toggleValueElements(\$('{$htmlId}'), \$('{$htmlId}').parentNode);";
     }
 
     /**
@@ -67,17 +76,25 @@ class DefaultSortby
         $html = parent::getElementHtml();
         $htmlId = 'use_config_' . $this->getHtmlId();
         $html .= '<input id="' . $htmlId . '" name="use_config[]" value="' . $this->getId() . '"';
-        $html .= ($disabled ? ' checked="checked"' : '');
+        $html .= $disabled ? ' checked="checked"' : '';
 
         if ($this->getReadonly() || $elementDisabled) {
             $html .= ' disabled="disabled"';
         }
 
-        $html .= ' onclick="toggleValueElements(this, this.parentNode);" class="checkbox" type="checkbox" />';
-        $html .= ' <label for="' . $htmlId . '" class="normal">'
-            . __('Use Config Settings') . '</label>';
-        $html .= '<script type="text/javascript">toggleValueElements($(\'' . $htmlId . '\'), $(\'' . $htmlId
-            . '\').parentNode);</script>';
+        $html .= ' class="checkbox" type="checkbox" />';
+        $html .= ' <label for="' . $htmlId . '" class="normal">' . __('Use Config Settings') . '</label>';
+        $scriptString = 'require(["prototype"], function(){toggleValueElements($(\'' .
+            $htmlId .
+            '\'), $(\'' .
+            $htmlId .
+            '\').parentNode);});';
+        $html .= /* @noEscape */ $this->secureRenderer->renderTag('script', [], $scriptString, false);
+        $html .= /* @noEscape */ $this->secureRenderer->renderEventListenerAsTag(
+            'onclick',
+            "toggleValueElements(this, this.parentNode);",
+            '#' . $htmlId
+        );
 
         return $html;
     }

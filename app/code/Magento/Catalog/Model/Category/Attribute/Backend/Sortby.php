@@ -1,117 +1,85 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Catalog\Model\Category\Attribute\Backend;
 
 /**
  * Catalog Category Attribute Default and Available Sort By Backend Model
  *
- * @category   Magento
- * @package    Magento_Catalog
+ * @api
+ *
  * @author     Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Catalog\Model\Category\Attribute\Backend;
-
-class Sortby
-    extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
+class Sortby extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
 {
     /**
      * Core store config
      *
-     * @var \Magento\Core\Model\Store\Config
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
      */
-    protected $_coreStoreConfig;
+    protected $_scopeConfig;
 
     /**
      * Construct
      *
-     * @param \Magento\Logger $logger
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      */
-    public function __construct(
-        \Magento\Logger $logger,
-        \Magento\Core\Model\Store\Config $coreStoreConfig
-    ) {
-        $this->_coreStoreConfig = $coreStoreConfig;
-        parent::__construct($logger);
+    public function __construct(\Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig)
+    {
+        $this->_scopeConfig = $scopeConfig;
     }
 
     /**
      * Validate process
      *
-     * @param \Magento\Object $object
+     * @param \Magento\Framework\DataObject $object
      * @return bool
-     * @throws \Magento\Core\Exception
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function validate($object)
     {
         $attributeCode = $this->getAttribute()->getName();
-        $postDataConfig = $object->getData('use_post_data_config');
-        if ($postDataConfig) {
-            $isUseConfig = in_array($attributeCode, $postDataConfig);
-        } else {
-            $isUseConfig = false;
-            $postDataConfig = array();
-        }
+        $postDataConfig = $object->getData('use_post_data_config') ?: [];
+        $isUseConfig = in_array($attributeCode, $postDataConfig);
 
         if ($this->getAttribute()->getIsRequired()) {
             $attributeValue = $object->getData($attributeCode);
-            if ($this->getAttribute()->isValueEmpty($attributeValue)) {
-                if (is_array($attributeValue) && count($attributeValue)>0) {
-                } else {
-                    if(!$isUseConfig) {
-                        return false;
-                    }
-                }
+            if ($this->getAttribute()->isValueEmpty($attributeValue) && !$isUseConfig) {
+                return false;
             }
         }
 
         if ($this->getAttribute()->getIsUnique()) {
             if (!$this->getAttribute()->getEntity()->checkAttributeUniqueValue($this->getAttribute(), $object)) {
                 $label = $this->getAttribute()->getFrontend()->getLabel();
-                throw new \Magento\Core\Exception(__('The value of attribute "%1" must be unique.', $label));
+                throw new \Magento\Framework\Exception\LocalizedException(
+                    __('The value of the "%1" attribute isn\'t unique. Set a unique value and try again.', $label)
+                );
             }
         }
 
         if ($attributeCode == 'default_sort_by') {
-            if ($available = $object->getData('available_sort_by')) {
-                if (!is_array($available)) {
-                    $available = explode(',', $available);
-                }
-                $data = (!in_array('default_sort_by', $postDataConfig))? $object->getData($attributeCode):
-                       $this->_coreStoreConfig->getConfig("catalog/frontend/default_sort_by");
-                if (!in_array($data, $available)) {
-                    throw new \Magento\Core\Exception(
-                        __('Default Product Listing Sort by does not exist in Available Product Listing Sort By.')
-                    );
-                }
-            } else {
-                if (!in_array('available_sort_by', $postDataConfig)) {
-                    throw new \Magento\Core\Exception(
-                        __('Default Product Listing Sort by does not exist in Available Product Listing Sort By.')
-                    );
-                }
+            $available = $object->getData('available_sort_by') ?: [];
+            $available = is_array($available) ? $available : explode(',', $available);
+            $data = !in_array(
+                'default_sort_by',
+                $postDataConfig
+            ) ? $object->getData(
+                $attributeCode
+            ) : $this->_scopeConfig->getValue(
+                "catalog/frontend/default_sort_by",
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+            if (!in_array($data, $available) && !in_array('available_sort_by', $postDataConfig)) {
+                throw new \Magento\Framework\Exception\LocalizedException(
+                    __('Default Product Listing Sort by does not exist in Available Product Listing Sort By.')
+                );
             }
         }
 
@@ -121,8 +89,8 @@ class Sortby
     /**
      * Before Attribute Save Process
      *
-     * @param \Magento\Object $object
-     * @return \Magento\Catalog\Model\Category\Attribute\Backend\Sortby
+     * @param \Magento\Framework\DataObject $object
+     * @return $this
      */
     public function beforeSave($object)
     {
@@ -130,23 +98,38 @@ class Sortby
         if ($attributeCode == 'available_sort_by') {
             $data = $object->getData($attributeCode);
             if (!is_array($data)) {
-                $data = array();
+                $data = [];
             }
-            $object->setData($attributeCode, join(',', $data));
+            $object->setData($attributeCode, implode(',', $data) ?: null);
+        }
+        if ($attributeCode == 'default_sort_by') {
+            $data = $object->getData($attributeCode);
+            $attributeValue = (is_array($data) ? reset($data) : (!empty($data))) ? $data : null;
+            $object->setData($attributeCode, $attributeValue);
         }
         if (!$object->hasData($attributeCode)) {
-            $object->setData($attributeCode, false);
+            $object->setData($attributeCode, null);
         }
         return $this;
     }
 
+    /**
+     * After Load Attribute Process
+     *
+     * @param \Magento\Framework\DataObject $object
+     * @return $this
+     */
     public function afterLoad($object)
     {
         $attributeCode = $this->getAttribute()->getName();
         if ($attributeCode == 'available_sort_by') {
             $data = $object->getData($attributeCode);
             if ($data) {
-                $object->setData($attributeCode, explode(',', $data));
+                if (!is_array($data)) {
+                    $object->setData($attributeCode, explode(',', $data));
+                } else {
+                    $object->setData($attributeCode, $data);
+                }
             }
         }
         return $this;

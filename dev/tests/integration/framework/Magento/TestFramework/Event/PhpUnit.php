@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,7 +9,7 @@
  */
 namespace Magento\TestFramework\Event;
 
-class PhpUnit implements \PHPUnit_Framework_TestListener
+class PhpUnit implements \PHPUnit\Framework\TestListener
 {
     /**
      * Used when PHPUnit framework instantiates the class on its own and passes nothing to the constructor
@@ -55,136 +34,115 @@ class PhpUnit implements \PHPUnit_Framework_TestListener
     }
 
     /**
-     * Constructor
-     *
      * @param \Magento\TestFramework\EventManager $eventManager
-     * @throws \Magento\Exception
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function __construct(\Magento\TestFramework\EventManager $eventManager = null)
     {
         $this->_eventManager = $eventManager ?: self::$_defaultEventManager;
         if (!$this->_eventManager) {
-            throw new \Magento\Exception('Instance of the event manager is required.');
+            throw new \Magento\Framework\Exception\LocalizedException(__('Instance of the event manager is required.'));
         }
     }
 
     /**
-     * An error occurred.
-     * Method is required by implemented interface, but is not needed by the class.
-     *
-     * @param  \PHPUnit_Framework_Test $test
-     * @param  \Exception              $e
-     * @param  float                  $time
-     *
+     * @inheritDoc
      * @SuppressWarnings(PHPMD.ShortVariable)
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function addError(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addError(\PHPUnit\Framework\Test $test, \Throwable $t, float $time): void
     {
     }
 
     /**
-     * A failure occurred.
-     * Method is required by implemented interface, but is not needed by the class.
-     *
-     * @param  \PHPUnit_Framework_Test                 $test
-     * @param  \PHPUnit_Framework_AssertionFailedError $e
-     * @param  float                                  $time
-     *
+     * @inheritDoc
      * @SuppressWarnings(PHPMD.ShortVariable)
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function addFailure(\PHPUnit_Framework_Test $test, \PHPUnit_Framework_AssertionFailedError $e, $time)
+    public function addFailure(
+        \PHPUnit\Framework\Test $test,
+        \PHPUnit\Framework\AssertionFailedError $e,
+        float $time
+    ): void {
+    }
+
+    /**
+     * @inheritDoc
+     * @SuppressWarnings(PHPMD.ShortVariable)
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function addIncompleteTest(\PHPUnit\Framework\Test $test, \Throwable $t, float $time): void
     {
     }
 
     /**
-     * Incomplete test.
-     * Method is required by implemented interface, but is not needed by the class.
-     *
-     * @param  \PHPUnit_Framework_Test $test
-     * @param  \Exception              $e
-     * @param  float                  $time
-     *
+     * @inheritDoc
      * @SuppressWarnings(PHPMD.ShortVariable)
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function addIncompleteTest(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addRiskyTest(\PHPUnit\Framework\Test $test, \Throwable $t, float $time): void
     {
     }
 
     /**
-     * Skipped test.
-     * Method is required by implemented interface, but is not needed by the class.
-     *
-     * @param  \PHPUnit_Framework_Test $test
-     * @param  \Exception              $e
-     * @param  float                  $time
-     * @since  Method available since Release 3.0.0
-     *
+     * @inheritDoc
      * @SuppressWarnings(PHPMD.ShortVariable)
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function addSkippedTest(\PHPUnit_Framework_Test $test, \Exception $e, $time)
+    public function addSkippedTest(\PHPUnit\Framework\Test $test, \Throwable $t, float $time): void
     {
     }
 
     /**
-     * A test suite started.
-     *
-     * @param  \PHPUnit_Framework_TestSuite $suite
-     * @since  Method available since Release 2.2.0
+     * @inheritDoc
      */
-    public function startTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function startTestSuite(\PHPUnit\Framework\TestSuite $suite): void
     {
         /* PHPUnit runs tests with data provider in own test suite for each test, so just skip such test suites */
-        if ($suite instanceof \PHPUnit_Framework_TestSuite_DataProvider) {
+        if ($suite instanceof \PHPUnit\Framework\DataProviderTestSuite) {
             return;
         }
         $this->_eventManager->fireEvent('startTestSuite');
     }
 
     /**
-     * A test suite ended.
-     *
-     * @param  \PHPUnit_Framework_TestSuite $suite
-     * @since  Method available since Release 2.2.0
+     * @inheritDoc
      */
-    public function endTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function endTestSuite(\PHPUnit\Framework\TestSuite $suite): void
     {
-        if ($suite instanceof \PHPUnit_Framework_TestSuite_DataProvider) {
+        if ($suite instanceof \PHPUnit\Framework\DataProviderTestSuite) {
             return;
         }
-        $this->_eventManager->fireEvent('endTestSuite', array($suite), true);
+        $this->_eventManager->fireEvent('endTestSuite', [$suite], true);
     }
 
     /**
-     * A test started.
-     *
-     * @param  \PHPUnit_Framework_Test $test
+     * @inheritDoc
      */
-    public function startTest(\PHPUnit_Framework_Test $test)
+    public function startTest(\PHPUnit\Framework\Test $test): void
     {
-        if (!($test instanceof \PHPUnit_Framework_TestCase) || ($test instanceof \PHPUnit_Framework_Warning)) {
+        if (!$test instanceof \PHPUnit\Framework\TestCase || $test instanceof \PHPUnit\Framework\Warning) {
             return;
         }
-        $this->_eventManager->fireEvent('startTest', array($test));
+        $this->_eventManager->fireEvent('startTest', [$test]);
     }
 
     /**
-     * A test ended.
-     * Method signature is implied by implemented interface, not all parameters are needed.
-     *
-     * @param  \PHPUnit_Framework_Test $test
-     * @param  float                  $time
-     *
+     * @inheritDoc
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function endTest(\PHPUnit_Framework_Test $test, $time)
+    public function endTest(\PHPUnit\Framework\Test $test, float $time): void
     {
-        if (!($test instanceof \PHPUnit_Framework_TestCase) || ($test instanceof \PHPUnit_Framework_Warning)) {
+        if (!$test instanceof \PHPUnit\Framework\TestCase || $test instanceof \PHPUnit\Framework\Warning) {
             return;
         }
-        $this->_eventManager->fireEvent('endTest', array($test), true);
+        $this->_eventManager->fireEvent('endTest', [$test], true);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function addWarning(\PHPUnit\Framework\Test $test, \PHPUnit\Framework\Warning $e, float $time): void
+    {
     }
 }

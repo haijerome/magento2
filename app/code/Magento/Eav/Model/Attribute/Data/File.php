@@ -1,91 +1,84 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Eav
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Eav\Model\Attribute\Data;
+
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Filesystem\Io\File as FileIo;
 
 /**
  * EAV Entity Attribute File Data Model
  *
- * @category    Magento
- * @package     Magento_Eav
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-namespace Magento\Eav\Model\Attribute\Data;
-
 class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
 {
     /**
      * Validator for check not protected extensions
      *
-     * @var \Magento\Core\Model\File\Validator\NotProtectedExtension
+     * @var \Magento\MediaStorage\Model\File\Validator\NotProtectedExtension
      */
     protected $_validatorNotProtectedExtensions;
 
     /**
-     * Core data
-     *
-     * @var \Magento\Core\Helper\Data
+     * @var \Magento\Framework\Url\EncoderInterface
      */
-    protected $_coreData = null;
+    protected $urlEncoder;
 
     /**
-     * @var \Magento\Core\Model\File\Validator\NotProtectedExtension
+     * @var \Magento\MediaStorage\Model\File\Validator\NotProtectedExtension
      */
     protected $_fileValidator;
 
     /**
-     * @var \Magento\App\Dir
+     * @var \Magento\Framework\Filesystem\Directory\Write
      */
-    protected $_coreDir;
+    protected $_directory;
 
     /**
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\Logger $logger
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Core\Model\File\Validator\NotProtectedExtension $fileValidator
-     * @param \Magento\App\Dir $coreDir
+     * @var FileIo
+     */
+    private $fileIo;
+
+    /**
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Locale\ResolverInterface $localeResolver
+     * @param \Magento\Framework\Url\EncoderInterface $urlEncoder
+     * @param \Magento\MediaStorage\Model\File\Validator\NotProtectedExtension $fileValidator
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param FileIo $fileIo
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\Logger $logger,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Core\Model\File\Validator\NotProtectedExtension $fileValidator,
-        \Magento\App\Dir $coreDir
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Locale\ResolverInterface $localeResolver,
+        \Magento\Framework\Url\EncoderInterface $urlEncoder,
+        \Magento\MediaStorage\Model\File\Validator\NotProtectedExtension $fileValidator,
+        \Magento\Framework\Filesystem $filesystem,
+        FileIo $fileIo
     ) {
-        parent::__construct($locale, $logger);
-        $this->_coreData = $coreData;
+        parent::__construct($localeDate, $logger, $localeResolver);
+        $this->urlEncoder = $urlEncoder;
         $this->_fileValidator = $fileValidator;
-        $this->_coreDir = $coreDir;
+        $this->_directory = $filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $this->fileIo = $fileIo;
     }
 
     /**
      * Extract data from request and return value
      *
-     * @param \Magento\App\RequestInterface $request
-     * @return array|string
+     * @param RequestInterface $request
+     * @return array|string|bool
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    public function extractValue(\Magento\App\RequestInterface $request)
+    public function extractValue(RequestInterface $request)
     {
         if ($this->getIsAjaxRequest()) {
             return false;
@@ -93,24 +86,24 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
 
         $extend = $this->_getRequestValue($request);
 
-        $attrCode  = $this->getAttribute()->getAttributeCode();
+        $attrCode = $this->getAttribute()->getAttributeCode();
         if ($this->_requestScope) {
-            $value  = array();
+            $value = [];
             if (strpos($this->_requestScope, '/') !== false) {
                 $scopes = explode('/', $this->_requestScope);
-                $mainScope  = array_shift($scopes);
+                $mainScope = array_shift($scopes);
             } else {
-                $mainScope  = $this->_requestScope;
-                $scopes     = array();
+                $mainScope = $this->_requestScope;
+                $scopes = [];
             }
-
+            // phpcs:disable Magento2.Security.Superglobal
             if (!empty($_FILES[$mainScope])) {
                 foreach ($_FILES[$mainScope] as $fileKey => $scopeData) {
                     foreach ($scopes as $scopeName) {
                         if (isset($scopeData[$scopeName])) {
                             $scopeData = $scopeData[$scopeName];
                         } else {
-                            $scopeData[$scopeName] = array();
+                            $scopeData[$scopeName] = [];
                         }
                     }
 
@@ -119,14 +112,17 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
                     }
                 }
             } else {
-                $value = array();
+                $value = [];
             }
+            // phpcs:enable Magento2.Security.Superglobal
         } else {
+            // phpcs:disable Magento2.Security.Superglobal
             if (isset($_FILES[$attrCode])) {
                 $value = $_FILES[$attrCode];
             } else {
-                $value = array();
+                $value = [];
             }
+            // phpcs:enable Magento2.Security.Superglobal
         }
 
         if (!empty($extend['delete'])) {
@@ -137,25 +133,22 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
     }
 
     /**
-     * Validate file by attribute validate rules
-     * Return array of errors
+     * Validate file by attribute validate rules and return array of errors
      *
      * @param array $value
-     * @return array
+     * @return string[]
      */
     protected function _validateByRules($value)
     {
-        $label  = $this->getAttribute()->getStoreLabel();
-        $rules  = $this->getAttribute()->getValidateRules();
-        $extension  = pathinfo($value['name'], PATHINFO_EXTENSION);
+        $label = $this->getAttribute()->getStoreLabel();
+        $rules = $this->getAttribute()->getValidateRules();
+        $extension = $this->fileIo->getPathInfo($value['name'])['extension'];
 
         if (!empty($rules['file_extensions'])) {
             $extensions = explode(',', $rules['file_extensions']);
             $extensions = array_map('trim', $extensions);
             if (!in_array($extension, $extensions)) {
-                return array(
-                    __('"%1" is not a valid file extension.', $label)
-                );
+                return [__('"%1" is not a valid file extension.', $label)];
             }
         }
 
@@ -166,43 +159,52 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
             return $this->_fileValidator->getMessages();
         }
 
-        if (!is_uploaded_file($value['tmp_name'])) {
-            return array(
-                __('"%1" is not a valid file.', $label)
-            );
+        if (!empty($value['tmp_name'])
+            && !$this->_directory->getDriver()->isExists($value['tmp_name'])
+        ) {
+            return [__('"%1" is not a valid file.', $label)];
         }
 
         if (!empty($rules['max_file_size'])) {
             $size = $value['size'];
             if ($rules['max_file_size'] < $size) {
-                return array(
-                    __('"%1" exceeds the allowed file size.', $label)
-                );
-            };
+                return [__('"%1" exceeds the allowed file size.', $label)];
+            }
         }
 
-        return array();
+        return [];
     }
 
     /**
      * Validate data
      *
      * @param array|string $value
-     * @throws \Magento\Core\Exception
-     * @return boolean
+     * @return bool
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function validateValue($value)
     {
         if ($this->getIsAjaxRequest()) {
             return true;
         }
+        $fileData = $value;
 
-        $errors     = array();
-        $attribute  = $this->getAttribute();
-        $label      = $attribute->getStoreLabel();
+        if (is_string($value) && !empty($value)) {
+            $dir = $this->_directory->getAbsolutePath($this->getAttribute()->getEntityType()->getEntityTypeCode());
+            $stat = $this->_directory->getDriver()->stat($dir . $value);
+            $fileData = [
+                'size' => $stat['size'],
+                'name' => $value,
+                'tmp_name' => $dir . $value
+            ];
+        }
 
-        $toDelete   = !empty($value['delete']) ? true : false;
-        $toUpload   = !empty($value['tmp_name']) ? true : false;
+        $errors = [];
+        $attribute = $this->getAttribute();
+
+        $toDelete = !empty($value['delete']) ? true : false;
+        $toUpload = !empty($value['tmp_name']) || is_string($value) && !empty($value) ? true : false;
 
         if (!$toUpload && !$toDelete && $this->getEntity()->getData($attribute->getAttributeCode())) {
             return true;
@@ -213,11 +215,12 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
         }
 
         if ($attribute->getIsRequired() && !$toUpload) {
+            $label = __($attribute->getStoreLabel());
             $errors[] = __('"%1" is a required value.', $label);
         }
 
         if ($toUpload) {
-            $errors = array_merge($errors, $this->_validateByRules($value));
+            $errors = array_merge($errors, $this->_validateByRules($fileData));
         }
 
         if (count($errors) == 0) {
@@ -230,9 +233,9 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
     /**
      * Export attribute value to entity model
      *
-     * @param \Magento\Core\Model\AbstractModel $entity
      * @param array|string $value
-     * @return \Magento\Eav\Model\Attribute\Data\File
+     * @return $this
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function compactValue($value)
     {
@@ -241,40 +244,39 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
         }
 
         $attribute = $this->getAttribute();
-        $original  = $this->getEntity()->getData($attribute->getAttributeCode());
-        $toDelete  = false;
+        $original = $this->getEntity()->getData($attribute->getAttributeCode());
+        $toDelete = false;
         if ($original) {
             if (!$attribute->getIsRequired() && !empty($value['delete'])) {
-                $toDelete  = true;
+                $toDelete = true;
             }
             if (!empty($value['tmp_name'])) {
-                $toDelete  = true;
+                $toDelete = true;
             }
         }
 
-        $path = $this->_coreDir->getDir('media') . DS . $attribute->getEntity()->getEntityTypeCode();
+        $destinationFolder = $attribute->getEntityType()->getEntityTypeCode();
 
         // unlink entity file
         if ($toDelete) {
             $this->getEntity()->setData($attribute->getAttributeCode(), '');
-            $file = $path . $original;
-            $ioFile = new \Magento\Io\File();
-            if ($ioFile->fileExists($file)) {
-                $ioFile->rm($file);
+            $file = $destinationFolder . $original;
+            if ($this->_directory->isExist($file)) {
+                $this->_directory->delete($file);
             }
         }
 
         if (!empty($value['tmp_name'])) {
             try {
-                $uploader = new \Magento\File\Uploader($value);
+                $uploader = new \Magento\Framework\File\Uploader($value);
                 $uploader->setFilesDispersion(true);
                 $uploader->setFilenamesCaseSensitivity(false);
                 $uploader->setAllowRenameFiles(true);
-                $uploader->save($path, $value['name']);
+                $uploader->save($this->_directory->getAbsolutePath($destinationFolder), $value['name']);
                 $fileName = $uploader->getUploadedFileName();
                 $this->getEntity()->setData($attribute->getAttributeCode(), $fileName);
             } catch (\Exception $e) {
-                $this->_logger->logException($e);
+                $this->_logger->critical($e);
             }
         }
 
@@ -285,7 +287,10 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
      * Restore attribute value from SESSION to entity model
      *
      * @param array|string $value
-     * @return \Magento\Eav\Model\Attribute\Data\File
+     * @return $this
+     *
+     * @codeCoverageIgnore
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function restoreValue($value)
     {
@@ -293,21 +298,19 @@ class File extends \Magento\Eav\Model\Attribute\Data\AbstractData
     }
 
     /**
-     * Return formated attribute value from entity model
+     * Return formatted attribute value from entity model
      *
+     * @param string $format
      * @return string|array
      */
     public function outputValue($format = \Magento\Eav\Model\AttributeDataFactory::OUTPUT_FORMAT_TEXT)
     {
         $output = '';
-        $value  = $this->getEntity()->getData($this->getAttribute()->getAttributeCode());
+        $value = $this->getEntity()->getData($this->getAttribute()->getAttributeCode());
         if ($value) {
             switch ($format) {
                 case \Magento\Eav\Model\AttributeDataFactory::OUTPUT_FORMAT_JSON:
-                    $output = array(
-                        'value'     => $value,
-                        'url_key'   => $this->_coreData->urlEncode($value)
-                    );
+                    $output = ['value' => $value, 'url_key' => $this->urlEncoder->encode($value)];
                     break;
             }
         }

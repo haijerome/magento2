@@ -1,32 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Directory
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Directory\Model\Config\Source;
 
-class Allregion implements \Magento\Core\Model\Option\ArrayInterface
+/**
+ * Options provider for regions list
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Allregion implements \Magento\Framework\Option\ArrayInterface
 {
     /**
      * @var array
@@ -39,56 +24,59 @@ class Allregion implements \Magento\Core\Model\Option\ArrayInterface
     protected $_options;
 
     /**
-     * @var \Magento\Directory\Model\Resource\Country\CollectionFactory
+     * @var \Magento\Directory\Model\ResourceModel\Country\CollectionFactory
      */
-    protected $_countryCollFactory;
+    protected $_countryCollectionFactory;
 
     /**
-     * @var \Magento\Directory\Model\Resource\Region\CollectionFactory
+     * @var \Magento\Directory\Model\ResourceModel\Region\CollectionFactory
      */
-    protected $_regionCollFactory;
+    protected $_regionCollectionFactory;
 
     /**
-     * @param \Magento\Directory\Model\Resource\Country\CollectionFactory $countryCollFactory
-     * @param \Magento\Directory\Model\Resource\Region\CollectionFactory $regionCollFactory
+     * @param \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory
+     * @param \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
      */
     public function __construct(
-        \Magento\Directory\Model\Resource\Country\CollectionFactory $countryCollFactory,
-        \Magento\Directory\Model\Resource\Region\CollectionFactory $regionCollFactory
+        \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory,
+        \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
     ) {
-        $this->_countryCollFactory = $countryCollFactory;
-        $this->_regionCollFactory = $regionCollFactory;
+        $this->_countryCollectionFactory = $countryCollectionFactory;
+        $this->_regionCollectionFactory = $regionCollectionFactory;
     }
 
+    /**
+     * @param bool $isMultiselect
+     * @return array
+     */
     public function toOptionArray($isMultiselect = false)
     {
         if (!$this->_options) {
-            $countriesArray = $this->_countryCollFactory->create()->load()
-                ->toOptionArray(false);
-            $this->_countries = array();
+            $countriesArray = $this->_countryCollectionFactory->create()->load()->toOptionArray(false);
+            $this->_countries = [];
             foreach ($countriesArray as $a) {
                 $this->_countries[$a['value']] = $a['label'];
             }
 
-            $countryRegions = array();
-            $regionsCollection = $this->_regionCollFactory->create()->load();
+            $countryRegions = [];
+            $regionsCollection = $this->_regionCollectionFactory->create()->load();
             foreach ($regionsCollection as $region) {
                 $countryRegions[$region->getCountryId()][$region->getId()] = $region->getDefaultName();
             }
-            uksort($countryRegions, array($this, 'sortRegionCountries'));
+            uksort($countryRegions, [$this, 'sortRegionCountries']);
 
-            $this->_options = array();
+            $this->_options = [];
             foreach ($countryRegions as $countryId => $regions) {
-                $regionOptions = array();
+                $regionOptions = [];
                 foreach ($regions as $regionId => $regionName) {
-                    $regionOptions[] = array('label' => $regionName, 'value' => $regionId);
+                    $regionOptions[] = ['label' => $regionName, 'value' => $regionId];
                 }
-                $this->_options[] = array('label' => $this->_countries[$countryId], 'value' => $regionOptions);
+                $this->_options[] = ['label' => $this->_countries[$countryId], 'value' => $regionOptions];
             }
         }
         $options = $this->_options;
         if (!$isMultiselect) {
-            array_unshift($options, array('value' => '', 'label' => ''));
+            array_unshift($options, ['value' => '', 'label' => '']);
         }
 
         return $options;

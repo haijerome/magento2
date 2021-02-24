@@ -1,38 +1,19 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Sidebar;
+
+use Magento\Framework\Pricing\PriceCurrencyInterface;
 
 /**
  * Adminhtml sales order create sidebar cart block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Sidebar;
-
 class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\AbstractSidebar
 {
     /**
@@ -43,30 +24,39 @@ class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Abstra
     protected $_sidebarStorageAction = 'add_order_item';
 
     /**
-     * @var \Magento\Sales\Model\Resource\Order\CollectionFactory
+     * Orders factory
+     *
+     * @var \Magento\Sales\Model\ResourceModel\Order\CollectionFactory
      */
     protected $_ordersFactory;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param \Magento\Sales\Model\AdminOrder\Create $orderCreate
+     * @param PriceCurrencyInterface $priceCurrency
      * @param \Magento\Sales\Model\Config $salesConfig
-     * @param \Magento\Sales\Model\Resource\Order\CollectionFactory $ordersFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $ordersFactory
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
         \Magento\Sales\Model\AdminOrder\Create $orderCreate,
+        PriceCurrencyInterface $priceCurrency,
         \Magento\Sales\Model\Config $salesConfig,
-        \Magento\Sales\Model\Resource\Order\CollectionFactory $ordersFactory,
-        array $data = array()
+        \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $ordersFactory,
+        array $data = []
     ) {
         $this->_ordersFactory = $ordersFactory;
-        parent::__construct($context, $sessionQuote, $orderCreate, $salesConfig, $data);
+        parent::__construct($context, $sessionQuote, $orderCreate, $priceCurrency, $salesConfig, $data);
     }
 
+    /**
+     * Constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -74,7 +64,11 @@ class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Abstra
         $this->setDataId('reorder');
     }
 
-
+    /**
+     * Get header text
+     *
+     * @return \Magento\Framework\Phrase
+     */
     public function getHeaderText()
     {
         return __('Last Ordered Items');
@@ -88,27 +82,34 @@ class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Abstra
     public function getLastOrder()
     {
         $storeIds = $this->getQuote()->getStore()->getWebsite()->getStoreIds();
-        $collection = $this->_ordersFactory->create()
-            ->addFieldToFilter('customer_id', $this->getCustomerId())
-            ->addFieldToFilter('store_id', array('in' => $storeIds))
-            ->setOrder('created_at', 'desc')
-            ->setPageSize(1)
-            ->load();
+        $collection = $this->_ordersFactory->create()->addFieldToFilter(
+            'customer_id',
+            $this->getCustomerId()
+        )->addFieldToFilter(
+            'store_id',
+            ['in' => $storeIds]
+        )->setOrder(
+            'created_at',
+            'desc'
+        )->setPageSize(
+            1
+        )->load();
         foreach ($collection as $order) {
             return $order;
         }
 
         return false;
     }
+
     /**
      * Retrieve item collection
      *
-     * @return mixed
+     * @return array|false
      */
     public function getItemCollection()
     {
         if ($order = $this->getLastOrder()) {
-            $items = array();
+            $items = [];
             foreach ($order->getItemsCollection() as $item) {
                 if (!$item->getParentItem()) {
                     $items[] = $item;
@@ -119,16 +120,31 @@ class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Abstra
         return false;
     }
 
+    /**
+     * Retrieve display item qty availability
+     *
+     * @return false
+     */
     public function canDisplayItemQty()
     {
         return false;
     }
 
+    /**
+     * Retrieve remove items availability
+     *
+     * @return false
+     */
     public function canRemoveItems()
     {
         return false;
     }
 
+    /**
+     * Retrieve display price availability
+     *
+     * @return false
+     */
     public function canDisplayPrice()
     {
         return false;
@@ -137,7 +153,7 @@ class Reorder extends \Magento\Sales\Block\Adminhtml\Order\Create\Sidebar\Abstra
     /**
      * Retrieve identifier of block item
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return int
      */
     public function getIdentifierId($item)

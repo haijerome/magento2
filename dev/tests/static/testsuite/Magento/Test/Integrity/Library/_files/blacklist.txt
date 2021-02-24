@@ -1,65 +1,74 @@
-lib/Magento/Data/Collection/Filesystem.php
-lib/Magento/Data/Collection/Db.php
-lib/Magento/Data/Form/Element/Radio.php
-lib/Magento/Data/Form/Element/Label.php
-lib/Magento/Data/Form/Element/AbstractElement.php
-lib/Magento/Data/Form/Element/File.php
-lib/Magento/Data/Form/Element/Checkbox.php
-lib/Magento/Data/Form/Element/Checkboxes.php
-lib/Magento/Data/Form/Element/Password.php
-lib/Magento/Data/Form/Element/Column.php
-lib/Magento/Data/Form/Element/Gallery.php
-lib/Magento/Data/Form/Element/Obscure.php
-lib/Magento/Data/Form/Element/Data.php
-lib/Magento/Data/Form/Element/Multiline.php
-lib/Magento/Data/Form/Element/Radios.php
-lib/Magento/Data/Form/Element/Submit.php
-lib/Magento/Data/Form/Element/Note.php
-lib/Magento/Data/Form/Element/Image.php
-lib/Magento/Data/Form/Element/Text.php
-lib/Magento/Data/Form/Element/Time.php
-lib/Magento/Data/Form/Element/Button.php
-lib/Magento/Data/Form/Element/Editor.php
-lib/Magento/Data/Form/Element/Hidden.php
-lib/Magento/Data/Form/Element/Reset.php
-lib/Magento/Data/Form/Element/Link.php
-lib/Magento/Data/Form/Element/Editablemultiselect.php
-lib/Magento/Data/Form/Element/Multiselect.php
-lib/Magento/Data/Form/Element/Fieldset.php
-lib/Magento/Data/Form/Element/Select.php
-lib/Magento/Data/Form/Element/Textarea.php
-lib/Magento/Data/Form/Element/Imagefile.php
-lib/Magento/Data/Form/Element/Imagefile.php
-lib/Magento/Data/Form/Element/Date.php
-lib/Magento/Data/Form/AbstractForm.php
-lib/Magento/Data/Form/Factory.php
-lib/Magento/Data/Collection.php
-lib/Magento/Data/Form.php
-lib/Magento/Data/Form/FormKey.php
+library magento/framework Data/Collection/Filesystem.php
+library magento/framework Data/Form/Element/Radio.php
+library magento/framework Data/Form/Element/Label.php
+library magento/framework Data/Form/Element/AbstractElement.php
+library magento/framework Data/Form/Element/File.php
+library magento/framework Data/Form/Element/Checkbox.php
+library magento/framework Data/Form/Element/Checkboxes.php
+library magento/framework Data/Form/Element/Password.php
+library magento/framework Data/Form/Element/Column.php
+library magento/framework Data/Form/Element/Gallery.php
+library magento/framework Data/Form/Element/Obscure.php
+library magento/framework Data/Form/Element/Multiline.php
+library magento/framework Data/Form/Element/Radios.php
+library magento/framework Data/Form/Element/Submit.php
+library magento/framework Data/Form/Element/Note.php
+library magento/framework Data/Form/Element/Image.php
+library magento/framework Data/Form/Element/Text.php
+library magento/framework Data/Form/Element/Time.php
+library magento/framework Data/Form/Element/Button.php
+library magento/framework Data/Form/Element/Editor.php
+library magento/framework Data/Form/Element/Hidden.php
+library magento/framework Data/Form/Element/Reset.php
+library magento/framework Data/Form/Element/Link.php
+library magento/framework Data/Form/Element/Editablemultiselect.php
+library magento/framework Data/Form/Element/Multiselect.php
+library magento/framework Data/Form/Element/Fieldset.php
+library magento/framework Data/Form/Element/Select.php
+library magento/framework Data/Form/Element/Textarea.php
+library magento/framework Data/Form/Element/Imagefile.php
+library magento/framework Data/Form/Element/Imagefile.php
+library magento/framework Data/Form/Element/Date.php
+library magento/framework Data/Form/AbstractForm.php
+library magento/framework Data/Collection.php
+library magento/framework Data/Form.php
+library magento/framework Data/Form/FormKey.php
 
-lib/Magento/Filter/Object/Grid.php
-lib/Magento/Filter/Object.php
+library magento/framework Exception/AuthenticationException.php
+library magento/framework Exception/AuthorizationException.php
+library magento/framework Exception/InputException.php
+library magento/framework Exception/NoSuchEntityException.php
 
-lib/Magento/View/Context.php
-lib/Magento/View/Element/Js/Cookie.php
-lib/Magento/View/Element/Html/Calendar.php
-lib/Magento/View/Element/Html/Link/Current.php
-lib/Magento/View/Element/Messages.php
-lib/Magento/View/Element/AbstractBlock.php
-lib/Magento/View/Element/Template.php
-lib/Magento/View/Element/Context.php
-lib/Magento/View/Element/Template/Context.php
-lib/Magento/View/Element/Redirect.php
+library magento/framework View/Context.php
+library magento/framework View/Element/Js/Cookie.php
+library magento/framework View/Element/Html/Calendar.php
+library magento/framework View/Element/Html/Link/Current.php
+library magento/framework View/Element/Messages.php
+library magento/framework View/Element/AbstractBlock.php
+library magento/framework View/Element/Template.php
+library magento/framework View/Element/Context.php
+library magento/framework View/Element/Template/Context.php
+library magento/framework View/Element/Redirect.php
 
-lib/Magento/App/Module/ResourceResolver.php
-lib/Magento/Event/Invoker/InvokerDefault.php
-lib/Magento/Phrase/Renderer/Translate.php
-lib/Magento/Backup/Snapshot.php
-lib/Magento/Outbound/Authentication/Hmac.php
-lib/Magento/Oauth/Exception.php
+library magento/framework Event/Invoker/InvokerDefault.php
+library magento/framework Phrase/Renderer/Translate.php
+library magento/framework Backup/Snapshot.php
+library magento/framework Oauth/Exception.php
 
-lib/Magento/App/Helper/AbstractHelper.php
-lib/Magento/App/Helper/Context.php
+library magento/framework App/Helper/AbstractHelper.php
+library magento/framework App/Helper/Context.php
 
-lib/Magento/View/DesignLoader.php
-lib/Magento/Session/SidResolverInterface.php
+library magento/framework View/DesignLoader.php
+library magento/framework View/Page/Config.php
+library magento/framework View/Page/Title.php
+library magento/framework Session/SidResolverInterface.php
+
+library magento/framework Filesystem/Driver/Http.php
+
+library magento/framework Url/ScopeResolver.php
+library magento/framework Url/SecurityInfo.php
+library magento/framework Url/RouteParamsResolver.php
+library magento/framework View/Url/Config.php
+library magento/framework View/Asset/Config.php
+
+library magento/framework Locale/Format.php

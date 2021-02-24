@@ -1,39 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
+namespace Magento\Reports\Block\Product;
 
 /**
  * Reports Recently Products Abstract Block
  *
- * @category   Magento
- * @package    Magento_Reports
  * @author     Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Reports\Block\Product;
-
 abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractProduct
 {
     /**
@@ -46,7 +22,7 @@ abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractPr
     /**
      * Product Index Collection
      *
-     * @var \Magento\Reports\Model\Resource\Product\Index\Collection\AbstractCollection
+     * @var \Magento\Reports\Model\ResourceModel\Product\Index\Collection\AbstractCollection
      */
     protected $_collection;
 
@@ -61,30 +37,24 @@ abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractPr
     protected $_indexFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Tax\Helper\Data $taxData
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Math\Random $mathRandom
+     * @param \Magento\Catalog\Block\Product\Context $context
      * @param \Magento\Catalog\Model\Product\Visibility $productVisibility
      * @param \Magento\Reports\Model\Product\Index\Factory $indexFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Tax\Helper\Data $taxData,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Math\Random $mathRandom,
+        \Magento\Catalog\Block\Product\Context $context,
         \Magento\Catalog\Model\Product\Visibility $productVisibility,
         \Magento\Reports\Model\Product\Index\Factory $indexFactory,
-        array $data = array()
+        array $data = []
     ) {
-        parent::__construct($context, $catalogConfig, $registry, $taxData, $catalogData, $mathRandom, $data);
+        parent::__construct(
+            $context,
+            $data
+        );
         $this->_productVisibility = $productVisibility;
         $this->_indexFactory = $indexFactory;
+        $this->_isScopePrivate = true;
     }
 
     /**
@@ -107,57 +77,48 @@ abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractPr
      */
     protected function _getProductsToSkip()
     {
-        return array();
+        return [];
     }
 
     /**
-     * Retrieve Product Index model instance
-     *
+     * Public method for retrieve Product Index model
+     * @throws \Magento\Framework\Exception\LocalizedException
      * @return \Magento\Reports\Model\Product\Index\AbstractIndex
      */
-    protected function _getModel()
+    public function getModel()
     {
         try {
             $model = $this->_indexFactory->get($this->_indexType);
         } catch (\InvalidArgumentException $e) {
-            new \Magento\Core\Exception(__('Index type is not valid'));
+            throw new \Magento\Framework\Exception\LocalizedException(__('Index type is not valid'));
         }
 
         return $model;
     }
 
     /**
-     * Public method for retrieve Product Index model
-     *
-     * @return \Magento\Reports\Model\Product\Index\AbstractIndex
-     */
-    public function getModel()
-    {
-        return $this->_getModel();
-    }
-
-    /**
      * Retrieve Index Product Collection
      *
-     * @return \Magento\Reports\Model\Resource\Product\Index\Collection\AbstractCollection
+     * @return \Magento\Reports\Model\ResourceModel\Product\Index\Collection\AbstractCollection
      */
     public function getItemsCollection()
     {
-        if (is_null($this->_collection)) {
+        if ($this->_collection === null) {
             $attributes = $this->_catalogConfig->getProductAttributes();
 
-            $this->_collection = $this->_getModel()
-                ->getCollection()
-                ->addAttributeToSelect($attributes);
+            $this->_collection = $this->getModel()->getCollection()->addAttributeToSelect($attributes);
 
-                if ($this->getCustomerId()) {
-                    $this->_collection->setCustomerId($this->getCustomerId());
-                }
+            if ($this->getCustomerId()) {
+                $this->_collection->setCustomerId($this->getCustomerId());
+            }
 
-                $this->_collection->excludeProductIds($this->_getModel()->getExcludeProductIds())
-                    ->addUrlRewrite()
-                    ->setPageSize($this->getPageSize())
-                    ->setCurPage(1);
+            $this->_collection->excludeProductIds(
+                $this->getModel()->getExcludeProductIds()
+            )->addUrlRewrite()->setPageSize(
+                $this->getPageSize()
+            )->setCurPage(
+                1
+            );
 
             /* Price data is added to consider item stock status using price index */
             $this->_collection->addPriceData();
@@ -168,8 +129,7 @@ abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractPr
             } else {
                 $this->_collection->addFilterByIds($ids);
             }
-            $this->_collection->setAddedAtOrder()
-                ->setVisibility($this->_productVisibility->getVisibleInSiteIds());
+            $this->_collection->setAddedAtOrder()->setVisibility($this->_productVisibility->getVisibleInSiteIds());
         }
 
         return $this->_collection;
@@ -182,7 +142,7 @@ abstract class AbstractProduct extends \Magento\Catalog\Block\Product\AbstractPr
      */
     public function getCount()
     {
-        if (!$this->_getModel()->getCount()) {
+        if (!$this->getModel()->getCount()) {
             return 0;
         }
         return $this->getItemsCollection()->count();

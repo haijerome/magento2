@@ -1,93 +1,125 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Block\Widget\Form\Element;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Data\Form\Element\AbstractElement;
+use Magento\Framework\Json\Helper\Data as JsonHelper;
+use Magento\Backend\Block\Template\Context;
 
 /**
  * Backend image gallery item renderer
  *
- * @category   Magento
- * @package    Magento_Backend
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Backend\Block\Widget\Form\Element;
-
-class Gallery extends \Magento\Backend\Block\Template
-    implements \Magento\Data\Form\Element\Renderer\RendererInterface
+class Gallery extends \Magento\Backend\Block\Template implements
+    \Magento\Framework\Data\Form\Element\Renderer\RendererInterface
 {
-
+    /**
+     * @var AbstractElement|null
+     */
     protected $_element = null;
 
+    /**
+     * @var string
+     */
     protected $_template = 'Magento_Backend::widget/form/element/gallery.phtml';
 
-    public function render(\Magento\Data\Form\Element\AbstractElement $element)
+    /**
+     * @param Context $context
+     * @param array $data
+     */
+    public function __construct(Context $context, array $data = [])
+    {
+        $data['jsonHelper'] = ObjectManager::getInstance()->get(JsonHelper::class);
+        parent::__construct($context, $data);
+    }
+
+    /**
+     * Renderer.
+     *
+     * @param AbstractElement $element
+     * @return string
+     */
+    public function render(AbstractElement $element)
     {
         $this->setElement($element);
         return $this->toHtml();
     }
 
-    public function setElement(\Magento\Data\Form\Element\AbstractElement $element)
+    /**
+     * Set element.
+     *
+     * @param AbstractElement $element
+     * @return $this
+     */
+    public function setElement(AbstractElement $element)
     {
         $this->_element = $element;
         return $this;
     }
 
+    /**
+     * Get element.
+     *
+     * @return AbstractElement|null
+     */
     public function getElement()
     {
         return $this->_element;
     }
 
+    /**
+     * Get value.
+     *
+     * @return array
+     */
     public function getValues()
     {
         return $this->getElement()->getValue();
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _prepareLayout()
     {
-        $this->addChild('delete_button', 'Magento\Backend\Block\Widget\Button', array(
-            'label'     => __('Delete'),
-            'onclick'   => "deleteImage(#image#)",
-            'class' => 'delete'
-        ));
+        $this->addChild(
+            'delete_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Delete'), 'onclick' => "deleteImage(#image#)", 'class' => 'delete']
+        );
 
-        $this->addChild('add_button', 'Magento\Backend\Block\Widget\Button', array(
-            'label'     => __('Add New Image'),
-            'onclick'   => 'addNewImage()',
-            'class' => 'add'
-        ));
+        $this->addChild(
+            'add_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            ['label' => __('Add New Image'), 'onclick' => 'addNewImage()', 'class' => 'add']
+        );
         return parent::_prepareLayout();
     }
 
+    /**
+     * Return add button.
+     *
+     * @return string
+     */
     public function getAddButtonHtml()
     {
         return $this->getChildHtml('add_button');
     }
 
+    /**
+     * Return delete button.
+     *
+     * @param string $image
+     * @return string|string[]
+     */
     public function getDeleteButtonHtml($image)
     {
         return str_replace('#image#', $image, $this->getChildHtml('delete_button'));
     }
-
 }
-

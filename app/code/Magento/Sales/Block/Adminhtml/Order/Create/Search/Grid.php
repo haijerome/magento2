@@ -1,85 +1,90 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Search;
+
+use Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\DataProvider\ProductCollection;
+use Magento\Framework\App\ObjectManager;
 
 /**
  * Adminhtml sales order create search products block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Search;
-
-class Grid extends \Magento\Adminhtml\Block\Widget\Grid
+class Grid extends \Magento\Backend\Block\Widget\Grid\Extended
 {
     /**
+     * Sales config
+     *
      * @var \Magento\Sales\Model\Config
      */
     protected $_salesConfig;
 
     /**
-     * @var \Magento\Adminhtml\Model\Session\Quote
+     * Session quote
+     *
+     * @var \Magento\Backend\Model\Session\Quote
      */
     protected $_sessionQuote;
 
     /**
+     * Catalog config
+     *
      * @var \Magento\Catalog\Model\Config
      */
     protected $_catalogConfig;
 
     /**
+     * Product factory
+     *
      * @var \Magento\Catalog\Model\ProductFactory
      */
     protected $_productFactory;
 
     /**
+     * @var ProductCollection $productCollectionProvider
+     */
+    private $productCollectionProvider;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
+     * @param \Magento\Backend\Helper\Data $backendHelper
      * @param \Magento\Catalog\Model\ProductFactory $productFactory
      * @param \Magento\Catalog\Model\Config $catalogConfig
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param \Magento\Sales\Model\Config $salesConfig
      * @param array $data
+     * @param ProductCollection|null $productCollectionProvider
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
+        \Magento\Backend\Helper\Data $backendHelper,
         \Magento\Catalog\Model\ProductFactory $productFactory,
         \Magento\Catalog\Model\Config $catalogConfig,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
         \Magento\Sales\Model\Config $salesConfig,
-        array $data = array()
+        array $data = [],
+        ProductCollection $productCollectionProvider = null
     ) {
         $this->_productFactory = $productFactory;
         $this->_catalogConfig = $catalogConfig;
         $this->_sessionQuote = $sessionQuote;
         $this->_salesConfig = $salesConfig;
-        parent::__construct($context, $urlModel, $data);
+        $this->productCollectionProvider = $productCollectionProvider
+            ?: ObjectManager::getInstance()->get(ProductCollection::class);
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -88,6 +93,7 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
         $this->setCheckboxCheckCallback('order.productGridCheckboxCheck.bind(order)');
         $this->setRowInitCallback('order.productGridRowInit.bind(order)');
         $this->setDefaultSort('entity_id');
+        $this->setFilterKeyPressCallback('order.productGridFilterKeyPress');
         $this->setUseAjax(true);
         if ($this->getRequest()->getParam('collapse')) {
             $this->setIsCollapsed(true);
@@ -96,7 +102,8 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
 
     /**
      * Retrieve quote store object
-     * @return \Magento\Core\Model\Store
+     *
+     * @return \Magento\Store\Model\Store
      */
     public function getStore()
     {
@@ -105,13 +112,20 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
 
     /**
      * Retrieve quote object
-     * @return \Magento\Sales\Model\Quote
+     *
+     * @return \Magento\Quote\Model\Quote
      */
     public function getQuote()
     {
         return $this->_sessionQuote->getQuote();
     }
 
+    /**
+     * Add column filter to collection
+     *
+     * @param \Magento\Backend\Block\Widget\Grid\Column $column
+     * @return $this
+     */
     protected function _addColumnFilterToCollection($column)
     {
         // Set custom filter for in product flag
@@ -121,10 +135,10 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
                 $productIds = 0;
             }
             if ($column->getFilter()->getValue()) {
-                $this->getCollection()->addFieldToFilter('entity_id', array('in'=>$productIds));
+                $this->getCollection()->addFieldToFilter('entity_id', ['in' => $productIds]);
             } else {
-                if($productIds) {
-                    $this->getCollection()->addFieldToFilter('entity_id', array('nin'=>$productIds));
+                if ($productIds) {
+                    $this->getCollection()->addFieldToFilter('entity_id', ['nin' => $productIds]);
                 }
             }
         } else {
@@ -136,20 +150,23 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
     /**
      * Prepare collection to be displayed in the grid
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid
+     * @return $this
      */
     protected function _prepareCollection()
     {
+
         $attributes = $this->_catalogConfig->getProductAttributes();
-        /* @var $collection \Magento\Catalog\Model\Resource\Product\Collection */
-        $collection = $this->_productFactory->create()->getCollection();
-        $collection
-            ->setStore($this->getStore())
-            ->addAttributeToSelect($attributes)
-            ->addAttributeToSelect('sku')
-            ->addStoreFilter()
-            ->addAttributeToFilter('type_id', $this->_salesConfig->getAvailableProductTypes())
-            ->addAttributeToSelect('gift_message_available');
+        $store = $this->getStore();
+
+        /* @var $collection \Magento\Catalog\Model\ResourceModel\Product\Collection */
+        $collection = $this->productCollectionProvider->getCollectionForStore($store);
+        $collection->addAttributeToSelect(
+            $attributes
+        );
+        $collection->addAttributeToFilter(
+            'type_id',
+            $this->_salesConfig->getAvailableProductTypes()
+        );
 
         $this->setCollection($collection);
         return parent::_prepareCollection();
@@ -158,83 +175,106 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
     /**
      * Prepare columns
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid
+     * @return $this
      */
     protected function _prepareColumns()
     {
-        $this->addColumn('entity_id', array(
-            'header'    => __('ID'),
-            'sortable'  => true,
-            'width'     => '60',
-            'index'     => 'entity_id'
-        ));
-        $this->addColumn('name', array(
-            'header'    => __('Product'),
-            'renderer'  => 'Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Product',
-            'index'     => 'name'
-        ));
-        $this->addColumn('sku', array(
-            'header'    => __('SKU'),
-            'width'     => '80',
-            'index'     => 'sku'
-        ));
-        $this->addColumn('price', array(
-            'header'    => __('Price'),
-            'column_css_class' => 'price',
-            'align'     => 'center',
-            'type'      => 'currency',
-            'currency_code' => $this->getStore()->getCurrentCurrencyCode(),
-            'rate'      => $this->getStore()->getBaseCurrency()->getRate($this->getStore()->getCurrentCurrencyCode()),
-            'index'     => 'price',
-            'renderer'  => 'Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Price',
-        ));
+        $this->addColumn(
+            'entity_id',
+            [
+                'header' => __('ID'),
+                'sortable' => true,
+                'header_css_class' => 'col-id',
+                'column_css_class' => 'col-id',
+                'index' => 'entity_id'
+            ]
+        );
+        $this->addColumn(
+            'name',
+            [
+                'header' => __('Product'),
+                'renderer' => \Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Product::class,
+                'index' => 'name'
+            ]
+        );
+        $this->addColumn('sku', ['header' => __('SKU'), 'index' => 'sku']);
+        $this->addColumn(
+            'price',
+            [
+                'header' => __('Price'),
+                'column_css_class' => 'price',
+                'type' => 'currency',
+                'currency_code' => $this->getStore()->getCurrentCurrencyCode(),
+                'rate' => $this->getStore()->getBaseCurrency()->getRate($this->getStore()->getCurrentCurrencyCode()),
+                'index' => 'price',
+                'renderer' => \Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Price::class
+            ]
+        );
 
-        $this->addColumn('in_products', array(
-            'header'    => __('Select'),
-            'header_css_class' => 'a-center',
-            'type'      => 'checkbox',
-            'name'      => 'in_products',
-            'values'    => $this->_getSelectedProducts(),
-            'align'     => 'center',
-            'index'     => 'entity_id',
-            'sortable'  => false,
-        ));
+        $this->addColumn(
+            'in_products',
+            [
+                'header' => __('Select'),
+                'type' => 'checkbox',
+                'name' => 'in_products',
+                'values' => $this->_getSelectedProducts(),
+                'index' => 'entity_id',
+                'sortable' => false,
+                'header_css_class' => 'col-select',
+                'column_css_class' => 'col-select'
+            ]
+        );
 
-        $this->addColumn('qty', array(
-            'filter'    => false,
-            'sortable'  => false,
-            'header'    => __('Quantity'),
-            'renderer'  => 'Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Qty',
-            'name'      => 'qty',
-            'inline_css'=> 'qty',
-            'align'     => 'center',
-            'type'      => 'input',
-            'validate_class' => 'validate-number',
-            'index'     => 'qty',
-            'width'     => '1',
-        ));
+        $this->addColumn(
+            'qty',
+            [
+                'filter' => false,
+                'sortable' => false,
+                'header' => __('Quantity'),
+                'renderer' => \Magento\Sales\Block\Adminhtml\Order\Create\Search\Grid\Renderer\Qty::class,
+                'name' => 'qty',
+                'inline_css' => 'qty',
+                'type' => 'input',
+                'validate_class' => 'validate-number',
+                'index' => 'qty'
+            ]
+        );
 
         return parent::_prepareColumns();
     }
 
+    /**
+     * Get grid url
+     *
+     * @return string
+     */
     public function getGridUrl()
     {
-        return $this->getUrl('sales/*/loadBlock', array('block'=>'search_grid', '_current' => true, 'collapse' => null));
+        return $this->getUrl(
+            'sales/*/loadBlock',
+            ['block' => 'search_grid', '_current' => true, 'collapse' => null]
+        );
     }
 
+    /**
+     * Get selected products
+     *
+     * @return mixed
+     */
     protected function _getSelectedProducts()
     {
-        $products = $this->getRequest()->getPost('products', array());
+        $products = $this->getRequest()->getPost('products', []);
 
         return $products;
     }
 
-    /*
+    /**
      * Add custom options to product collection
      *
-     * return \Magento\Adminhtml\Block\Widget\Grid
+     * @return $this
      */
-    protected function _afterLoadCollection() {
+    protected function _afterLoadCollection()
+    {
         $this->getCollection()->addOptionsToResult();
         return parent::_afterLoadCollection();
     }

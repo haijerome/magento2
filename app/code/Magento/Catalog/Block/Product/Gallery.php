@@ -1,80 +1,85 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Product gallery
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Product;
 
-class Gallery extends \Magento\View\Element\Template
+use Magento\Catalog\Model\Product;
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Data\Collection;
+
+/**
+ * Product gallery block
+ *
+ * @api
+ * @since 100.0.2
+ */
+class Gallery extends \Magento\Framework\View\Element\Template
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Framework\Registry $registry,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
         parent::__construct($context, $data);
     }
 
+    /**
+     * Prepare layout
+     *
+     * @return $this
+     */
     protected function _prepareLayout()
     {
-        $headBlock = $this->getLayout()->getBlock('head');
-        if ($headBlock) {
-            $headBlock->setTitle($this->getProduct()->getMetaTitle());
-        }
+        $this->pageConfig->getTitle()->set($this->getProduct()->getMetaTitle());
         return parent::_prepareLayout();
     }
 
+    /**
+     * Get product
+     *
+     * @return Product
+     */
     public function getProduct()
     {
         return $this->_coreRegistry->registry('product');
     }
 
+    /**
+     * Get gallery collection
+     *
+     * @return Collection
+     */
     public function getGalleryCollection()
     {
         return $this->getProduct()->getMediaGalleryImages();
     }
 
+    /**
+     * Get current image
+     *
+     * @return Image|null
+     */
     public function getCurrentImage()
     {
         $imageId = $this->getRequest()->getParam('image');
@@ -89,11 +94,21 @@ class Gallery extends \Magento\View\Element\Template
         return $image;
     }
 
+    /**
+     * Get image url
+     *
+     * @return string
+     */
     public function getImageUrl()
     {
         return $this->getCurrentImage()->getUrl();
     }
 
+    /**
+     * Get image file
+     *
+     * @return mixed
+     */
     public function getImageFile()
     {
         return $this->getCurrentImage()->getFile();
@@ -107,13 +122,14 @@ class Gallery extends \Magento\View\Element\Template
     public function getImageWidth()
     {
         $file = $this->getCurrentImage()->getPath();
-        if ($this->_filesystem->isFile($file)) {
+
+        if ($this->_filesystem->getDirectoryRead(DirectoryList::MEDIA)->isFile($file)) {
             $size = getimagesize($file);
             if (isset($size[0])) {
                 if ($size[0] > 600) {
                     return 600;
                 } else {
-                    return $size[0];
+                    return (int) $size[0];
                 }
             }
         }
@@ -121,6 +137,11 @@ class Gallery extends \Magento\View\Element\Template
         return false;
     }
 
+    /**
+     * Get previous image
+     *
+     * @return Image|false
+     */
     public function getPreviousImage()
     {
         $current = $this->getCurrentImage();
@@ -137,6 +158,11 @@ class Gallery extends \Magento\View\Element\Template
         return $previous;
     }
 
+    /**
+     * Get next image
+     *
+     * @return Image|false
+     */
     public function getNextImage()
     {
         $current = $this->getCurrentImage();
@@ -157,20 +183,30 @@ class Gallery extends \Magento\View\Element\Template
         return $next;
     }
 
+    /**
+     * Get previous image url
+     *
+     * @return false|string
+     */
     public function getPreviousImageUrl()
     {
         $image = $this->getPreviousImage();
         if ($image) {
-            return $this->getUrl('*/*/*', array('_current' => true, 'image' => $image->getValueId()));
+            return $this->getUrl('*/*/*', ['_current' => true, 'image' => $image->getValueId()]);
         }
         return false;
     }
 
+    /**
+     * Get next image url
+     *
+     * @return false|string
+     */
     public function getNextImageUrl()
     {
         $image = $this->getNextImage();
         if ($image) {
-            return $this->getUrl('*/*/*', array('_current' => true, 'image' => $image->getValueId()));
+            return $this->getUrl('*/*/*', ['_current' => true, 'image' => $image->getValueId()]);
         }
         return false;
     }

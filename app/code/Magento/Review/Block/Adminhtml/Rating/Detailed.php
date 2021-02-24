@@ -1,70 +1,68 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Review\Block\Adminhtml\Rating;
+
+use Magento\Review\Model\Rating;
+use Magento\Review\Model\Rating\Option;
+use Magento\Review\Model\ResourceModel\Rating\Collection as RatingCollection;
+use Magento\Review\Model\ResourceModel\Rating\Option\Vote\Collection as VoteCollection;
 
 /**
  * Adminhtml detailed rating stars
  */
-namespace Magento\Review\Block\Adminhtml\Rating;
-
 class Detailed extends \Magento\Backend\Block\Template
 {
+    /**
+     * Vote collection
+     *
+     * @var VoteCollection
+     */
     protected $_voteCollection = false;
 
-    protected $_template = 'Magento_Rating::rating/detailed.phtml';
+    /**
+     * Rating detail template name
+     *
+     * @var string
+     */
+    protected $_template = 'Magento_Review::rating/detailed.phtml';
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
-     * @var \Magento\Rating\Model\Resource\Rating\CollectionFactory
+     * Rating resource model
+     *
+     * @var \Magento\Review\Model\ResourceModel\Rating\CollectionFactory
      */
     protected $_ratingsFactory;
 
     /**
-     * @var \Magento\Rating\Model\Resource\Rating\Option\Vote\CollectionFactory
+     * Rating resource option model
+     *
+     * @var \Magento\Review\Model\ResourceModel\Rating\Option\Vote\CollectionFactory
      */
     protected $_votesFactory;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Rating\Model\Resource\Rating\CollectionFactory $ratingsFactory
-     * @param \Magento\Rating\Model\Resource\Rating\Option\Vote\CollectionFactory $votesFactory
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Review\Model\ResourceModel\Rating\CollectionFactory $ratingsFactory
+     * @param \Magento\Review\Model\ResourceModel\Rating\Option\Vote\CollectionFactory $votesFactory
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Rating\Model\Resource\Rating\CollectionFactory $ratingsFactory,
-        \Magento\Rating\Model\Resource\Rating\Option\Vote\CollectionFactory $votesFactory,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Review\Model\ResourceModel\Rating\CollectionFactory $ratingsFactory,
+        \Magento\Review\Model\ResourceModel\Rating\Option\Vote\CollectionFactory $votesFactory,
+        \Magento\Framework\Registry $registry,
+        array $data = []
     ) {
         $this->_ratingsFactory = $ratingsFactory;
         $this->_votesFactory = $votesFactory;
@@ -72,6 +70,11 @@ class Detailed extends \Magento\Backend\Block\Template
         parent::__construct($context, $data);
     }
 
+    /**
+     * Initialize review data
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -81,62 +84,73 @@ class Detailed extends \Magento\Backend\Block\Template
         }
     }
 
+    /**
+     * Get collection of ratings
+     *
+     * @return RatingCollection
+     */
     public function getRating()
     {
         if (!$this->getRatingCollection()) {
             if ($this->_coreRegistry->registry('review_data')) {
                 $stores = $this->_coreRegistry->registry('review_data')->getStores();
 
-                $stores = array_diff($stores, array(0));
+                $stores = array_diff($stores, [0]);
 
-                $ratingCollection = $this->_ratingsFactory->create()
-                    ->addEntityFilter('product')
-                    ->setStoreFilter($stores)
-                    ->setActiveFilter(true)
-                    ->setPositionOrder()
-                    ->load()
-                    ->addOptionToItems();
+                $ratingCollection = $this->_ratingsFactory->create()->addEntityFilter(
+                    'product'
+                )->setStoreFilter(
+                    $stores
+                )->setActiveFilter(
+                    true
+                )->setPositionOrder()->load()->addOptionToItems();
 
-                $this->_voteCollection = $this->_votesFactory->create()
-                    ->setReviewFilter($this->getReviewId())
-                    ->addOptionInfo()
-                    ->load()
-                    ->addRatingOptions();
-
+                $this->_voteCollection = $this->_votesFactory->create()->setReviewFilter(
+                    $this->getReviewId()
+                )->addOptionInfo()->load()->addRatingOptions();
             } elseif (!$this->getIsIndependentMode()) {
-                $ratingCollection = $this->_ratingsFactory->create()
-                    ->addEntityFilter('product')
-                    ->setStoreFilter(null)
-                    ->setPositionOrder()
-                    ->load()
-                    ->addOptionToItems();
+                $ratingCollection = $this->_ratingsFactory->create()->addEntityFilter(
+                    'product'
+                )->setStoreFilter(
+                    null
+                )->setPositionOrder()->load()->addOptionToItems();
             } else {
                 $stores = $this->getRequest()->getParam('select_stores') ?: $this->getRequest()->getParam('stores');
-                $ratingCollection = $this->_ratingsFactory->create()
-                    ->addEntityFilter('product')
-                    ->setStoreFilter($stores)
-                    ->setPositionOrder()
-                    ->load()
-                    ->addOptionToItems();
-                if (intval($this->getRequest()->getParam('id'))) {
-                    $this->_voteCollection = $this->_votesFactory->create()
-                        ->setReviewFilter(intval($this->getRequest()->getParam('id')))
-                        ->addOptionInfo()
-                        ->load()
-                        ->addRatingOptions();
+                $ratingCollection = $this->_ratingsFactory->create()->addEntityFilter(
+                    'product'
+                )->setStoreFilter(
+                    $stores
+                )->setPositionOrder()->load()->addOptionToItems();
+                if ((int)$this->getRequest()->getParam('id')) {
+                    $this->_voteCollection = $this->_votesFactory->create()->setReviewFilter(
+                        (int)$this->getRequest()->getParam('id')
+                    )->addOptionInfo()->load()->addRatingOptions();
                 }
             }
-            $this->setRatingCollection( ( $ratingCollection->getSize() ) ? $ratingCollection : false );
+            $this->setRatingCollection($ratingCollection->getSize() ? $ratingCollection : false);
         }
         return $this->getRatingCollection();
     }
 
+    /**
+     * Set independent mode
+     *
+     * @return $this
+     */
     public function setIndependentMode()
     {
         $this->setIsIndependentMode(true);
         return $this;
     }
 
+    /**
+     * Indicator of whether or not a rating is selected
+     *
+     * @param Option $option
+     * @param \Magento\Review\Model\Rating $rating
+     * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
     public function isSelected($option, $rating)
     {
         if ($this->getIsIndependentMode()) {

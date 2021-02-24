@@ -1,46 +1,60 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Paypal\Model;
+
+use Magento\Framework\DataObject;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\State\InvalidTransitionException;
+use Magento\Payment\Gateway\Command\CommandException;
+use Magento\Payment\Helper\Formatter;
+use Magento\Payment\Model\InfoInterface;
+use Magento\Payment\Model\Method\ConfigInterface;
+use Magento\Payment\Model\Method\ConfigInterfaceFactory;
+use Magento\Payment\Model\Method\Online\GatewayInterface;
+use Magento\Payment\Observer\AbstractDataAssignObserver;
+use Magento\Paypal\Model\Payflow\Service\Gateway;
+use Magento\Paypal\Model\Payflow\Service\Response\Handler\HandlerInterface;
+use Magento\Quote\Model\Quote;
+use Magento\Sales\Api\Data\OrderPaymentInterface;
+use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Payment;
+use Magento\Store\Model\ScopeInterface;
 
 /**
  * Payflow Pro payment gateway model
+ * @SuppressWarnings(PHPMD.TooManyFields)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-namespace Magento\Paypal\Model;
-
-class Payflowpro extends  \Magento\Payment\Model\Method\Cc
+class Payflowpro extends \Magento\Payment\Model\Method\Cc implements GatewayInterface
 {
+    use Formatter;
+
     /**
      * Transaction action codes
      */
-    const TRXTYPE_AUTH_ONLY         = 'A';
-    const TRXTYPE_SALE              = 'S';
-    const TRXTYPE_CREDIT            = 'C';
-    const TRXTYPE_DELAYED_CAPTURE   = 'D';
-    const TRXTYPE_DELAYED_VOID      = 'V';
-    const TRXTYPE_DELAYED_VOICE     = 'F';
-    const TRXTYPE_DELAYED_INQUIRY   = 'I';
+    const TRXTYPE_AUTH_ONLY = 'A';
+
+    const TRXTYPE_SALE = 'S';
+
+    const TRXTYPE_CREDIT = 'C';
+
+    const TRXTYPE_DELAYED_CAPTURE = 'D';
+
+    const TRXTYPE_DELAYED_VOID = 'V';
+
+    const TRXTYPE_DELAYED_VOICE = 'F';
+
+    const TRXTYPE_DELAYED_INQUIRY = 'I';
+
+    const TRXTYPE_ACCEPT_DENY       = 'U';
+
+    const UPDATEACTION_APPROVED = 'APPROVE';
+
+    const UPDATEACTION_DECLINED_BY_MERCHANT = 'FPS_MERCHANT_DECLINE';
 
     /**
      * Tender type codes
@@ -50,287 +64,476 @@ class Payflowpro extends  \Magento\Payment\Model\Method\Cc
     /**
      * Gateway request URLs
      */
-    const TRANSACTION_URL           = 'https://payflowpro.paypal.com/transaction';
+    const TRANSACTION_URL = 'https://payflowpro.paypal.com/transaction';
+
     const TRANSACTION_URL_TEST_MODE = 'https://pilot-payflowpro.paypal.com/transaction';
 
     /**#@+
      * Response code
      */
-    const RESPONSE_CODE_APPROVED                = 0;
-    const RESPONSE_CODE_INVALID_AMOUNT          = 4;
-    const RESPONSE_CODE_FRAUDSERVICE_FILTER     = 126;
-    const RESPONSE_CODE_DECLINED                = 12;
-    const RESPONSE_CODE_DECLINED_BY_FILTER      = 125;
-    const RESPONSE_CODE_DECLINED_BY_MERCHANT    = 128;
-    const RESPONSE_CODE_CAPTURE_ERROR           = 111;
-    const RESPONSE_CODE_VOID_ERROR              = 108;
+    const RESPONSE_CODE_APPROVED = 0;
+
+    const RESPONSE_CODE_INVALID_AMOUNT = 4;
+
+    const RESPONSE_CODE_FRAUDSERVICE_FILTER = 126;
+
+    const RESPONSE_CODE_DECLINED = 12;
+
+    const RESPONSE_CODE_DECLINED_BY_FILTER = 125;
+
+    const RESPONSE_CODE_DECLINED_BY_MERCHANT = 128;
+
+    const RESPONSE_CODE_CAPTURE_ERROR = 111;
+
+    const RESPONSE_CODE_VOID_ERROR = 108;
+
+    private const RESPONSE_CODE_AUTHORIZATION_EXPIRED = 10601;
+
+    const PNREF = 'pnref';
+
     /**#@-*/
+    protected $_responseParamsMappings = [
+        'firstname' => 'billtofirstname',
+        'lastname' => 'billtolastname',
+        'address' => 'billtostreet',
+        'city' => 'billtocity',
+        'state' => 'billtostate',
+        'zip' => 'billtozip',
+        'country' => 'billtocountry',
+        'phone' => 'billtophone',
+        'email' => 'billtoemail',
+        'nametoship' => 'shiptofirstname',
+        'addresstoship' => 'shiptostreet',
+        'citytoship' => 'shiptocity',
+        'statetoship' => 'shiptostate',
+        'ziptoship' => 'shiptozip',
+        'countrytoship' => 'shiptocountry',
+        'phonetoship' => 'shiptophone',
+        'emailtoship' => 'shiptoemail',
+        'faxtoship' => 'shiptofax',
+        'method' => 'tender',
+        'cscmatch' => 'cvv2match',
+        'type' => 'trxtype',
+        'cclast4' => 'acct',
+        'ccavsstatus' => 'avsdata',
+        'amt' => 'amt',
+        'transtime' => 'transtime',
+        'expdate' => 'expdate',
+        'securetoken' => 'securetoken',
+        'securetokenid' => 'securetokenid',
+        'authcode' => 'authcode',
+        'hostcode' => 'hostcode',
+        'pnref' => 'pnref',
+        'cc_type' => 'cardtype'
+    ];
+
+    /**
+     * PayPal credit card type map.
+     * @see https://developer.paypal.com/docs/classic/payflow/integration-guide/#credit-card-transaction-responses
+     *
+     * @var array
+     */
+    private $ccTypeMap = [
+        '0' => 'VI',
+        '1' => 'MC',
+        '2' => 'DI',
+        '3' => 'AE',
+        '4' => 'DN',
+        '5' => 'JCB'
+    ];
 
     /**
      * Payment method code
+     *
+     * @var string
      */
     protected $_code = \Magento\Paypal\Model\Config::METHOD_PAYFLOWPRO;
 
-    /**#@+
+    /**
      * Availability option
+     *
+     * @var bool
      */
-    protected $_isGateway               = true;
-    protected $_canAuthorize            = true;
-    protected $_canCapture              = true;
-    protected $_canCapturePartial       = false;
-    protected $_canRefund               = true;
-    protected $_canVoid                 = true;
-    protected $_canUseInternal          = true;
-    protected $_canUseCheckout          = true;
-    protected $_canUseForMultishipping  = true;
+    protected $_isGateway = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canAuthorize = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canCapture = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canCapturePartial = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canRefund = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canRefundInvoicePartial = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canVoid = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseInternal = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseCheckout = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
     protected $_canSaveCc = false;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
     protected $_isProxy = false;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
     protected $_canFetchTransactionInfo = true;
-    /**#@-*/
+
+    /**
+     * Payment Method feature
+     *
+     * @var bool
+     */
+    protected $_canReviewPayment = true;
 
     /**
      * Gateway request timeout
+     *
+     * @var int
      */
     protected $_clientTimeout = 45;
 
     /**
      * Fields that should be replaced in debug with '***'
      *
-     * @var array
+     * @var string[]
      */
-    protected $_debugReplacePrivateDataKeys = array('user', 'pwd', 'acct', 'expdate', 'cvv2');
+    protected $_debugReplacePrivateDataKeys = ['user', 'pwd', 'acct', 'expdate', 'cvv2'];
 
     /**
-     * Centinel cardinal fields map
-     *
-     * @var string
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
-    protected $_centinelFieldMap = array(
-        'centinel_mpivendor'    => 'MPIVENDOR3DS',
-        'centinel_authstatus'   => 'AUTHSTATUS3DS',
-        'centinel_cavv'         => 'CAVV',
-        'centinel_eci'          => 'ECI',
-        'centinel_xid'          => 'XID',
-    );
-    /**
-     * @var \Magento\Core\Model\StoreManagerInterface
-     */
-    protected $_storeManager;
+    protected $storeManager;
 
     /**
-     * @var \Magento\Paypal\Model\ConfigFactory
+     * @var ConfigInterfaceFactory
      */
-    protected $_configFactory;
+    protected $configFactory;
 
     /**
-     * @var \Magento\Math\Random
+     * @var ConfigInterface
      */
-    protected $mathRandom;
+    private $config;
 
     /**
-     * @param \Magento\Event\ManagerInterface $eventManager
+     * @var Gateway
+     */
+    private $gateway;
+
+    /**
+     * @var HandlerInterface
+     */
+    private $errorHandler;
+
+    /**
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory
      * @param \Magento\Payment\Helper\Data $paymentData
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory
-     * @param \Magento\Logger $logger
-     * @param \Magento\Module\ModuleListInterface $moduleList
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\Centinel\Model\Service $centinelService
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Paypal\Model\ConfigFactory $configFactory
-     * @param \Magento\Math\Random $mathRandom
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Payment\Model\Method\Logger $logger
+     * @param \Magento\Framework\Module\ModuleListInterface $moduleList
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param ConfigInterfaceFactory $configFactory
+     * @param Gateway $gateway
+     * @param HandlerInterface $errorHandler
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
-     * 
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Event\ManagerInterface $eventManager,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
         \Magento\Payment\Helper\Data $paymentData,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory,
-        \Magento\Logger $logger,
-        \Magento\Module\ModuleListInterface $moduleList,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\Centinel\Model\Service $centinelService,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Paypal\Model\ConfigFactory $configFactory,
-        \Magento\Math\Random $mathRandom,
-        array $data = array()
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Payment\Model\Method\Logger $logger,
+        \Magento\Framework\Module\ModuleListInterface $moduleList,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        ConfigInterfaceFactory $configFactory,
+        Gateway $gateway,
+        HandlerInterface $errorHandler,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        $this->_storeManager = $storeManager;
-        $this->_configFactory = $configFactory;
-        $this->mathRandom = $mathRandom;
+        $this->storeManager = $storeManager;
+        $this->configFactory = $configFactory;
+        $this->gateway = $gateway;
         parent::__construct(
-            $eventManager,
+            $context,
+            $registry,
+            $extensionFactory,
+            $customAttributeFactory,
             $paymentData,
-            $coreStoreConfig,
-            $logAdapterFactory,
+            $scopeConfig,
             $logger,
             $moduleList,
-            $locale,
-            $centinelService,
+            $localeDate,
+            $resource,
+            $resourceCollection,
             $data
         );
+        $this->errorHandler = $errorHandler;
     }
 
     /**
      * Check whether payment method can be used
      *
-     * @param \Magento\Sales\Model\Quote
+     * @param \Magento\Quote\Api\Data\CartInterface|Quote|null $quote
+     * @return bool
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function isAvailable(\Magento\Quote\Api\Data\CartInterface $quote = null)
+    {
+        return parent::isAvailable($quote) && $this->getConfig()->isMethodAvailable($this->getCode());
+    }
+
+    /**
+     * Is active
+     *
+     * @param int|null $storeId
      * @return bool
      */
-    public function isAvailable($quote = null)
+    public function isActive($storeId = null)
     {
-        $storeId = $this->_storeManager->getStore($this->getStore())->getId();
-        /** @var \Magento\Paypal\Model\Config $config */
-        $config = $this->_configFactory->create()->setStoreId($storeId);
-        if (parent::isAvailable($quote) && $config->isMethodAvailable($this->getCode())) {
-            return true;
-        }
-        return false;
+        $pathPayflowPro = 'payment/' . Config::METHOD_PAYFLOWPRO . '/active';
+        $pathPaymentPro = 'payment/' . Config::METHOD_PAYMENT_PRO . '/active';
+
+        return (bool)(int) $this->_scopeConfig->getValue($pathPayflowPro, ScopeInterface::SCOPE_STORE, $storeId)
+            || (bool)(int) $this->_scopeConfig->getValue($pathPaymentPro, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
     /**
      * Payment action getter compatible with payment model
      *
-     * @see \Magento\Sales\Model\Payment::place()
      * @return string
      */
     public function getConfigPaymentAction()
     {
-        switch ($this->getConfigData('payment_action')) {
-            case \Magento\Paypal\Model\Config::PAYMENT_ACTION_AUTH:
-                return \Magento\Payment\Model\Method\AbstractMethod::ACTION_AUTHORIZE;
-            case \Magento\Paypal\Model\Config::PAYMENT_ACTION_SALE:
-                return \Magento\Payment\Model\Method\AbstractMethod::ACTION_AUTHORIZE_CAPTURE;
-            default:
-                break;
-        }
+        return $this->getConfig()->getPaymentAction();
     }
 
     /**
      * Authorize payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param InfoInterface|Payment|Object $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws InvalidTransitionException
      */
-    public function authorize(\Magento\Object $payment, $amount)
+    public function authorize(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
         $request = $this->_buildPlaceRequest($payment, $amount);
+        $this->addRequestOrderInfo($request, $payment->getOrder());
         $request->setTrxtype(self::TRXTYPE_AUTH_ONLY);
-        $this->_setReferenceTransaction($payment, $request);
-        $response = $this->_postRequest($request);
-        $this->_processErrors($response);
-
-        switch ($response->getResultCode()){
-            case self::RESPONSE_CODE_APPROVED:
-                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
-                break;
-            case self::RESPONSE_CODE_FRAUDSERVICE_FILTER:
-                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
-                $payment->setIsTransactionPending(true);
-                $payment->setIsFraudDetected(true);
-                break;
-            default:
-                break;
-        }
+        $response = $this->postRequest($request, $this->getConfig());
+        $this->processErrors($response);
+        $this->setTransStatus($payment, $response);
         return $this;
+    }
+
+    /**
+     * Get capture amount
+     *
+     * @param float $amount
+     * @return float|int
+     */
+    protected function _getCaptureAmount($amount)
+    {
+        $infoInstance = $this->getInfoInstance();
+        $amountToPay = $amount;
+        $authorizedAmount = $infoInstance->getAmountAuthorized();
+        return abs($amountToPay - $authorizedAmount) < 0.00001 ? 0 : $amountToPay;
     }
 
     /**
      * Capture payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param InfoInterface|Payment|Object $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws InvalidTransitionException
      */
-    public function capture(\Magento\Object $payment, $amount)
+    public function capture(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        if ($payment->getReferenceTransactionId()) {
-            $request = $this->_buildPlaceRequest($payment, $amount);
+        if ($payment->getAdditionalInformation(self::PNREF)) {
+            $request = $this->buildBasicRequest();
+            $request->setAmt($this->formatPrice($amount));
             $request->setTrxtype(self::TRXTYPE_SALE);
-            $request->setOrigid($payment->getReferenceTransactionId());
+            $request->setOrigid($payment->getAdditionalInformation(self::PNREF));
+            $payment->unsAdditionalInformation(self::PNREF);
+            $request->setData('currency', $payment->getOrder()->getBaseCurrencyCode());
         } elseif ($payment->getParentTransactionId()) {
-            $request = $this->_buildBasicRequest($payment);
-            $request->setTrxtype(self::TRXTYPE_DELAYED_CAPTURE);
+            $request = $this->buildBasicRequest();
             $request->setOrigid($payment->getParentTransactionId());
+            $captureAmount = $this->_getCaptureAmount($amount);
+            if ($captureAmount) {
+                $request->setAmt($this->formatPrice($captureAmount));
+            }
+            $trxType = $this->getInfoInstance()->hasAmountPaid() ? self::TRXTYPE_SALE : self::TRXTYPE_DELAYED_CAPTURE;
+            $request->setTrxtype($trxType);
         } else {
             $request = $this->_buildPlaceRequest($payment, $amount);
             $request->setTrxtype(self::TRXTYPE_SALE);
         }
+        $this->addRequestOrderInfo($request, $payment->getOrder());
 
-        $response = $this->_postRequest($request);
-        $this->_processErrors($response);
-
-        switch ($response->getResultCode()) {
-            case self::RESPONSE_CODE_APPROVED:
-                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
-                break;
-            case self::RESPONSE_CODE_FRAUDSERVICE_FILTER:
-                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
-                $payment->setIsTransactionPending(true);
-                $payment->setIsFraudDetected(true);
-                break;
-            default:
-                break;
-        }
+        $response = $this->postRequest($request, $this->getConfig());
+        $this->processErrors($response);
+        $this->setTransStatus($payment, $response);
         return $this;
     }
 
     /**
      * Void payment
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @param InfoInterface|Payment|Object $payment
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws InvalidTransitionException
      */
-    public function void(\Magento\Object $payment)
+    public function void(\Magento\Payment\Model\InfoInterface $payment)
     {
-        $request = $this->_buildBasicRequest($payment);
+        $request = $this->buildBasicRequest();
         $request->setTrxtype(self::TRXTYPE_DELAYED_VOID);
         $request->setOrigid($payment->getParentTransactionId());
-        $response = $this->_postRequest($request);
-        $this->_processErrors($response);
+        $response = $this->postRequest($request, $this->getConfig());
+        $this->processErrors($response);
 
-        if ($response->getResultCode() == self::RESPONSE_CODE_APPROVED){
-            $payment->setTransactionId($response->getPnref())
-                ->setIsTransactionClosed(1)
-                ->setShouldCloseParentTransaction(1);
+        if ($response->getResultCode() == self::RESPONSE_CODE_APPROVED) {
+            $payment->setTransactionId(
+                $response->getPnref()
+            )->setIsTransactionClosed(
+                1
+            )->setShouldCloseParentTransaction(
+                1
+            );
         }
 
         return $this;
     }
 
     /**
+     * Check void availability
+     *
+     * @return bool
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function canVoid()
+    {
+        if ($this->getInfoInstance()->getAmountPaid()) {
+            $this->_canVoid = false;
+        }
+
+        return $this->_canVoid;
+    }
+
+    /**
      * Attempt to void the authorization on cancelling
      *
-     * @param \Magento\Object $payment
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @param InfoInterface|Object $payment
+     * @return $this
+     * @throws CommandException
      */
-    public function cancel(\Magento\Object $payment)
+    public function cancel(\Magento\Payment\Model\InfoInterface $payment)
     {
-        return $this->void($payment);
+        if (!$payment->getOrder()->getInvoiceCollection()->count()) {
+            try {
+                $this->void($payment);
+            } catch (CommandException $e) {
+                // Ignore error about expiration of authorization transaction.
+                if (strpos($e->getMessage(), (string)self::RESPONSE_CODE_AUTHORIZATION_EXPIRED) === false) {
+                    throw $e;
+                }
+            }
+
+        }
+
+        return $this;
     }
 
     /**
      * Refund capture
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param InfoInterface|Payment|Object $payment
      * @param float $amount
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws InvalidTransitionException
      */
-    public function refund(\Magento\Object $payment, $amount)
+    public function refund(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        $request = $this->_buildBasicRequest($payment);
+        $request = $this->buildBasicRequest();
         $request->setTrxtype(self::TRXTYPE_CREDIT);
         $request->setOrigid($payment->getParentTransactionId());
-        $request->setAmt(round($amount, 2));
-        $response = $this->_postRequest($request);
-        $this->_processErrors($response);
+        $request->setAmt($this->formatPrice($amount));
+        $response = $this->postRequest($request, $this->getConfig());
+        $this->processErrors($response);
 
-        if ($response->getResultCode() == self::RESPONSE_CODE_APPROVED){
-            $payment->setTransactionId($response->getPnref())
-                ->setIsTransactionClosed(1);
+        if ($response->getResultCode() == self::RESPONSE_CODE_APPROVED) {
+            $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(true);
         }
         return $this;
     }
@@ -338,31 +541,27 @@ class Payflowpro extends  \Magento\Payment\Model\Method\Cc
     /**
      * Fetch transaction details info
      *
-     * @param \Magento\Payment\Model\Info $payment
+     * @param InfoInterface $payment
      * @param string $transactionId
      * @return array
      */
-    public function fetchTransactionInfo(\Magento\Payment\Model\Info $payment, $transactionId)
+    public function fetchTransactionInfo(InfoInterface $payment, $transactionId)
     {
-        $request = $this->_buildBasicRequest($payment);
-        $request->setTrxtype(self::TRXTYPE_DELAYED_INQUIRY);
-        $request->setOrigid($transactionId);
-        $response = $this->_postRequest($request);
+        $response = $this->transactionInquiryRequest($payment, $transactionId);
 
-        $this->_processErrors($response);
+        $this->processErrors($response);
 
         if (!$this->_isTransactionUnderReview($response->getOrigresult())) {
-            $payment->setTransactionId($response->getOrigpnref())
-                ->setIsTransactionClosed(0);
+            $payment->setTransactionId($response->getOrigpnref())->setIsTransactionClosed(0);
             if ($response->getOrigresult() == self::RESPONSE_CODE_APPROVED) {
                 $payment->setIsTransactionApproved(true);
-            } else if ($response->getOrigresult() == self::RESPONSE_CODE_DECLINED_BY_MERCHANT) {
+            } elseif ($response->getOrigresult() == self::RESPONSE_CODE_DECLINED_BY_MERCHANT) {
                 $payment->setIsTransactionDenied(true);
             }
         }
 
         $rawData = $response->getData();
-        return ($rawData) ? $rawData : array();
+        return $rawData ? $rawData : [];
     }
 
     /**
@@ -370,226 +569,432 @@ class Payflowpro extends  \Magento\Payment\Model\Method\Cc
      *
      * @param string $status
      * @return bool
+     * phpcs:disable Magento2.Functions.StaticFunction
      */
-    protected static function _isTransactionUnderReview($status)
+    protected function _isTransactionUnderReview($status)
     {
-        if (in_array($status, array(self::RESPONSE_CODE_APPROVED, self::RESPONSE_CODE_DECLINED_BY_MERCHANT))) {
+        if (in_array($status, [self::RESPONSE_CODE_APPROVED, self::RESPONSE_CODE_DECLINED_BY_MERCHANT])) {
             return false;
         }
         return true;
     }
 
     /**
-     * Getter for URL to perform Payflow requests, based on test mode by default
+     * Get Config instance
      *
-     * @param bool $testMode Ability to specify test mode using
-     * @return string
+     * @return PayflowConfig
      */
-    protected function _getTransactionUrl($testMode = null)
+    public function getConfig()
     {
-        $testMode = is_null($testMode) ? $this->getConfigData('sandbox_flag') : (bool)$testMode;
-        if ($testMode) {
-            return self::TRANSACTION_URL_TEST_MODE;
+        if (!$this->config) {
+            $storeId = $this->storeManager->getStore($this->getStore())->getId();
+
+            $this->config = $this->configFactory->create();
+
+            $this->config->setStoreId($storeId);
+            $this->config->setMethodInstance($this);
+            $this->config->setMethod($this);
         }
-        return self::TRANSACTION_URL;
+
+        return $this->config;
     }
 
     /**
-     * Post request to gateway and return response
-     *
-     * @param \Magento\Object $request
-     * @return \Magento\Object
-     * @throws \Exception
+     * @inheritdoc
      */
-    protected function _postRequest(\Magento\Object $request)
+    public function postRequest(DataObject $request, ConfigInterface $config)
     {
-        $debugData = array('request' => $request->getData());
-
-        $client = new \Magento\HTTP\ZendClient();
-        $result = new \Magento\Object();
-
-        $_config = array(
-            'maxredirects' => 5,
-            'timeout'    => 30,
-            'verifypeer' => $this->getConfigData('verify_peer')
-        );
-
-        $_isProxy = $this->getConfigData('use_proxy', false);
-        if ($_isProxy){
-            $_config['proxy'] = $this->getConfigData('proxy_host')
-                . ':'
-                . $this->getConfigData('proxy_port');//http://proxy.shr.secureserver.net:3128',
-            $_config['httpproxytunnel'] = true;
-            $_config['proxytype'] = CURLPROXY_HTTP;
-        }
-
-        $client->setUri($this->_getTransactionUrl())
-            ->setConfig($_config)
-            ->setMethod(\Zend_Http_Client::POST)
-            ->setParameterPost($request->getData())
-            ->setHeaders('X-VPS-VIT-CLIENT-CERTIFICATION-ID: 33baf5893fc2123d8b191d2d011b7fdc')
-            ->setHeaders('X-VPS-Request-ID: ' . $request->getRequestId())
-            ->setHeaders('X-VPS-CLIENT-TIMEOUT: ' . $this->_clientTimeout);
-
         try {
-            /**
-             * we are sending request to payflow pro without url encoding
-             * so we set up _urlEncodeBody flag to false
-             */
-            $response = $client->setUrlEncodeBody(false)->request();
-        } catch (\Exception $e) {
-            $result->setResponseCode(-1)
-                ->setResponseReasonCode($e->getCode())
-                ->setResponseReasonText($e->getMessage());
-
-            $debugData['result'] = $result->getData();
-            $this->_debug($debugData);
-            throw $e;
+            return $this->gateway->postRequest($request, $config);
+        } catch (\Zend_Http_Client_Exception $e) {
+            throw new LocalizedException(
+                __('Payment Gateway is unreachable at the moment. Please use another payment option.'),
+                $e
+            );
         }
-
-
-
-        $response = strstr($response->getBody(), 'RESULT');
-        $valArray = explode('&', $response);
-
-        foreach ($valArray as $val) {
-            $valArray2 = explode('=', $val);
-            $result->setData(strtolower($valArray2[0]), $valArray2[1]);
-        }
-
-        $result->setResultCode($result->getResult())
-            ->setRespmsg($result->getRespmsg());
-
-        $debugData['result'] = $result->getData();
-        $this->_debug($debugData);
-
-        return $result;
     }
 
     /**
      * Return request object with information for 'authorization' or 'sale' action
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
+     * @param Object|Payment $payment
      * @param float $amount
-     * @return \Magento\Object
+     * @return DataObject
      */
-    protected function _buildPlaceRequest(\Magento\Object $payment, $amount)
+    protected function _buildPlaceRequest(DataObject $payment, $amount)
     {
-        $request = $this->_buildBasicRequest($payment);
-        $request->setAmt(round($amount, 2));
+        $request = $this->buildBasicRequest();
+        $request->setAmt($this->formatPrice($amount));
         $request->setAcct($payment->getCcNumber());
         $request->setExpdate(sprintf('%02d', $payment->getCcExpMonth()) . substr($payment->getCcExpYear(), -2, 2));
         $request->setCvv2($payment->getCcCid());
 
-        if ($this->getIsCentinelValidationEnabled()){
-            $params = array();
-            $params = $this->getCentinelValidator()->exportCmpiData($params);
-            $request = \Magento\Object\Mapper::accumulateByMap($params, $request, $this->_centinelFieldMap);
-        }
-
         $order = $payment->getOrder();
-        if (!empty($order)) {
-            $request->setCurrency($order->getBaseCurrencyCode());
-
-            $orderIncrementId = $order->getIncrementId();
-            $request->setCustref($orderIncrementId)
-                ->setComment1($orderIncrementId);
-
-            $billing = $order->getBillingAddress();
-            if (!empty($billing)) {
-                $request->setFirstname($billing->getFirstname())
-                    ->setLastname($billing->getLastname())
-                    ->setStreet(implode(' ', $billing->getStreet()))
-                    ->setCity($billing->getCity())
-                    ->setState($billing->getRegionCode())
-                    ->setZip($billing->getPostcode())
-                    ->setCountry($billing->getCountry())
-                    ->setEmail($payment->getOrder()->getCustomerEmail());
-            }
-            $shipping = $order->getShippingAddress();
-            if (!empty($shipping)) {
-                $this->_applyCountryWorkarounds($shipping);
-                $request->setShiptofirstname($shipping->getFirstname())
-                    ->setShiptolastname($shipping->getLastname())
-                    ->setShiptostreet(implode(' ', $shipping->getStreet()))
-                    ->setShiptocity($shipping->getCity())
-                    ->setShiptostate($shipping->getRegionCode())
-                    ->setShiptozip($shipping->getPostcode())
-                    ->setShiptocountry($shipping->getCountry());
-            }
-        }
+        $request->setCurrency($order->getBaseCurrencyCode());
+        $request = $this->fillCustomerContacts($order, $request);
         return $request;
     }
 
     /**
      * Return request object with basic information for gateway request
      *
-     * @param \Magento\Object|\Magento\Sales\Model\Order\Payment $payment
-     * @return \Magento\Object
+     * @return DataObject
      */
-    protected function _buildBasicRequest(\Magento\Object $payment)
+    public function buildBasicRequest()
     {
-        $request = new \Magento\Object();
-        $request
-            ->setUser($this->getConfigData('user'))
-            ->setVendor($this->getConfigData('vendor'))
-            ->setPartner($this->getConfigData('partner'))
-            ->setPwd($this->getConfigData('pwd'))
-            ->setVerbosity($this->getConfigData('verbosity'))
-            ->setTender(self::TENDER_CC)
-            ->setRequestId($this->_generateRequestId());
-        return $request;
-    }
+        $request = new DataObject();
 
-    /**
-     * Return unique value for request
-     *
-     * @return string
-     */
-    protected function _generateRequestId()
-    {
-        return $this->mathRandom->getUniqueHash();
+        /** @var \Magento\Paypal\Model\PayflowConfig $config */
+        $config = $this->getConfig();
+
+        $request->setUser($this->getConfigData('user'));
+        $request->setVendor($this->getConfigData('vendor'));
+        $request->setPartner($this->getConfigData('partner'));
+        $request->setPwd($this->getConfigData('pwd'));
+        $request->setVerbosity($this->getConfigData('verbosity'));
+        $request->setData('BUTTONSOURCE', $config->getBuildNotationCode());
+        $request->setTender(self::TENDER_CC);
+
+        return $request;
     }
 
     /**
      * If response is failed throw exception
      *
-     * @throws \Magento\Core\Exception
+     * @param DataObject $response
+     * @return void
+     * @throws CommandException
+     * @throws InvalidTransitionException
      */
-    protected function _processErrors(\Magento\Object $response)
+    public function processErrors(DataObject $response)
     {
-        if ($response->getResultCode() == self::RESPONSE_CODE_VOID_ERROR) {
-            throw new \Magento\Paypal\Exception(__('You cannot void a verification transaction.'));
-        } elseif ($response->getResultCode() != self::RESPONSE_CODE_APPROVED
-            && $response->getResultCode() != self::RESPONSE_CODE_FRAUDSERVICE_FILTER
-        ) {
-            throw new \Magento\Core\Exception($response->getRespmsg());
+        $resultCode = (int)$response->getResultCode();
+        if ($resultCode === self::RESPONSE_CODE_VOID_ERROR) {
+            throw new InvalidTransitionException(
+                __("The verification transaction can't be voided. ")
+            );
+        }
+        if (!in_array($resultCode, [self::RESPONSE_CODE_APPROVED, self::RESPONSE_CODE_FRAUDSERVICE_FILTER])) {
+            throw new CommandException(__($response->getRespmsg()));
+        }
+        if ((int)$response->getOrigresult() === self::RESPONSE_CODE_DECLINED_BY_FILTER) {
+            throw new CommandException(__($response->getRespmsg()));
         }
     }
 
     /**
-     * Adopt specified address object to be compatible with Paypal
-     * Puerto Rico should be as state of USA and not as a country
+     * Attempt to accept a pending payment
      *
-     * @param \Magento\Object $address
+     * @param InfoInterface $payment
+     * @return bool
      */
-    protected function _applyCountryWorkarounds(\Magento\Object $address)
+    public function acceptPayment(InfoInterface $payment)
     {
-        if ($address->getCountry() == 'PR') {
-            $address->setCountry('US');
-            $address->setRegionCode('PR');
-        }
+        return $this->reviewPayment($payment, self::UPDATEACTION_APPROVED);
     }
 
     /**
-     * Set reference transaction data into request
+     * Attempt to deny a pending payment
      *
-     * @param \Magento\Object $payment
-     * @param \Magento\Object $request
-     * @return \Magento\Paypal\Model\Payflowpro
+     * @param InfoInterface $payment
+     * @return bool
      */
-    protected function _setReferenceTransaction(\Magento\Object $payment, $request)
+    public function denyPayment(InfoInterface $payment)
     {
+        return $this->reviewPayment($payment, self::UPDATEACTION_DECLINED_BY_MERCHANT);
+    }
+
+    /**
+     * Perform the payment review
+     *
+     * @param InfoInterface $payment
+     * @param string $action
+     * @return bool
+     */
+    public function reviewPayment(InfoInterface $payment, $action)
+    {
+        $request = $this->buildBasicRequest();
+        $transactionId = ($payment->getCcTransId()) ? $payment->getCcTransId() : $payment->getLastTransId();
+        $request->setTrxtype(self::TRXTYPE_ACCEPT_DENY);
+        $request->setOrigid($transactionId);
+        $request->setUpdateaction($action);
+
+        $response = $this->postRequest($request, $this->getConfig());
+        $payment->setAdditionalInformation((array)$response->getData());
+        $this->processErrors($response);
+
+        if (!$this->_isTransactionUnderReview($response->getOrigresult())) {
+            $payment->setTransactionId($response->getOrigpnref())->setIsTransactionClosed(0);
+            if ($response->getOrigresult() == self::RESPONSE_CODE_APPROVED) {
+                $payment->setIsTransactionApproved(true);
+            } elseif ($response->getOrigresult() == self::RESPONSE_CODE_DECLINED_BY_MERCHANT) {
+                $payment->setIsTransactionDenied(true);
+            }
+        }
+        $rawData = $response->getData();
+        return ($rawData) ? $rawData : [];
+    }
+
+    /**
+     * Set billing address
+     *
+     * @param DataObject $request
+     * @param DataObject $billing
+     *
+     * @return Object
+     */
+    public function setBilling(DataObject $request, $billing)
+    {
+        $request->setFirstname(
+            $billing->getFirstname()
+        )->setLastname(
+            $billing->getLastname()
+        )->setStreet(
+            implode(' ', $billing->getStreet())
+        )->setCity(
+            $billing->getCity()
+        )->setState(
+            $billing->getRegionCode()
+        )->setZip(
+            $billing->getPostcode()
+        )->setCountry(
+            $billing->getCountryId()
+        );
+        return $request;
+    }
+
+    /**
+     * Set shipping address
+     *
+     * @param DataObject $request
+     * @param DataObject $shipping
+     *
+     * @return Object
+     */
+    public function setShipping($request, $shipping)
+    {
+        $request->setShiptofirstname(
+            $shipping->getFirstname()
+        )->setShiptolastname(
+            $shipping->getLastname()
+        )->setShiptostreet(
+            implode(' ', $shipping->getStreet())
+        )->setShiptocity(
+            $shipping->getCity()
+        )->setShiptostate(
+            $shipping->getRegionCode()
+        )->setShiptozip(
+            $shipping->getPostcode()
+        )->setShiptocountry(
+            $shipping->getCountryId()
+        );
+        return $request;
+    }
+
+    /**
+     * Fill response with data.
+     *
+     * @param array $postData
+     * @param DataObject $response
+     *
+     * @return DataObject
+     */
+    public function mapGatewayResponse(array $postData, DataObject $response)
+    {
+        $response->setData(array_change_key_case($postData));
+
+        foreach ($this->_responseParamsMappings as $originKey => $key) {
+            if ($response->getData($key) !== null) {
+                $response->setData($originKey, $response->getData($key));
+            }
+        }
+
+        $response->setData(
+            'avsdata',
+            $this->mapResponseAvsData(
+                $response->getData('avsaddr'),
+                $response->getData('avszip')
+            )
+        );
+
+        $response->setData(
+            'name',
+            $this->mapResponseBillToName(
+                $response->getData('billtofirstname'),
+                $response->getData('billtolastname')
+            )
+        );
+
+        $response->setData(
+            OrderPaymentInterface::CC_TYPE,
+            $this->mapResponseCreditCardType(
+                $response->getData(OrderPaymentInterface::CC_TYPE)
+            )
+        );
+
+        return $response;
+    }
+
+    /**
+     * Set transaction status
+     *
+     * @param DataObject $payment
+     * @param DataObject $response
+     *
+     * @return Object
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function setTransStatus($payment, $response)
+    {
+        if ($payment instanceof InfoInterface) {
+            $this->errorHandler->handle($payment, $response);
+        }
+
+        switch ($response->getResultCode()) {
+            case self::RESPONSE_CODE_APPROVED:
+                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
+                break;
+            case self::RESPONSE_CODE_DECLINED_BY_FILTER:
+            case self::RESPONSE_CODE_FRAUDSERVICE_FILTER:
+                $payment->setTransactionId($response->getPnref())->setIsTransactionClosed(0);
+                $payment->setIsTransactionPending(true);
+                $payment->setIsFraudDetected(true);
+                break;
+            case self::RESPONSE_CODE_DECLINED:
+                throw new \Magento\Framework\Exception\LocalizedException(
+                    __($response->getRespmsg())
+                );
+            default:
+                break;
+        }
+        return $payment;
+    }
+
+    /**
+     * Fill customer contacts
+     *
+     * @param DataObject $order
+     * @param DataObject $request
+     * @return DataObject
+     */
+    public function fillCustomerContacts(DataObject $order, DataObject $request)
+    {
+        $billing = $order->getBillingAddress();
+        if (!empty($billing)) {
+            $request = $this->setBilling($request, $billing);
+            $request->setEmail($order->getCustomerEmail());
+        }
+        $shipping = $order->getShippingAddress();
+        if (!empty($shipping)) {
+            $request = $this->setShipping($request, $shipping);
+            return $request;
+        }
+        return $request;
+    }
+
+    /**
+     * Add order details to payment request
+     *
+     * @param DataObject $request
+     * @param Order $order
+     * @return void
+     */
+    public function addRequestOrderInfo(DataObject $request, Order $order)
+    {
+        $id = $order->getId();
+        // for auth request order id is not exists yet
+        if (!empty($id)) {
+            $request->setPonum($id);
+        }
+        $orderIncrementId = $order->getIncrementId();
+        $request->setCustref($orderIncrementId)
+            ->setInvnum($orderIncrementId)
+            ->setData('comment1', $orderIncrementId);
+    }
+
+    /**
+     * Assign data to info model instance
+     *
+     * @param array|DataObject $data
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function assignData(DataObject $data)
+    {
+        $this->_eventManager->dispatch(
+            'payment_method_assign_data_' . $this->getCode(),
+            [
+                AbstractDataAssignObserver::METHOD_CODE => $this,
+                AbstractDataAssignObserver::MODEL_CODE => $this->getInfoInstance(),
+                AbstractDataAssignObserver::DATA_CODE => $data
+            ]
+        );
+
+        $this->_eventManager->dispatch(
+            'payment_method_assign_data',
+            [
+                AbstractDataAssignObserver::METHOD_CODE => $this,
+                AbstractDataAssignObserver::MODEL_CODE => $this->getInfoInstance(),
+                AbstractDataAssignObserver::DATA_CODE => $data
+            ]
+        );
+
         return $this;
+    }
+
+    /**
+     * Make a transaction Inquiry Request
+     *
+     * @param InfoInterface $payment
+     * @param string $transactionId
+     * @return DataObject
+     * @throws LocalizedException
+     */
+    protected function transactionInquiryRequest(InfoInterface $payment, $transactionId)
+    {
+        $request = $this->buildBasicRequest();
+        $request->setTrxtype(self::TRXTYPE_DELAYED_INQUIRY);
+        $transactionId = $payment->getCcTransId() ? $payment->getCcTransId() : $transactionId;
+        $request->setOrigid($transactionId);
+        $response = $this->postRequest($request, $this->getConfig());
+
+        return $response;
+    }
+
+    /**
+     * Maps PayPal `avsdata` field.
+     *
+     * @param string|null $avsAddr
+     * @param string|null $avsZip
+     * @return string|null
+     */
+    private function mapResponseAvsData($avsAddr, $avsZip)
+    {
+        return isset($avsAddr, $avsZip) ? $avsAddr . $avsZip : null;
+    }
+
+    /**
+     * Maps PayPal `name` field.
+     *
+     * @param string|null $billToFirstName
+     * @param string|null $billToLastName
+     * @return string|null
+     */
+    private function mapResponseBillToName($billToFirstName, $billToLastName)
+    {
+        return isset($billToFirstName, $billToLastName)
+            ? implode(' ', [$billToFirstName, $billToLastName])
+            : null;
+    }
+
+    /**
+     * Map PayPal transaction response credit card type to Magento values if possible.
+     *
+     * @param string|null $ccType
+     * @return string|null
+     */
+    private function mapResponseCreditCardType($ccType)
+    {
+        return $this->ccTypeMap[$ccType] ?? $ccType;
     }
 }

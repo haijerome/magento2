@@ -1,42 +1,38 @@
 <?php
-
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
 namespace Magento\Backend\Block\Template;
 
+use Magento\Framework\Cache\LockGuardedCacheLoader;
+
 /**
- * Backend block template context
+ * Constructor modification point for Magento\Backend\Block\Template.
  *
- * Magento
+ * All context classes were introduced to allow for backwards compatible constructor modifications
+ * of classes that were supposed to be extended by extension developers.
  *
- * NOTICE OF LICENSE
+ * Do not call methods of this class directly.
  *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
+ * As Magento moves from inheritance-based APIs all such classes will be deprecated together with
+ * the classes they were introduced for.
  *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- *
+ * @api
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
+ * @since 100.0.2
  */
-class Context extends \Magento\View\Element\Template\Context
+class Context extends \Magento\Framework\View\Element\Template\Context
 {
     /**
-     * @var \Magento\AuthorizationInterface
+     * @var \Magento\Framework\AuthorizationInterface
      */
     protected $_authorization;
 
     /**
-     * @var \Magento\Math\Random
+     * @var \Magento\Framework\Math\Random
      */
     protected $mathRandom;
 
@@ -46,117 +42,127 @@ class Context extends \Magento\View\Element\Template\Context
     protected $_backendSession;
 
     /**
-     * @var \Magento\Data\Form\FormKey
+     * @var \Magento\Framework\Data\Form\FormKey
      */
     protected $formKey;
-    
+
     /**
-     * @param \Magento\App\RequestInterface $request
-     * @param \Magento\View\LayoutInterface $layout
-     * @param \Magento\Event\ManagerInterface $eventManager
-     * @param \Magento\UrlInterface $urlBuilder
-     * @param \Magento\Core\Model\Translate $translator
-     * @param \Magento\App\CacheInterface $cache
-     * @param \Magento\View\DesignInterface $design
-     * @param \Magento\Core\Model\Session $session
-     * @param \Magento\Session\SidResolverInterface $sidResolver
-     * @param \Magento\Core\Model\Store\Config $storeConfig
-     * @param \Magento\App\FrontController $frontController
-     * @param \Magento\App\Helper\HelperFactory $helperFactory
-     * @param \Magento\View\Url $viewUrl
-     * @param \Magento\View\ConfigInterface $viewConfig
-     * @param \Magento\App\Cache\StateInterface $cacheState
-     * @param \Magento\Logger $logger
-     * @param \Magento\Core\Model\App $app
-     * @param \Magento\Escaper $escaper
-     * @param \Magento\Filter\FilterManager $filterManager
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\App\Dir $dirs
-     * @param \Magento\Filesystem $filesystem
-     * @param \Magento\View\FileSystem $viewFileSystem
-     * @param \Magento\View\TemplateEnginePool $enginePool
-     * @param \Magento\App\State $appState
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\AuthorizationInterface $authorization
+     * @var \Magento\Framework\Code\NameBuilder
+     */
+    protected $nameBuilder;
+
+    /**
+     * @var \Magento\Framework\View\Page\Config
+     */
+    protected $pageConfig;
+
+    /**
+     * @param \Magento\Framework\App\RequestInterface $request
+     * @param \Magento\Framework\View\LayoutInterface $layout
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
+     * @param \Magento\Framework\UrlInterface $urlBuilder
+     * @param \Magento\Framework\App\CacheInterface $cache
+     * @param \Magento\Framework\View\DesignInterface $design
+     * @param \Magento\Framework\Session\Generic $session
+     * @param \Magento\Framework\Session\SidResolverInterface $sidResolver
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\View\Asset\Repository $assetRepo
+     * @param \Magento\Framework\View\ConfigInterface $viewConfig
+     * @param \Magento\Framework\App\Cache\StateInterface $cacheState
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\Escaper $escaper
+     * @param \Magento\Framework\Filter\FilterManager $filterManager
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Framework\Translate\Inline\StateInterface $inlineTranslation
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\View\FileSystem $viewFileSystem
+     * @param \Magento\Framework\View\TemplateEnginePool $enginePool
+     * @param \Magento\Framework\App\State $appState
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\View\Page\Config $pageConfig
+     * @param \Magento\Framework\View\Element\Template\File\Resolver $resolver
+     * @param \Magento\Framework\View\Element\Template\File\Validator $validator
+     * @param \Magento\Framework\AuthorizationInterface $authorization
      * @param \Magento\Backend\Model\Session $backendSession
-     * @param \Magento\Math\Random $mathRandom
-     * @param \Magento\Data\Form\FormKey $formKey
-     * @param array $data
-     * 
+     * @param \Magento\Framework\Math\Random $mathRandom
+     * @param \Magento\Framework\Data\Form\FormKey $formKey
+     * @param \Magento\Framework\Code\NameBuilder $nameBuilder
+     * @param LockGuardedCacheLoader|null $lockQuery
+     *
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\App\RequestInterface $request,
-        \Magento\View\LayoutInterface $layout,
-        \Magento\Event\ManagerInterface $eventManager,
-        \Magento\UrlInterface $urlBuilder,
-        \Magento\Core\Model\Translate $translator,
-        \Magento\App\CacheInterface $cache,
-        \Magento\View\DesignInterface $design,
-        \Magento\Core\Model\Session $session,
-        \Magento\Session\SidResolverInterface $sidResolver,
-        \Magento\Core\Model\Store\Config $storeConfig,
-        \Magento\App\FrontController $frontController,
-        \Magento\App\Helper\HelperFactory $helperFactory,
-        \Magento\View\Url $viewUrl,
-        \Magento\View\ConfigInterface $viewConfig,
-        \Magento\App\Cache\StateInterface $cacheState,
-        \Magento\Logger $logger,
-        \Magento\Core\Model\App $app,
-        \Magento\Escaper $escaper,
-        \Magento\Filter\FilterManager $filterManager,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\App\Dir $dirs,
-        \Magento\Filesystem $filesystem,
-        \Magento\View\FileSystem $viewFileSystem,
-        \Magento\View\TemplateEnginePool $enginePool,
-        \Magento\App\State $appState,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\AuthorizationInterface $authorization,
+        \Magento\Framework\App\RequestInterface $request,
+        \Magento\Framework\View\LayoutInterface $layout,
+        \Magento\Framework\Event\ManagerInterface $eventManager,
+        \Magento\Framework\UrlInterface $urlBuilder,
+        \Magento\Framework\App\CacheInterface $cache,
+        \Magento\Framework\View\DesignInterface $design,
+        \Magento\Framework\Session\Generic $session,
+        \Magento\Framework\Session\SidResolverInterface $sidResolver,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\View\Asset\Repository $assetRepo,
+        \Magento\Framework\View\ConfigInterface $viewConfig,
+        \Magento\Framework\App\Cache\StateInterface $cacheState,
+        \Psr\Log\LoggerInterface $logger,
+        \Magento\Framework\Escaper $escaper,
+        \Magento\Framework\Filter\FilterManager $filterManager,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Framework\Translate\Inline\StateInterface $inlineTranslation,
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\View\FileSystem $viewFileSystem,
+        \Magento\Framework\View\TemplateEnginePool $enginePool,
+        \Magento\Framework\App\State $appState,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Framework\View\Page\Config $pageConfig,
+        \Magento\Framework\View\Element\Template\File\Resolver $resolver,
+        \Magento\Framework\View\Element\Template\File\Validator $validator,
+        \Magento\Framework\AuthorizationInterface $authorization,
         \Magento\Backend\Model\Session $backendSession,
-        \Magento\Math\Random $mathRandom,
-        \Magento\Data\Form\FormKey $formKey,
-        array $data = array()
+        \Magento\Framework\Math\Random $mathRandom,
+        \Magento\Framework\Data\Form\FormKey $formKey,
+        \Magento\Framework\Code\NameBuilder $nameBuilder,
+        LockGuardedCacheLoader $lockQuery = null
     ) {
         $this->_authorization = $authorization;
         $this->_backendSession = $backendSession;
         $this->mathRandom = $mathRandom;
         $this->formKey = $formKey;
+        $this->nameBuilder = $nameBuilder;
         parent::__construct(
             $request,
             $layout,
             $eventManager,
             $urlBuilder,
-            $translator,
             $cache,
             $design,
             $session,
             $sidResolver,
-            $storeConfig,
-            $frontController,
-            $helperFactory,
-            $viewUrl,
+            $scopeConfig,
+            $assetRepo,
             $viewConfig,
             $cacheState,
             $logger,
-            $app,
             $escaper,
             $filterManager,
-            $locale,
-            $dirs,
+            $localeDate,
+            $inlineTranslation,
             $filesystem,
             $viewFileSystem,
             $enginePool,
             $appState,
             $storeManager,
-            $data
+            $pageConfig,
+            $resolver,
+            $validator,
+            $lockQuery
         );
     }
 
     /**
      * Get store manager
      *
-     * @return \Magento\Core\Model\StoreManagerInterface
+     * @return \Magento\Store\Model\StoreManagerInterface
      */
     public function getStoreManager()
     {
@@ -166,7 +172,7 @@ class Context extends \Magento\View\Element\Template\Context
     /**
      * Retrieve Authorization
      *
-     * @return \Magento\AuthorizationInterface
+     * @return \Magento\Framework\AuthorizationInterface
      */
     public function getAuthorization()
     {
@@ -174,6 +180,8 @@ class Context extends \Magento\View\Element\Template\Context
     }
 
     /**
+     * Get backend session instance.
+     *
      * @return \Magento\Backend\Model\Session
      */
     public function getBackendSession()
@@ -182,15 +190,9 @@ class Context extends \Magento\View\Element\Template\Context
     }
 
     /**
-     * @return \Magento\Core\Model\LocaleInterface
-     */
-    public function getLocale()
-    {
-        return $this->_locale;
-    }
-
-    /**
-     * @return \Magento\Math\Random
+     * Get math random instance.
+     *
+     * @return \Magento\Framework\Math\Random
      */
     public function getMathRandom()
     {
@@ -198,10 +200,22 @@ class Context extends \Magento\View\Element\Template\Context
     }
 
     /**
-     * @return \Magento\Data\Form\FormKey
+     * Get form key instance.
+     *
+     * @return \Magento\Framework\Data\Form\FormKey
      */
     public function getFormKey()
     {
         return $this->formKey;
+    }
+
+    /**
+     * Get name builder instance.
+     *
+     * @return \Magento\Framework\Code\NameBuilder
+     */
+    public function getNameBuilder()
+    {
+        return $this->nameBuilder;
     }
 }

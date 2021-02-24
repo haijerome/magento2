@@ -1,49 +1,32 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create;
+
+use Magento\Quote\Model\Quote\Item;
 
 /**
  * Adminhtml sales order create items block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author     Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-
-namespace Magento\Sales\Block\Adminhtml\Order\Create;
-
 class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
 {
     /**
      * Contains button descriptions to be shown at the top of accordion
+     *
      * @var array
      */
-    protected $_buttons = array();
+    protected $_buttons = [];
 
     /**
      * Define block ID
+     *
+     * @return void
      */
     protected function _construct()
     {
@@ -54,7 +37,7 @@ class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
     /**
      * Accordion header text
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getHeaderText()
     {
@@ -64,7 +47,7 @@ class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
     /**
      * Returns all visible items
      *
-     * @return array
+     * @return Item[]
      */
     public function getItems()
     {
@@ -74,7 +57,8 @@ class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
     /**
      * Add button to the items header
      *
-     * @param $args array
+     * @param array $args
+     * @return void
      */
     public function addButton($args)
     {
@@ -92,7 +76,11 @@ class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
         // Make buttons to be rendered in opposite order of addition. This makes "Add products" the last one.
         $this->_buttons = array_reverse($this->_buttons);
         foreach ($this->_buttons as $buttonData) {
-            $html .= $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button')->setData($buttonData)->toHtml();
+            $html .= $this->getLayout()->createBlock(
+                \Magento\Backend\Block\Widget\Button::class
+            )->setData(
+                $buttonData
+            )->toHtml();
         }
 
         return $html;
@@ -110,5 +98,4 @@ class Items extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
         }
         return '';
     }
-
 }

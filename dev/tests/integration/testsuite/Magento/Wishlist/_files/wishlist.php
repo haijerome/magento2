@@ -1,46 +1,27 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Wishlist
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-require __DIR__ . '/../../../Magento/Customer/_files/customer.php';
-require __DIR__ . '/../../../Magento/Catalog/_files/product_simple.php';
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Customer\Model\CustomerRegistry;
+use Magento\Framework\DataObject;
+use Magento\TestFramework\Helper\Bootstrap;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
+use Magento\Wishlist\Model\Wishlist;
 
-$wishlist = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Wishlist\Model\Wishlist');
-$wishlist->loadByCustomer($customer->getId(), true);
-$item = $wishlist->addNewItem($product, new \Magento\Object(array(
-//    'product' => '1',
-//    'related_product' => '',
-//    'options' => array(
-//        1 => '1-text',
-//        2 => array('month' => 1, 'day' => 1, 'year' => 2001, 'hour' => 1, 'minute' => 1),
-//        3 => '1',
-//        4 => '1',
-//    ),
-//    'validate_datetime_2' => '',
-//    'qty' => '1',
-)));
+Resolver::getInstance()->requireDataFixture('Magento/Customer/_files/customer.php');
+Resolver::getInstance()->requireDataFixture('Magento/Catalog/_files/product_simple.php');
+
+$objectManager = Bootstrap::getObjectManager();
+/** @var CustomerRegistry $customerRegistry */
+$customerRegistry = Bootstrap::getObjectManager()->create(CustomerRegistry::class);
+$customer = $customerRegistry->retrieve(1);
+/** @var ProductRepositoryInterface $productRepository */
+$productRepository = $objectManager->create(ProductRepositoryInterface::class);
+$product = $productRepository->get('simple');
+$wishlist = Bootstrap::getObjectManager()->create(Wishlist::class);
+$wishlist->loadByCustomerId($customer->getId(), true);
+$item = $wishlist->addNewItem($product, new DataObject([]));
 $wishlist->setSharingCode('fixture_unique_code')->save();

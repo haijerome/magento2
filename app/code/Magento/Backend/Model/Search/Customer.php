@@ -1,39 +1,28 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Backend\Model\Search;
 
 /**
  * Search Customer Model
  *
- * @category    Magento
- * @package     Magento_Backend
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @method Customer setQuery(string $query)
+ * @method string|null getQuery()
+ * @method bool hasQuery()
+ * @method Customer setStart(int $startPosition)
+ * @method int|null getStart()
+ * @method bool hasStart()
+ * @method Customer setLimit(int $limit)
+ * @method int|null getLimit()
+ * @method bool hasLimit()
+ * @method Customer setResults(array $results)
+ * @method array getResults()
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Model\Search;
-
-class Customer extends \Magento\Object
+class Customer extends \Magento\Framework\DataObject
 {
     /**
      * Adminhtml data
@@ -43,58 +32,95 @@ class Customer extends \Magento\Object
     protected $_adminhtmlData = null;
 
     /**
-     * @var \Magento\Customer\Model\Resource\Customer\CollectionFactory
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
      */
-    protected $_collectionFactory;
+    protected $customerRepository;
 
     /**
-     * @param \Magento\Customer\Model\Resource\Customer\CollectionFactory $collectionFactory
+     * @var \Magento\Framework\Api\SearchCriteriaBuilder
+     */
+    protected $searchCriteriaBuilder;
+
+    /**
+     * @var \Magento\Framework\Api\FilterBuilder
+     */
+    protected $filterBuilder;
+
+    /**
+     * @var \Magento\Customer\Helper\View
+     */
+    protected $_customerViewHelper;
+
+    /**
+     * Initialize dependencies.
+     *
      * @param \Magento\Backend\Helper\Data $adminhtmlData
+     * @param \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param \Magento\Framework\Api\FilterBuilder $filterBuilder
+     * @param \Magento\Customer\Helper\View $customerViewHelper
      */
     public function __construct(
-        \Magento\Customer\Model\Resource\Customer\CollectionFactory $collectionFactory,
-        \Magento\Backend\Helper\Data $adminhtmlData
+        \Magento\Backend\Helper\Data $adminhtmlData,
+        \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository,
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
+        \Magento\Framework\Api\FilterBuilder $filterBuilder,
+        \Magento\Customer\Helper\View $customerViewHelper
     ) {
-        $this->_collectionFactory = $collectionFactory;
         $this->_adminhtmlData = $adminhtmlData;
+        $this->customerRepository = $customerRepository;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
+        $this->filterBuilder = $filterBuilder;
+        $this->_customerViewHelper = $customerViewHelper;
     }
 
     /**
      * Load search results
      *
-     * @return \Magento\Backend\Model\Search\Customer
+     * @return $this
      */
     public function load()
     {
-        $result = array();
+        $result = [];
         if (!$this->hasStart() || !$this->hasLimit() || !$this->hasQuery()) {
             $this->setResults($result);
             return $this;
         }
 
-        $collection = $this->_collectionFactory->create()
-            ->addNameToSelect()
-            ->joinAttribute('company', 'customer_address/company', 'default_billing', null, 'left')
-            ->addAttributeToFilter(array(
-                array('attribute'=>'firstname', 'like' => $this->getQuery().'%'),
-                array('attribute'=>'lastname', 'like'  => $this->getQuery().'%'),
-                array('attribute'=>'company', 'like'   => $this->getQuery().'%'),
-            ))
-            ->setPage(1, 10)
-            ->load();
-
-        foreach ($collection->getItems() as $customer) {
-            $result[] = array(
-                'id'            => 'customer/1/'.$customer->getId(),
-                'type'          => __('Customer'),
-                'name'          => $customer->getName(),
-                'description'   => $customer->getCompany(),
-                'url' => $this->_adminhtmlData->getUrl('customer/index/edit', array('id' => $customer->getId())),
-            );
+        $this->searchCriteriaBuilder->setCurrentPage($this->getStart());
+        $this->searchCriteriaBuilder->setPageSize($this->getLimit());
+        $searchFields = ['firstname', 'lastname', 'billing_company'];
+        $filters = [];
+        foreach ($searchFields as $field) {
+            $filters[] = $this->filterBuilder
+                ->setField($field)
+                ->setConditionType('like')
+                ->setValue($this->getQuery() . '%')
+                ->create();
         }
+        $this->searchCriteriaBuilder->addFilters($filters);
+        $searchCriteria = $this->searchCriteriaBuilder->create();
+        $searchResults = $this->customerRepository->getList($searchCriteria);
 
+        foreach ($searchResults->getItems() as $customer) {
+            $customerAddresses = $customer->getAddresses();
+            /** Look for a company name defined in default billing address */
+            $company = null;
+            foreach ($customerAddresses as $customerAddress) {
+                if ($customerAddress->getId() == $customer->getDefaultBilling()) {
+                    $company = $customerAddress->getCompany();
+                    break;
+                }
+            }
+            $result[] = [
+                'id' => 'customer/1/' . $customer->getId(),
+                'type' => __('Customer'),
+                'name' => $this->_customerViewHelper->getCustomerName($customer),
+                'description' => $company,
+                'url' => $this->_adminhtmlData->getUrl('customer/index/edit', ['id' => $customer->getId()]),
+            ];
+        }
         $this->setResults($result);
-
         return $this;
     }
 }

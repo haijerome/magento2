@@ -1,97 +1,161 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Paypal
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * PayPal Standard payment "form"
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Paypal\Block\Express;
 
-class Form extends \Magento\Paypal\Block\Standard\Form
+use Magento\Customer\Helper\Session\CurrentCustomer;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Paypal\Helper\Data;
+use Magento\Paypal\Model\Config;
+use Magento\Paypal\Model\ConfigFactory;
+use Magento\Paypal\Model\Express\Checkout;
+
+class Form extends \Magento\Payment\Block\Form
 {
     /**
      * Payment method code
      *
      * @var string
      */
-    protected $_methodCode = \Magento\Paypal\Model\Config::METHOD_WPP_EXPRESS;
+    protected $_methodCode = Config::METHOD_WPP_EXPRESS;
 
     /**
      * Paypal data
      *
-     * @var \Magento\Paypal\Helper\Data
+     * @var Data
      */
     protected $_paypalData;
 
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var ConfigFactory
      */
-    protected $_customerSession;
+    protected $_paypalConfigFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Paypal\Model\ConfigFactory $paypalConfigFactory
-     * @param \Magento\Paypal\Helper\Data $paypalData
-     * @param \Magento\Customer\Model\Session $customerSession
+     * @var ResolverInterface
+     */
+    protected $_localeResolver;
+
+    /**
+     * @var null
+     */
+    protected $_config;
+
+    /**
+     * @var bool
+     */
+    protected $_isScopePrivate;
+
+    /**
+     * @var CurrentCustomer
+     */
+    protected $currentCustomer;
+
+    /**
+     * @param Context $context
+     * @param ConfigFactory $paypalConfigFactory
+     * @param ResolverInterface $localeResolver
+     * @param Data $paypalData
+     * @param CurrentCustomer $currentCustomer
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Paypal\Model\ConfigFactory $paypalConfigFactory,
-        \Magento\Paypal\Helper\Data $paypalData,
-        \Magento\Customer\Model\Session $customerSession,
-        array $data = array()
+        Context $context,
+        ConfigFactory $paypalConfigFactory,
+        ResolverInterface $localeResolver,
+        Data $paypalData,
+        CurrentCustomer $currentCustomer,
+        array $data = []
     ) {
         $this->_paypalData = $paypalData;
-        $this->_customerSession = $customerSession;
-        parent::__construct($context, $paypalConfigFactory, $data);
+        $this->_paypalConfigFactory = $paypalConfigFactory;
+        $this->_localeResolver = $localeResolver;
+        $this->_config = null;
+        $this->_isScopePrivate = true;
+        $this->currentCustomer = $currentCustomer;
+        parent::__construct($context, $data);
     }
 
     /**
      * Set template and redirect message
+     *
+     * @return null
      */
     protected function _construct()
     {
-        $result = parent::_construct();
+        $this->_config = $this->_paypalConfigFactory->create()
+            ->setMethod($this->getMethodCode());
+        $mark = $this->_getMarkTemplate();
+        $mark->setPaymentAcceptanceMarkHref(
+            $this->_config->getPaymentMarkWhatIsPaypalUrl($this->_localeResolver)
+        )->setPaymentAcceptanceMarkSrc(
+            $this->_config->getPaymentMarkImageUrl($this->_localeResolver->getLocale())
+        );
+
+        // known issue: code above will render only static mark image
+        $this->_initializeRedirectTemplateWithMark($mark);
+        parent::_construct();
+
         $this->setRedirectMessage(__('You will be redirected to the PayPal website.'));
-        return $result;
     }
 
     /**
-     * Set data to block
+     * Payment method code getter
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return string
      */
-    protected function _beforeToHtml()
+    public function getMethodCode()
     {
-        $customerId = $this->_customerSession->getCustomerId();
-        if ($this->_paypalData->shouldAskToCreateBillingAgreement($this->_config, $customerId)
-            && $this->canCreateBillingAgreement()
-        ) {
-            $this->setCreateBACode(\Magento\Paypal\Model\Express\Checkout::PAYMENT_INFO_TRANSPORT_BILLING_AGREEMENT);
-        }
-        return parent::_beforeToHtml();
+        return $this->_methodCode;
+    }
+
+    /**
+     * Get initialized mark template
+     *
+     * @return Template
+     */
+    protected function _getMarkTemplate()
+    {
+        /** @var $mark Template */
+        $mark = $this->_layout->createBlock(\Magento\Framework\View\Element\Template::class);
+        $mark->setTemplate('Magento_Paypal::payment/mark.phtml');
+        return $mark;
+    }
+
+    /**
+     * Initializes redirect template and set mark
+     * @param Template $mark
+     *
+     * @return void
+     */
+    protected function _initializeRedirectTemplateWithMark(Template $mark)
+    {
+        $this->setTemplate(
+            'Magento_Paypal::payment/redirect.phtml'
+        )->setRedirectMessage(
+            __('You will be redirected to the PayPal website when you place an order.')
+        )->setMethodTitle(
+            // Output PayPal mark, omit title
+            ''
+        )->setMethodLabelAfterHtml(
+            $mark->toHtml()
+        );
+    }
+
+    /**
+     * Get billing agreement code
+     *
+     * @return string|null
+     */
+    public function getBillingAgreementCode()
+    {
+        $customerId = $this->currentCustomer->getCustomerId();
+        return $this->_paypalData->shouldAskToCreateBillingAgreement($this->_config, $customerId)
+            ? Checkout::PAYMENT_INFO_TRANSPORT_BILLING_AGREEMENT
+            : null;
     }
 }

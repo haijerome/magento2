@@ -1,39 +1,16 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_SalesRule
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\SalesRule\Model\System\Config\Source\Coupon;
 
 /**
  * Options for Code Format Field in Auto Generated Specific Coupon Codes configuration section
  *
- * @category    Magento
- * @package     Magento_SalesRule
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\SalesRule\Model\System\Config\Source\Coupon;
-
-class Format implements \Magento\Core\Model\Option\ArrayInterface
+class Format implements \Magento\Framework\Option\ArrayInterface
 {
     /**
      * Sales rule coupon
@@ -45,26 +22,20 @@ class Format implements \Magento\Core\Model\Option\ArrayInterface
     /**
      * @param \Magento\SalesRule\Helper\Coupon $salesRuleCoupon
      */
-    public function __construct(
-        \Magento\SalesRule\Helper\Coupon $salesRuleCoupon
-    ) {
+    public function __construct(\Magento\SalesRule\Helper\Coupon $salesRuleCoupon)
+    {
         $this->_salesRuleCoupon = $salesRuleCoupon;
     }
 
     /**
-     * Options getter
-     *
-     * @return array
+     * {@inheritdoc}
      */
     public function toOptionArray()
     {
         $formatsList = $this->_salesRuleCoupon->getFormatsList();
-        $result = array();
+        $result = [];
         foreach ($formatsList as $formatId => $formatTitle) {
-            $result[] = array(
-                'value' => $formatId,
-                'label' => $formatTitle
-            );
+            $result[] = ['value' => $formatId, 'label' => $formatTitle];
         }
 
         return $result;

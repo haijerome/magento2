@@ -1,29 +1,8 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Widget\Block\Adminhtml\Widget\Instance\Edit\Chooser;
 
 /**
@@ -32,36 +11,36 @@ namespace Magento\Widget\Block\Adminhtml\Widget\Instance\Edit\Chooser;
  * @method getArea()
  * @method getTheme()
  */
-class DesignAbstraction extends \Magento\View\Element\Html\Select
+class DesignAbstraction extends \Magento\Framework\View\Element\Html\Select
 {
     /**
-     * @var \Magento\View\Layout\ProcessorFactory
+     * @var \Magento\Framework\View\Layout\ProcessorFactory
      */
     protected $_layoutProcessorFactory;
 
     /**
-     * @var \Magento\Core\Model\Resource\Theme\CollectionFactory
+     * @var \Magento\Theme\Model\ResourceModel\Theme\CollectionFactory
      */
     protected $_themesFactory;
 
     /**
-     * @var \Magento\App\State
+     * @var \Magento\Framework\App\State
      */
     protected $_appState;
 
     /**
-     * @param \Magento\View\Element\Context $context
-     * @param \Magento\View\Layout\ProcessorFactory $layoutProcessorFactory
-     * @param \Magento\Core\Model\Resource\Theme\CollectionFactory $themesFactory
-     * @param \Magento\App\State $appState
+     * @param \Magento\Framework\View\Element\Context $context
+     * @param \Magento\Framework\View\Layout\ProcessorFactory $layoutProcessorFactory
+     * @param \Magento\Theme\Model\ResourceModel\Theme\CollectionFactory $themesFactory
+     * @param \Magento\Framework\App\State $appState
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Context $context,
-        \Magento\View\Layout\ProcessorFactory $layoutProcessorFactory,
-        \Magento\Core\Model\Resource\Theme\CollectionFactory $themesFactory,
-        \Magento\App\State $appState,
-        array $data = array()
+        \Magento\Framework\View\Element\Context $context,
+        \Magento\Framework\View\Layout\ProcessorFactory $layoutProcessorFactory,
+        \Magento\Theme\Model\ResourceModel\Theme\CollectionFactory $themesFactory,
+        \Magento\Framework\App\State $appState,
+        array $data = []
     ) {
         $this->_layoutProcessorFactory = $layoutProcessorFactory;
         $this->_themesFactory = $themesFactory;
@@ -72,18 +51,16 @@ class DesignAbstraction extends \Magento\View\Element\Html\Select
     /**
      * Add necessary options
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return \Magento\Framework\View\Element\AbstractBlock
      */
     protected function _beforeToHtml()
     {
         if (!$this->getOptions()) {
             $this->addOption('', __('-- Please Select --'));
-            $layoutUpdateParams = array(
-                'theme' => $this->_getThemeInstance($this->getTheme()),
-            );
+            $layoutUpdateParams = ['theme' => $this->_getThemeInstance($this->getTheme())];
             $designAbstractions = $this->_appState->emulateAreaCode(
                 'frontend',
-                array($this->_getLayoutProcessor($layoutUpdateParams), 'getAllDesignAbstractions')
+                [$this->_getLayoutProcessor($layoutUpdateParams), 'getAllDesignAbstractions']
             );
             $this->_addDesignAbstractionOptions($designAbstractions);
         }
@@ -94,11 +71,11 @@ class DesignAbstraction extends \Magento\View\Element\Html\Select
      * Retrieve theme instance by its identifier
      *
      * @param int $themeId
-     * @return \Magento\Core\Model\Theme|null
+     * @return \Magento\Theme\Model\Theme|null
      */
     protected function _getThemeInstance($themeId)
     {
-        /** @var \Magento\Core\Model\Resource\Theme\Collection $themeCollection */
+        /** @var \Magento\Theme\Model\ResourceModel\Theme\Collection $themeCollection */
         $themeCollection = $this->_themesFactory->create();
         return $themeCollection->getItemById($themeId);
     }
@@ -107,7 +84,7 @@ class DesignAbstraction extends \Magento\View\Element\Html\Select
      * Retrieve new layout merge model instance
      *
      * @param array $arguments
-     * @return \Magento\View\Layout\ProcessorInterface
+     * @return \Magento\Framework\View\Layout\ProcessorInterface
      */
     protected function _getLayoutProcessor(array $arguments)
     {
@@ -118,29 +95,30 @@ class DesignAbstraction extends \Magento\View\Element\Html\Select
      * Add design abstractions information to the options
      *
      * @param array $designAbstractions
+     * @return void
      */
     protected function _addDesignAbstractionOptions(array $designAbstractions)
     {
-        $label = array();
+        $label = [];
         // Sort list of design abstractions by label
         foreach ($designAbstractions as $key => $row) {
-            $label[$key]  = $row['label'];
+            $label[$key] = $row['label'];
         }
         array_multisort($label, SORT_STRING, $designAbstractions);
 
         // Group the layout options
-        $customLayouts = array();
-        $pageLayouts = array();
-        /** @var $layoutProcessor \Magento\View\Layout\ProcessorInterface */
+        $customLayouts = [];
+        $pageLayouts = [];
+        /** @var $layoutProcessor \Magento\Framework\View\Layout\ProcessorInterface */
         $layoutProcessor = $this->_layoutProcessorFactory->create();
         foreach ($designAbstractions as $pageTypeName => $pageTypeInfo) {
             if ($layoutProcessor->isPageLayoutDesignAbstraction($pageTypeInfo)) {
-                    $pageLayouts[] = array('value' => $pageTypeName, 'label' => $pageTypeInfo['label']);
+                $pageLayouts[] = ['value' => $pageTypeName, 'label' => $pageTypeInfo['label']];
             } else {
-                $customLayouts[] = array('value' => $pageTypeName, 'label' => $pageTypeInfo['label']);
+                $customLayouts[] = ['value' => $pageTypeName, 'label' => $pageTypeInfo['label']];
             }
         }
-        $params = array();
+        $params = [];
         $this->addOption($customLayouts, __('Custom Layouts'), $params);
         $this->addOption($pageLayouts, __('Page Layouts'), $params);
     }

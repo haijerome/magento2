@@ -2,30 +2,12 @@
 /**
  * Google Optimizer Scripts Block
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\GoogleOptimizer\Block;
 
-abstract class AbstractCode extends \Magento\View\Element\Template
+abstract class AbstractCode extends \Magento\Framework\View\Element\Template
 {
     /**
      * @var Entity name in registry
@@ -33,7 +15,7 @@ abstract class AbstractCode extends \Magento\View\Element\Template
     protected $_registryName;
 
     /**
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_registry;
 
@@ -48,18 +30,18 @@ abstract class AbstractCode extends \Magento\View\Element\Template
     protected $_codeHelper;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\GoogleOptimizer\Helper\Data $helper
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
      * @param \Magento\GoogleOptimizer\Helper\Code $codeHelper
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\GoogleOptimizer\Helper\Data $helper,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Registry $registry,
         \Magento\GoogleOptimizer\Helper\Code $codeHelper,
-        array $data = array()
+        array $data = []
     ) {
         $this->_helper = $helper;
         $this->_registry = $registry;

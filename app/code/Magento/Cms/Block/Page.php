@@ -1,42 +1,20 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Cms\Block;
 
+use Magento\Store\Model\ScopeInterface;
 
 /**
  * Cms page content block
  *
- * @category   Magento
- * @package    Magento_Cms
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Cms\Block;
-
-use Magento\View\Element\AbstractBlock;
-
-class Page extends \Magento\View\Element\AbstractBlock
+class Page extends \Magento\Framework\View\Element\AbstractBlock implements
+    \Magento\Framework\DataObject\IdentityInterface
 {
     /**
      * @var \Magento\Cms\Model\Template\FilterProvider
@@ -51,7 +29,7 @@ class Page extends \Magento\View\Element\AbstractBlock
     /**
      * Store manager
      *
-     * @var \Magento\Core\Model\StoreManagerInterface
+     * @var \Magento\Store\Model\StoreManagerInterface
      */
     protected $_storeManager;
 
@@ -63,22 +41,29 @@ class Page extends \Magento\View\Element\AbstractBlock
     protected $_pageFactory;
 
     /**
+     * @var \Magento\Framework\View\Page\Config
+     */
+    protected $pageConfig;
+
+    /**
      * Construct
      *
-     * @param \Magento\View\Element\Context $context
+     * @param \Magento\Framework\View\Element\Context $context
      * @param \Magento\Cms\Model\Page $page
      * @param \Magento\Cms\Model\Template\FilterProvider $filterProvider
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param \Magento\Cms\Model\PageFactory $pageFactory
+     * @param \Magento\Framework\View\Page\Config $pageConfig
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Context $context,
+        \Magento\Framework\View\Element\Context $context,
         \Magento\Cms\Model\Page $page,
         \Magento\Cms\Model\Template\FilterProvider $filterProvider,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Magento\Cms\Model\PageFactory $pageFactory,
-        array $data = array()
+        \Magento\Framework\View\Page\Config $pageConfig,
+        array $data = []
     ) {
         parent::__construct($context, $data);
         // used singleton (instead factory) because there exist dependencies on \Magento\Cms\Helper\Page
@@ -86,6 +71,7 @@ class Page extends \Magento\View\Element\AbstractBlock
         $this->_filterProvider = $filterProvider;
         $this->_storeManager = $storeManager;
         $this->_pageFactory = $pageFactory;
+        $this->pageConfig = $pageConfig;
     }
 
     /**
@@ -99,8 +85,7 @@ class Page extends \Magento\View\Element\AbstractBlock
             if ($this->getPageId()) {
                 /** @var \Magento\Cms\Model\Page $page */
                 $page = $this->_pageFactory->create();
-                $page->setStoreId($this->_storeManager->getStore()->getId())
-                    ->load($this->getPageId(), 'identifier');
+                $page->setStoreId($this->_storeManager->getStore()->getId())->load($this->getPageId(), 'identifier');
             } else {
                 $page = $this->_page;
             }
@@ -112,42 +97,67 @@ class Page extends \Magento\View\Element\AbstractBlock
     /**
      * Prepare global layout
      *
-     * @return \Magento\Cms\Block\Page
+     * @return $this
      */
     protected function _prepareLayout()
     {
         $page = $this->getPage();
-
-        // show breadcrumbs
-        if ($this->_storeConfig->getConfig('web/default/show_cms_breadcrumbs')
-            && ($breadcrumbs = $this->getLayout()->getBlock('breadcrumbs'))
-            && ($page->getIdentifier()!==$this->_storeConfig->getConfig('web/default/cms_home_page'))
-            && ($page->getIdentifier()!==$this->_storeConfig->getConfig('web/default/cms_no_route'))) {
-                $breadcrumbs->addCrumb('home', array('label'=>__('Home'), 'title'=>__('Go to Home Page'),
-                    'link' => $this->_storeManager->getStore()->getBaseUrl()));
-                $breadcrumbs->addCrumb('cms_page', array('label'=>$page->getTitle(), 'title'=>$page->getTitle()));
-        }
-
-        $root = $this->getLayout()->getBlock('root');
-        if ($root) {
-            $root->addBodyClass('cms-'.$page->getIdentifier());
-        }
-
-        $head = $this->getLayout()->getBlock('head');
-        if ($head) {
-            $head->setTitle($page->getTitle());
-            $head->setKeywords($page->getMetaKeywords());
-            $head->setDescription($page->getMetaDescription());
-        }
+        $this->_addBreadcrumbs($page);
+        $this->pageConfig->addBodyClass('cms-' . $page->getIdentifier());
+        $metaTitle = $page->getMetaTitle();
+        $this->pageConfig->getTitle()->set($metaTitle ? $metaTitle : $page->getTitle());
+        $this->pageConfig->setKeywords($page->getMetaKeywords());
+        $this->pageConfig->setDescription($page->getMetaDescription());
 
         $pageMainTitle = $this->getLayout()->getBlock('page.main.title');
         if ($pageMainTitle) {
             // Setting empty page title if content heading is absent
-            $cmsTitle = $page->getContentHeading() ? : ' ';
+            $cmsTitle = $page->getContentHeading() ?: ' ';
             $pageMainTitle->setPageTitle($this->escapeHtml($cmsTitle));
         }
-
         return parent::_prepareLayout();
+    }
+
+    /**
+     * Prepare breadcrumbs
+     *
+     * @param \Magento\Cms\Model\Page $page
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @return void
+     */
+    protected function _addBreadcrumbs(\Magento\Cms\Model\Page $page)
+    {
+        $homePageIdentifier = $this->_scopeConfig->getValue(
+            'web/default/cms_home_page',
+            ScopeInterface::SCOPE_STORE
+        );
+        $homePageDelimiterPosition = strrpos($homePageIdentifier, '|');
+        if ($homePageDelimiterPosition) {
+            $homePageIdentifier = substr($homePageIdentifier, 0, $homePageDelimiterPosition);
+        }
+        $noRouteIdentifier = $this->_scopeConfig->getValue(
+            'web/default/cms_no_route',
+            ScopeInterface::SCOPE_STORE
+        );
+        $noRouteDelimiterPosition = strrpos($noRouteIdentifier, '|');
+        if ($noRouteDelimiterPosition) {
+            $noRouteIdentifier = substr($noRouteIdentifier, 0, $noRouteDelimiterPosition);
+        }
+        if ($this->_scopeConfig->getValue('web/default/show_cms_breadcrumbs', ScopeInterface::SCOPE_STORE)
+            && ($breadcrumbsBlock = $this->getLayout()->getBlock('breadcrumbs'))
+            && $page->getIdentifier() !== $homePageIdentifier
+            && $page->getIdentifier() !== $noRouteIdentifier
+        ) {
+            $breadcrumbsBlock->addCrumb(
+                'home',
+                [
+                    'label' => __('Home'),
+                    'title' => __('Go to Home Page'),
+                    'link' => $this->_storeManager->getStore()->getBaseUrl()
+                ]
+            );
+            $breadcrumbsBlock->addCrumb('cms_page', ['label' => $page->getTitle(), 'title' => $page->getTitle()]);
+        }
     }
 
     /**
@@ -158,7 +168,16 @@ class Page extends \Magento\View\Element\AbstractBlock
     protected function _toHtml()
     {
         $html = $this->_filterProvider->getPageFilter()->filter($this->getPage()->getContent());
-        $html = $this->getLayout()->renderElement('messages') . $html;
         return $html;
+    }
+
+    /**
+     * Return identifiers for produced content
+     *
+     * @return array
+     */
+    public function getIdentities()
+    {
+        return [\Magento\Cms\Model\Page::CACHE_TAG . '_' . $this->getPage()->getId()];
     }
 }

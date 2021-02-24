@@ -1,69 +1,169 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Test;
 
-use Magento\App\State;
+use Magento\Framework\App\Area;
+use Magento\Framework\App\AreaList;
+use Magento\Framework\App\Bootstrap;
+use Magento\Framework\App\ObjectManager\ConfigLoader;
+use Magento\Framework\App\State;
+use Magento\Framework\Autoload\ClassLoaderWrapper;
+use Magento\Framework\Config\Scope;
+use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\Shell;
+use Magento\TestFramework\Application;
 
-class ApplicationTest extends \PHPUnit_Framework_TestCase
+/**
+ * Provide tests for \Magento\TestFramework\Application.
+ */
+class ApplicationTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * @covers \Magento\TestFramework\Application::getInstallDir()
+     * Test subject.
+     *
+     * @var Application
+     */
+    private $subject;
+
+    /**
+     * @var string
+     */
+    private $tempDir;
+
+    /**
+     * @inheritdoc
+     */
+    protected function setUp(): void
+    {
+        /** @var Shell|\PHPUnit\Framework\MockObject\MockObject $shell */
+        $shell = $this->createMock(Shell::class);
+        /** @var ClassLoaderWrapper|\PHPUnit\Framework\MockObject\MockObject $autoloadWrapper */
+        $autoloadWrapper = $this->getMockBuilder(ClassLoaderWrapper::class)
+            ->disableOriginalConstructor()->getMock();
+        $this->tempDir = '/temp/dir';
+        $appMode = \Magento\Framework\App\State::MODE_DEVELOPER;
+
+        $this->subject = new Application(
+            $shell,
+            $this->tempDir,
+            'config.php',
+            'global-config.php',
+            '',
+            $appMode,
+            $autoloadWrapper
+        );
+    }
+
+    /**
+     * @covers \Magento\TestFramework\Application::getTempDir
      * @covers \Magento\TestFramework\Application::getDbInstance()
      * @covers \Magento\TestFramework\Application::getInitParams()
      */
     public function testConstructor()
     {
-        $dbInstance = $this->getMockForAbstractClass('Magento\TestFramework\Db\AbstractDb', array(), '', false);
-        $installDir = '/install/dir';
-        $appMode = \Magento\App\State::MODE_DEVELOPER;
+        $this->assertEquals($this->tempDir, $this->subject->getTempDir(), 'Temp directory is not set in Application');
 
-        $object = new \Magento\TestFramework\Application(
-            $dbInstance,
-            $installDir,
-            new \Magento\Simplexml\Element('<data/>'),
-            '',
-            array(),
-            $appMode
+        $initParams = $this->subject->getInitParams();
+        $this->assertIsArray($initParams, 'Wrong initialization parameters type');
+        $this->assertArrayHasKey(
+            Bootstrap::INIT_PARAM_FILESYSTEM_DIR_PATHS,
+            $initParams,
+            'Directories are not configured'
         );
-
-        $this->assertSame($dbInstance, $object->getDbInstance(), 'Db instance is not set in Application');
-        $this->assertEquals($installDir, $object->getInstallDir(), 'Install directory is not set in Application');
-
-        $initParams = $object->getInitParams();
-        $this->assertInternalType('array', $initParams, 'Wrong initialization parameters type');
-        $this->assertArrayHasKey(\Magento\App\Dir::PARAM_APP_DIRS, $initParams,
-            'Directories are not configured');
-        $this->assertArrayHasKey(State::PARAM_MODE, $initParams,
-            'Application mode is not configured');
+        $this->assertArrayHasKey(State::PARAM_MODE, $initParams, 'Application mode is not configured');
         $this->assertEquals(
-            \Magento\App\State::MODE_DEVELOPER,
+            \Magento\Framework\App\State::MODE_DEVELOPER,
             $initParams[State::PARAM_MODE],
             'Wrong application mode configured'
         );
+    }
+
+    /**
+     * Test \Magento\TestFramework\Application will correctly load specified areas.
+     *
+     * @dataProvider partialLoadAreaDataProvider
+     * @param string $areaCode
+     * @return void
+     */
+    public function testPartialLoadArea(string $areaCode)
+    {
+        $configScope = $this->getMockBuilder(Scope::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $configScope->expects($this->once())
+            ->method('setCurrentScope')
+            ->with($this->identicalTo($areaCode));
+
+        $configLoader = $this->getMockBuilder(ConfigLoader::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $configLoader->expects($this->once())
+            ->method('load')
+            ->with($this->identicalTo($areaCode))
+            ->willReturn([]);
+
+        $area = $this->getMockBuilder(Area::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $area->expects($this->once())
+            ->method('load')
+            ->with($this->identicalTo(Area::PART_CONFIG));
+
+        $areaList = $this->getMockBuilder(AreaList::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $areaList->expects($this->once())
+            ->method('getArea')
+            ->with($this->identicalTo($areaCode))
+            ->willReturn($area);
+
+        /** @var ObjectManagerInterface|\PHPUnit\Framework\MockObject\MockObject $objectManager */
+        $objectManager = $this->getMockBuilder(ObjectManagerInterface::class)
+            ->disableOriginalConstructor()
+            ->getMockForAbstractClass();
+        $objectManager->expects($this->once())
+            ->method('configure')
+            ->with($this->identicalTo([]));
+        $objectManager->expects($this->exactly(3))
+            ->method('get')
+            ->willReturnOnConsecutiveCalls(
+                $configScope,
+                $configLoader,
+                $areaList
+            );
+
+        \Magento\TestFramework\Helper\Bootstrap::setObjectManager($objectManager);
+
+        $this->subject->loadArea($areaCode);
+    }
+
+    /**
+     * Provide test data for testPartialLoadArea().
+     *
+     * @return array
+     */
+    public function partialLoadAreaDataProvider()
+    {
+        return [
+            [
+                'area_code' => Area::AREA_GLOBAL,
+            ],
+            [
+                'area_code' => Area::AREA_WEBAPI_REST,
+            ],
+            [
+                'area_code' => Area::AREA_WEBAPI_SOAP,
+            ],
+            [
+                'area_code' => Area::AREA_CRONTAB,
+            ],
+            [
+                'area_code' => Area::AREA_GRAPHQL,
+            ],
+        ];
     }
 }

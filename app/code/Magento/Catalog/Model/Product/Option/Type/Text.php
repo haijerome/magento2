@@ -1,73 +1,57 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Model\Product\Option\Type;
 
+use Magento\Framework\Exception\LocalizedException;
+
 /**
  * Catalog product option text type
+ *
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
  */
 class Text extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
 {
     /**
      * Magento string lib
      *
-     * @var \Magento\Stdlib\String
+     * @var \Magento\Framework\Stdlib\StringUtils
      */
     protected $string;
 
     /**
-     * @var \Magento\Escaper
+     * @var \Magento\Framework\Escaper
      */
     protected $_escaper = null;
 
     /**
      * @param \Magento\Checkout\Model\Session $checkoutSession
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Escaper $escaper
-     * @param \Magento\Stdlib\String $string
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\Escaper $escaper
+     * @param \Magento\Framework\Stdlib\StringUtils $string
      * @param array $data
      */
     public function __construct(
         \Magento\Checkout\Model\Session $checkoutSession,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Escaper $escaper,
-        \Magento\Stdlib\String $string,
-        array $data = array()
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\Escaper $escaper,
+        \Magento\Framework\Stdlib\StringUtils $string,
+        array $data = []
     ) {
         $this->_escaper = $escaper;
         $this->string = $string;
-        parent::__construct($checkoutSession, $coreStoreConfig, $data);
+        parent::__construct($checkoutSession, $scopeConfig, $data);
     }
 
     /**
      * Validate user input for option
      *
-     * @throws \Magento\Core\Exception
      * @param array $values All product option values, i.e. array (option_id => mixed, option_id => mixed...)
-     * @return \Magento\Catalog\Model\Product\Option\Type\DefaultType
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function validateUserValue($values)
     {
@@ -79,14 +63,17 @@ class Text extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
         // Check requires option to have some value
         if (strlen($value) == 0 && $option->getIsRequire() && !$this->getSkipCheckRequiredOption()) {
             $this->setIsValid(false);
-            throw new \Magento\Core\Exception(__('Please specify the product\'s required option(s).'));
+            throw new LocalizedException(
+                __("The product's required option(s) weren't entered. Make sure the options are entered and try again.")
+            );
         }
 
         // Check maximal length limit
         $maxCharacters = $option->getMaxCharacters();
+        $value = $this->normalizeNewLineSymbols($value);
         if ($maxCharacters > 0 && $this->string->strlen($value) > $maxCharacters) {
             $this->setIsValid(false);
-            throw new \Magento\Core\Exception(__('The text is too long.'));
+            throw new LocalizedException(__('The text is too long. Shorten the text and try again.'));
         }
 
         $this->setUserValue($value);
@@ -96,11 +83,11 @@ class Text extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
     /**
      * Prepare option value for cart
      *
-     * @return mixed Prepared option value
+     * @return string|null Prepared option value
      */
     public function prepareForCart()
     {
-        if ($this->getIsValid() && strlen($this->getUserValue()) > 0) {
+        if ($this->getIsValid() && ($this->getUserValue() !== '')) {
             return $this->getUserValue();
         } else {
             return null;
@@ -116,5 +103,16 @@ class Text extends \Magento\Catalog\Model\Product\Option\Type\DefaultType
     public function getFormattedOptionValue($value)
     {
         return $this->_escaper->escapeHtml($value);
+    }
+
+    /**
+     * Normalize newline symbols
+     *
+     * @param string $value
+     * @return string
+     */
+    private function normalizeNewLineSymbols(string $value)
+    {
+        return str_replace(["\r\n", "\n\r", "\r"], "\n", $value);
     }
 }

@@ -1,65 +1,56 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Widget
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * WYSIWYG widget options form
  *
- * @category   Magento
- * @package    Magento_Adminhtml
  * @author     Magento Core Team <core@magentocommerce.com>
  */
-
 namespace Magento\Widget\Block\Adminhtml\Widget;
 
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
+
+/**
+ * Chooser widget block.
+ */
 class Chooser extends \Magento\Backend\Block\Template
 {
     /**
-     * @var \Magento\Data\Form\Element\Factory
+     * @var \Magento\Framework\Data\Form\Element\Factory
      */
     protected $_elementFactory;
 
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Data\Form\Element\Factory $elementFactory
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Framework\Data\Form\Element\Factory $elementFactory
      * @param array $data
+     * @param SecureHtmlRenderer|null $secureRenderer
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\Data\Form\Element\Factory $elementFactory,
-        array $data = array()
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Framework\Data\Form\Element\Factory $elementFactory,
+        array $data = [],
+        ?SecureHtmlRenderer $secureRenderer = null
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_elementFactory = $elementFactory;
+        $this->secureRenderer = $secureRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
         parent::__construct($context, $data);
     }
 
@@ -76,7 +67,7 @@ class Chooser extends \Magento\Backend\Block\Template
     /**
      * Chooser form element getter
      *
-     * @return \Magento\Data\Form\Element\AbstractElement
+     * @return \Magento\Framework\Data\Form\Element\AbstractElement
      */
     public function getElement()
     {
@@ -86,16 +77,16 @@ class Chooser extends \Magento\Backend\Block\Template
     /**
      * Convert Array config to Object
      *
-     * @return \Magento\Object
+     * @return \Magento\Framework\DataObject
      */
     public function getConfig()
     {
-        if ($this->_getData('config') instanceof \Magento\Object) {
+        if ($this->_getData('config') instanceof \Magento\Framework\DataObject) {
             return $this->_getData('config');
         }
 
         $configArray = $this->_getData('config');
-        $config = new \Magento\Object();
+        $config = new \Magento\Framework\DataObject();
         $this->setConfig($config);
         if (!is_array($configArray)) {
             return $this->_getData('config');
@@ -107,10 +98,7 @@ class Chooser extends \Magento\Backend\Block\Template
         }
 
         // chooser control buttons
-        $buttons = array(
-            'open'  => __('Choose...'),
-            'close' => __('Close')
-        );
+        $buttons = ['open' => __('Choose...'), 'close' => __('Close')];
         if (isset($configArray['button']) && is_array($configArray['button'])) {
             foreach ($configArray['button'] as $id => $label) {
                 $buttons[$id] = __($label);
@@ -145,6 +133,7 @@ class Chooser extends \Magento\Backend\Block\Template
      * Flag to indicate include hidden field before chooser or not
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getHiddenEnabled()
     {
@@ -158,20 +147,21 @@ class Chooser extends \Magento\Backend\Block\Template
      */
     protected function _toHtml()
     {
-        $element   = $this->getElement();
-        /* @var $fieldset \Magento\Data\Form\Element\Fieldset */
-        $fieldset  = $element->getForm()->getElement($this->getFieldsetId());
+        $element = $this->getElement();
+        /* @var $fieldset \Magento\Framework\Data\Form\Element\Fieldset */
+        $fieldset = $element->getForm()->getElement($this->getFieldsetId());
         $chooserId = $this->getUniqId();
-        $config    = $this->getConfig();
+        $config = $this->getConfig();
 
         // add chooser element to fieldset
-        $chooser = $fieldset->addField('chooser' . $element->getId(), 'note', array(
-            'label'       => $config->getLabel() ? $config->getLabel() : '',
-            'value_class' => 'value2',
-        ));
+        $chooser = $fieldset->addField(
+            'chooser' . $element->getId(),
+            'note',
+            ['label' => $config->getLabel() ? $config->getLabel() : '', 'value_class' => 'value2']
+        );
         $hiddenHtml = '';
         if ($this->getHiddenEnabled()) {
-            $hidden = $this->_elementFactory->create('hidden', array('data' => $element->getData()));
+            $hidden = $this->_elementFactory->create('hidden', ['data' => $element->getData()]);
             $hidden->setId("{$chooserId}value")->setForm($element->getForm());
             if ($element->getRequired()) {
                 $hidden->addClass('required-entry');
@@ -181,41 +171,73 @@ class Chooser extends \Magento\Backend\Block\Template
         }
 
         $buttons = $config->getButtons();
-        $chooseButton = $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button')
-            ->setType('button')
-            ->setId($chooserId . 'control')
-            ->setClass('btn-chooser')
-            ->setLabel($buttons['open'])
-            ->setOnclick($chooserId.'.choose()')
-            ->setDisabled($element->getReadonly());
+        $chooseButton = $this->getLayout()->createBlock(
+            \Magento\Backend\Block\Widget\Button::class
+        )->setType(
+            'button'
+        )->setId(
+            $chooserId . 'control'
+        )->setClass(
+            'btn-chooser'
+        )->setLabel(
+            $buttons['open']
+        )->setOnclick(
+            $chooserId . '.choose()'
+        )->setDisabled(
+            $element->getReadonly()
+        );
         $chooser->setData('after_element_html', $hiddenHtml . $chooseButton->toHtml());
 
         // render label and chooser scripts
         $configJson = $this->_jsonEncoder->encode($config->getData());
         return '
-            <label class="widget-option-label" id="' . $chooserId . 'label">'
-            . ($this->getLabel() ? $this->getLabel() : __('Not Selected')) . '</label>
-            <div id="' . $chooserId . 'advice-container" class="hidden"></div>
-            <script type="text/javascript">//<![CDATA[
+            <label class="widget-option-label" id="' .
+            $chooserId .
+            'label">' .
+            ($this->getLabel() ? $this->escapeHtml($this->getLabel()) : __(
+                'Not Selected'
+            )) .
+            '</label>
+            <div id="' .
+            $chooserId .
+            'advice-container" class="hidden"></div>' .
+            $this->secureRenderer->renderTag(
+                'script',
+                [],
+                'require(["prototype", "mage/adminhtml/wysiwyg/widget"], function(){
+            //<![CDATA[
                 (function() {
                     var instantiateChooser = function() {
-                        window.' . $chooserId . ' = new WysiwygWidget.chooser(
-                            "' . $chooserId . '",
-                            "' . $this->getSourceUrl() . '",
-                            ' . $configJson . '
+                        window.' .
+                $chooserId .
+                ' = new WysiwygWidget.chooser(
+                            "' .
+                $chooserId .
+                '",
+                            "' .
+                $this->getSourceUrl() .
+                '",
+                            ' .
+                $configJson .
+                '
                         );
-                        if ($("' . $chooserId . 'value")) {
-                            $("' . $chooserId . 'value").advaiceContainer = "' . $chooserId . 'advice-container";
+                        if ($("' .
+                $chooserId .
+                'value")) {
+                            $("' .
+                $chooserId .
+                'value").advaiceContainer = "' .
+                $chooserId .
+                'advice-container";
                         }
                     }
 
-                    if (document.loaded) { //allow load over ajax
-                        instantiateChooser();
-                    } else {
-                        document.observe("dom:loaded", instantiateChooser);
-                    }
+                    jQuery(instantiateChooser);
                 })();
-            //]]></script>
-        ';
+            //]]>
+            });
+            ',
+                false
+            );
     }
 }

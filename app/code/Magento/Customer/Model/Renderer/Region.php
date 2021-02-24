@@ -1,55 +1,35 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * REgion field renderer
- *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Model\Renderer;
 
-class Region implements \Magento\Data\Form\Element\Renderer\RendererInterface
+use Magento\Framework\Data\Form\Element\AbstractElement;
+
+/**
+ * Region field renderer
+ *
+ * @author      Magento Core Team <core@magentocommerce.com>
+ */
+class Region implements \Magento\Framework\Data\Form\Element\Renderer\RendererInterface
 {
     /**
      * Country region collections
      *
+     * Structure:
      * array(
-     *      [$countryId] => \Magento\Data\Collection\Db
+     *      [$countryId] => \Magento\Framework\Data\Collection\AbstractDb
      * )
      *
      * @var array
      */
-    static protected $_regionCollections;
+    protected static $_regionCollections;
 
     /**
      * Adminhtml data
      *
-     * @var \Magento\Escaper
+     * @var \Magento\Framework\Escaper
      */
     protected $_escaper = null;
 
@@ -60,37 +40,49 @@ class Region implements \Magento\Data\Form\Element\Renderer\RendererInterface
 
     /**
      * @param \Magento\Directory\Model\CountryFactory $countryFactory
-     * @param \Magento\Escaper $escaper
+     * @param \Magento\Directory\Helper\Data $directoryHelper
+     * @param \Magento\Framework\Escaper $escaper
      */
     public function __construct(
         \Magento\Directory\Model\CountryFactory $countryFactory,
-        \Magento\Escaper $escaper
+        \Magento\Directory\Helper\Data $directoryHelper,
+        \Magento\Framework\Escaper $escaper
     ) {
         $this->_countryFactory = $countryFactory;
+        $this->_directoryHelper = $directoryHelper;
         $this->_escaper = $escaper;
     }
 
-    public function render(\Magento\Data\Form\Element\AbstractElement $element)
+    /**
+     * Render element
+     *
+     * @param AbstractElement $element
+     * @return string
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     */
+    public function render(AbstractElement $element)
     {
-        $html = '<div class="field field-region required">'."\n";
-
         $countryId = false;
+        $isRegionRequired = false;
         if ($country = $element->getForm()->getElement('country_id')) {
             $countryId = $country->getValue();
+            $isRegionRequired = $this->_directoryHelper->isRegionRequired($countryId);
         }
+
+        $html = '<div class="field field-region ' . ($isRegionRequired ? 'required' : '') . '">' . "\n";
 
         $regionCollection = false;
         if ($countryId) {
             if (!isset(self::$_regionCollections[$countryId])) {
-                self::$_regionCollections[$countryId] = $this->_countryFactory->create()
-                    ->setId($countryId)
-                    ->getLoadedRegionCollection()
-                    ->toOptionArray();
+                self::$_regionCollections[$countryId] = $this->_countryFactory->create()->setId(
+                    $countryId
+                )->getLoadedRegionCollection()->toOptionArray();
             }
             $regionCollection = self::$_regionCollections[$countryId];
         }
 
-        $regionId = intval($element->getForm()->getElement('region_id')->getValue());
+        $regionId = (int)$element->getForm()->getElement('region_id')->getValue();
 
         $htmlAttributes = $element->getHtmlAttributes();
         foreach ($htmlAttributes as $key => $attribute) {
@@ -109,42 +101,57 @@ class Region implements \Magento\Data\Form\Element\Renderer\RendererInterface
         $regionHtmlId = $element->getHtmlId();
         $regionIdHtmlId = str_replace('region', 'region_id', $regionHtmlId);
 
+        if ($isRegionRequired) {
+            $element->addClass('required-entry');
+        }
+
         if ($regionCollection && count($regionCollection) > 0) {
             $elementClass = $element->getClass();
-            $html.= '<label class="label" for="' . $regionIdHtmlId . '"><span>' . $element->getLabel() . '</span>'
-                . '</label>';
-            $html.= '<div class="control">';
+            $html .= '<label class="label" for="' .
+                $regionIdHtmlId .
+                '"><span>' .
+                $element->getLabel() .
+                '</span>' .
+                '</label>';
+            $html .= '<div class="control">';
 
-            $html .= '<select id="' . $regionIdHtmlId . '" name="' . $regionIdHtmlName . '" '
-                 . $element->serialize($htmlAttributes) .'>' . "\n";
+            $html .= '<select id="' . $regionIdHtmlId . '" name="' . $regionIdHtmlName . '" ' . $element->serialize(
+                $htmlAttributes
+            ) . '>' . "\n";
             foreach ($regionCollection as $region) {
-                $selected = ($regionId==$region['value']) ? ' selected="selected"' : '';
-                $regionVal = (0 == $region['value']) ? '' : (int)$region['value'];
-                $html.= '<option value="' . $regionVal . '"' . $selected . '>'
-                    . $this->_escaper->escapeHtml(__($region['label']))
-                    . '</option>';
+                $selected = $regionId == $region['value'] ? ' selected="selected"' : '';
+                $regionVal = 0 == $region['value'] ? '' : (int)$region['value'];
+                $html .= '<option value="' . $regionVal . '"' . $selected . '>' . $this->_escaper->escapeHtml(
+                    __($region['label'])
+                ) . '</option>';
             }
-            $html.= '</select>' . "\n";
+            $html .= '</select>' . "\n";
 
             $html .= '<input type="hidden" name="' . $regionHtmlName . '" id="' . $regionHtmlId . '" value=""/>';
 
-            $html.= '</div>';
+            $html .= '</div>';
             $element->setClass($elementClass);
         } else {
-            $element->setClass('input-text');
-            $html.= '<label class="label" for="' . $regionHtmlId . '"><span>'
-                . $element->getLabel()
-                . '</span></label>';
-
-            $element->setRequired(false);
-            $html.= '<div class="control">';
-            $html .= '<input id="' . $regionHtmlId . '" name="' . $regionHtmlName
-                . '" value="' . $element->getEscapedValue() . '" '
-                . $element->serialize($htmlAttributes) . "/>" . "\n";
+            $html .= '<label class="label" for="' .
+                $regionHtmlId .
+                '"><span>' .
+                $element->getLabel() .
+                '</span></label>';
+            $html .= '<div class="control">';
+            $html .= '<input id="' .
+                $regionHtmlId .
+                '" name="' .
+                $regionHtmlName .
+                '" value="' .
+                $element->getEscapedValue() .
+                '" ' .
+                $element->serialize(
+                    $htmlAttributes
+                ) . "/>" . "\n";
             $html .= '<input type="hidden" name="' . $regionIdHtmlName . '" id="' . $regionIdHtmlId . '" value=""/>';
-            $html .= '</div>'."\n";
+            $html .= '</div>' . "\n";
         }
-        $html.= '</div>'."\n";
+        $html .= '</div>' . "\n";
         return $html;
     }
 }

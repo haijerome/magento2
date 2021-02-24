@@ -1,35 +1,14 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\TestFramework\Event;
 
 /**
  * Database transaction events manager
  */
-namespace Magento\TestFramework\Event;
-
 class Transaction
 {
     /**
@@ -60,9 +39,9 @@ class Transaction
     /**
      * Handler for 'startTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param \PHPUnit\Framework\TestCase $test
      */
-    public function startTest(\PHPUnit_Framework_TestCase $test)
+    public function startTest(\PHPUnit\Framework\TestCase $test)
     {
         $this->_processTransactionRequests('startTest', $test);
     }
@@ -70,9 +49,9 @@ class Transaction
     /**
      * Handler for 'endTest' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param \PHPUnit\Framework\TestCase $test
      */
-    public function endTest(\PHPUnit_Framework_TestCase $test)
+    public function endTest(\PHPUnit\Framework\TestCase $test)
     {
         $this->_processTransactionRequests('endTest', $test);
     }
@@ -89,12 +68,12 @@ class Transaction
      * Query whether there are any requests for transaction operations and performs them
      *
      * @param string $eventName
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param \PHPUnit\Framework\TestCase $test
      */
-    protected function _processTransactionRequests($eventName, \PHPUnit_Framework_TestCase $test)
+    protected function _processTransactionRequests($eventName, \PHPUnit\Framework\TestCase $test)
     {
         $param = $this->_getEventParam();
-        $this->_eventManager->fireEvent($eventName . 'TransactionRequest', array($test, $param));
+        $this->_eventManager->fireEvent($eventName . 'TransactionRequest', [$test, $param]);
         if ($param->isTransactionRollbackRequested()) {
             $this->_rollbackTransaction();
         }
@@ -106,14 +85,37 @@ class Transaction
     /**
      * Start transaction and fire 'startTransaction' event
      *
-     * @param \PHPUnit_Framework_TestCase $test
+     * @param \PHPUnit\Framework\TestCase $test
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
-    protected function _startTransaction(\PHPUnit_Framework_TestCase $test)
+    protected function _startTransaction(\PHPUnit\Framework\TestCase $test)
     {
         if (!$this->_isTransactionActive) {
-            $this->_getAdapter()->beginTransparentTransaction();
+            $this->_getConnection()->beginTransparentTransaction();
             $this->_isTransactionActive = true;
-            $this->_eventManager->fireEvent('startTransaction', array($test));
+            try {
+                /**
+                 * Add any warning during transaction execution as a failure.
+                 */
+                set_error_handler(
+                    function ($errNo, $errStr, $errFile, $errLine) use ($test) {
+                        $errMsg = sprintf("%s: %s in %s:%s.", "Warning", $errStr, $errFile, $errLine);
+                        $test->getTestResultObject()->addError($test, new \PHPUnit\Framework\Warning($errMsg), 0);
+
+                        // Allow error to be handled by next error handler
+                        return false;
+                    },
+                    E_WARNING
+                );
+                $this->_eventManager->fireEvent('startTransaction', [$test]);
+                restore_error_handler();
+            } catch (\Exception $e) {
+                $test->getTestResultObject()->addFailure(
+                    $test,
+                    new \PHPUnit\Framework\AssertionFailedError((string)$e),
+                    0
+                );
+            }
         }
     }
 
@@ -123,23 +125,25 @@ class Transaction
     protected function _rollbackTransaction()
     {
         if ($this->_isTransactionActive) {
-            $this->_getAdapter()->rollbackTransparentTransaction();
+            $this->_getConnection()->rollbackTransparentTransaction();
             $this->_isTransactionActive = false;
             $this->_eventManager->fireEvent('rollbackTransaction');
+            $this->_getConnection()->closeConnection();
         }
     }
 
     /**
      * Retrieve database adapter instance
      *
-     * @param string $connectionName 'read' or 'write'
-     * @return \Magento\DB\Adapter\AdapterInterface|\Magento\TestFramework\Db\Adapter\TransactionInterface
-     * @throws \Magento\Exception
+     * @param string $connectionName
+     * @return \Magento\Framework\DB\Adapter\AdapterInterface|\Magento\TestFramework\Db\Adapter\TransactionInterface
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
-    protected function _getAdapter($connectionName = 'core_write')
+    protected function _getConnection($connectionName = \Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION)
     {
-        /** @var $resource \Magento\App\Resource */
-        $resource = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\App\Resource');
+        /** @var $resource \Magento\Framework\App\ResourceConnection */
+        $resource = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
+            ->get(\Magento\Framework\App\ResourceConnection::class);
         return $resource->getConnection($connectionName);
     }
 

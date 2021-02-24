@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,7 +9,7 @@
  */
 namespace Magento\Test\Annotation;
 
-class AppIsolationTest extends \PHPUnit_Framework_TestCase
+class AppIsolationTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\TestFramework\Annotation\AppIsolation
@@ -38,18 +17,17 @@ class AppIsolationTest extends \PHPUnit_Framework_TestCase
     protected $_object;
 
     /**
-     * @var \PHPUnit_Framework_MockObject_MockObject
+     * @var \PHPUnit\Framework\MockObject\MockObject
      */
     protected $_application;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_application = $this->getMock(
-            'Magento\TestFramework\Application', array('reinitialize'), array(), '', false);
+        $this->_application = $this->createPartialMock(\Magento\TestFramework\Application::class, ['reinitialize']);
         $this->_object = new \Magento\TestFramework\Annotation\AppIsolation($this->_application);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         $this->_application = null;
         $this->_object = null;
@@ -63,20 +41,22 @@ class AppIsolationTest extends \PHPUnit_Framework_TestCase
 
     /**
      * @magentoAppIsolation invalid
-     * @expectedException \Magento\Exception
      */
     public function testEndTestIsolationInvalid()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+
         $this->_object->endTest($this);
     }
 
     /**
      * @magentoAppIsolation enabled
      * @magentoAppIsolation disabled
-     * @expectedException \Magento\Exception
      */
     public function testEndTestIsolationAmbiguous()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+
         $this->_object->endTest($this);
     }
 
@@ -89,7 +69,7 @@ class AppIsolationTest extends \PHPUnit_Framework_TestCase
     public function testEndTestIsolationController()
     {
         /** @var $controllerTest \Magento\TestFramework\TestCase\AbstractController */
-        $controllerTest = $this->getMockForAbstractClass('Magento\TestFramework\TestCase\AbstractController');
+        $controllerTest = $this->getMockForAbstractClass(\Magento\TestFramework\TestCase\AbstractController::class);
         $this->_application->expects($this->once())->method('reinitialize');
         $this->_object->endTest($controllerTest);
     }

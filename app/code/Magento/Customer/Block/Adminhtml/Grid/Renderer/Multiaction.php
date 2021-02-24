@@ -1,53 +1,59 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Adminhtml\Grid\Renderer;
+
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Math\Random;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Adminhtml customers wishlist grid item action renderer for few action controls in one cell
  *
- * @category   Magento
- * @package    Magento_Customer
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Customer\Block\Adminhtml\Grid\Renderer;
-
-class Multiaction
-    extends \Magento\Adminhtml\Block\Widget\Grid\Column\Renderer\Action
+class Multiaction extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\Action
 {
+
+    /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureHtmlRenderer;
+
+    /**
+     * @var Random
+     */
+    private $random;
+
+    /**
+     * @inheritDoc
+     */
+    public function __construct(
+        \Magento\Backend\Block\Context $context,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        array $data = [],
+        ?SecureHtmlRenderer $secureHtmlRenderer = null,
+        ?Random $random = null
+    ) {
+        parent::__construct($context, $jsonEncoder, $data, $secureHtmlRenderer, $random);
+        $this->secureHtmlRenderer = $secureHtmlRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
+        $this->random = $random ?? ObjectManager::getInstance()->get(Random::class);
+    }
+
     /**
      * Renders column
      *
-     * @param  \Magento\Object $row
+     * @param  \Magento\Framework\DataObject $row
      * @return string
      */
-    public function render(\Magento\Object $row)
+    public function render(\Magento\Framework\DataObject $row)
     {
         $html = '';
         $actions = $this->getColumn()->getActions();
         if (!empty($actions) && is_array($actions)) {
-            $links = array();
+            $links = [];
             foreach ($actions as $action) {
                 if (is_array($action)) {
                     $link = $this->_toLinkHtml($action, $row);
@@ -70,23 +76,27 @@ class Multiaction
      * Render single action as link html
      *
      * @param  array $action
-     * @param  \Magento\Object $row
-     * @return string
+     * @param  \Magento\Framework\DataObject $row
+     * @return string|false
      */
-    protected function _toLinkHtml($action, \Magento\Object $row)
+    protected function _toLinkHtml($action, \Magento\Framework\DataObject $row)
     {
         $product = $row->getProduct();
 
         if (isset($action['process']) && $action['process'] == 'configurable') {
             if ($product->canConfigure()) {
-                $style = '';
-                $onClick = sprintf('onclick="return %s.configureItem(%s)"', $action['control_object'], $row->getId());
+                $id = 'id' .$this->random->getRandomString(10);
+                $onClick = sprintf('return %s.configureItem(%s)', $action['control_object'], $row->getId());
+                return sprintf(
+                    '<a href="%s" id="%s" class="configure-item-link">%s</a>%s',
+                    $action['url'],
+                    $id,
+                    $action['caption'],
+                    $this->secureHtmlRenderer->renderEventListenerAsTag('onclick', $onClick, "#$id")
+                );
             } else {
-                $style = 'style="color: #CCC;"';
-                $onClick = '';
+                return false;
             }
-
-            return sprintf('<a href="%s" %s %s>%s</a>', $action['url'], $style, $onClick, $action['caption']);
         } else {
             return parent::_toLinkHtml($action, $row);
         }

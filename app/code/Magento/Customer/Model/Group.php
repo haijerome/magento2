@@ -1,57 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Model;
 
 /**
  * Customer group model
  *
- * @method \Magento\Customer\Model\Resource\Group _getResource()
- * @method \Magento\Customer\Model\Resource\Group getResource()
+ * @api
  * @method string getCustomerGroupCode()
  * @method \Magento\Customer\Model\Group setCustomerGroupCode(string $value)
  * @method \Magento\Customer\Model\Group setTaxClassId(int $value)
- *
- * @category    Magento
- * @package     Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @method Group setTaxClassName(string $value)
+ * @since 100.0.2
  */
-namespace Magento\Customer\Model;
-
-class Group extends \Magento\Core\Model\AbstractModel
+class Group extends \Magento\Framework\Model\AbstractModel
 {
-    /**
-     * Xml config path for create account default group
-     */
-    const XML_PATH_DEFAULT_ID       = 'customer/create_account/default_group';
+    const NOT_LOGGED_IN_ID = 0;
 
-    const NOT_LOGGED_IN_ID          = 0;
-    const CUST_GROUP_ALL            = 32000;
+    const CUST_GROUP_ALL = 32000;
 
-    const ENTITY                    = 'customer_group';
+    const ENTITY = 'customer_group';
 
-    const GROUP_CODE_MAX_LENGTH     = 32;
+    const GROUP_CODE_MAX_LENGTH = 32;
 
     /**
      * Prefix of model events names
@@ -69,52 +41,69 @@ class Group extends \Magento\Core\Model\AbstractModel
      */
     protected $_eventObject = 'object';
 
-    protected static $_taxClassIds = array();
+    /**
+     * @var \Magento\Store\Model\StoresConfig
+     */
+    protected $_storesConfig;
 
     /**
-     * @var \Magento\Core\Model\Store\Config
+     * @var \Magento\Framework\Reflection\DataObjectProcessor
      */
-    protected $_storeConfig;
+    protected $dataObjectProcessor;
 
     /**
-     * @var \Magento\Index\Model\Indexer
+     * @var \Magento\Tax\Model\ClassModelFactory
      */
-    protected $_indexer;
+    protected $classModelFactory;
 
     /**
      * Constructor
      *
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
-     * @param \Magento\Core\Model\Store\Config $storeConfig
-     * @param \Magento\Index\Model\Indexer $indexer
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Store\Model\StoresConfig $storesConfig
+     * @param \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor
+     * @param \Magento\Tax\Model\ClassModelFactory $classModelFactory
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
-        \Magento\Core\Model\Store\Config $storeConfig,
-        \Magento\Index\Model\Indexer $indexer,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Store\Model\StoresConfig $storesConfig,
+        \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor,
+        \Magento\Tax\Model\ClassModelFactory $classModelFactory,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        $this->_storeConfig = $storeConfig;
-        $this->_indexer = $indexer;
-        parent::__construct($context, $registry, $resource, $resourceCollection, $data);
+        $this->_storesConfig = $storesConfig;
+        $this->dataObjectProcessor = $dataObjectProcessor;
+        $this->classModelFactory = $classModelFactory;
+        parent::__construct(
+            $context,
+            $registry,
+            $resource,
+            $resourceCollection,
+            $data
+        );
     }
 
+    /**
+     * @return void
+     */
     protected function _construct()
     {
-        $this->_init('Magento\Customer\Model\Resource\Group');
+        $this->_init(\Magento\Customer\Model\ResourceModel\Group::class);
     }
 
     /**
      * Alias for setCustomerGroupCode
      *
      * @param string $value
+     * @return $this
      */
     public function setCode($value)
     {
@@ -131,22 +120,34 @@ class Group extends \Magento\Core\Model\AbstractModel
         return $this->getCustomerGroupCode();
     }
 
-    public function getTaxClassId($groupId = null)
+    /**
+     * Get tax class name
+     *
+     * @return string
+     */
+    public function getTaxClassName()
     {
-        if (!is_null($groupId)) {
-            if (empty(self::$_taxClassIds[$groupId])) {
-                $this->load($groupId);
-                self::$_taxClassIds[$groupId] = $this->getData('tax_class_id');
-            }
-            $this->setData('tax_class_id', self::$_taxClassIds[$groupId]);
+        $taxClassName = $this->getData('tax_class_name');
+        if ($taxClassName) {
+            return $taxClassName;
         }
-        return $this->getData('tax_class_id');
+        $classModel = $this->classModelFactory->create();
+        $classModel->load($this->getTaxClassId());
+        $taxClassName = $classModel->getClassName();
+        $this->setData('tax_class_name', $taxClassName);
+        return $taxClassName;
     }
 
-
+    /**
+     * Determine if this group is used as the create account default group
+     *
+     * @return bool
+     */
     public function usesAsDefault()
     {
-        $data = $this->_storeConfig->getStoresConfigByPath(self::XML_PATH_DEFAULT_ID);
+        $data = $this->_storesConfig->getStoresConfigByPath(
+            GroupManagement::XML_PATH_DEFAULT_ID
+        );
         if (in_array($this->getId(), $data)) {
             return true;
         }
@@ -154,38 +155,24 @@ class Group extends \Magento\Core\Model\AbstractModel
     }
 
     /**
-     * Run reindex process after data save
-     *
-     * @return \Magento\Customer\Model\Group
-     */
-    protected function _afterSave()
-    {
-        parent::_afterSave();
-        $this->_indexer->processEntityAction($this, self::ENTITY, \Magento\Index\Model\Event::TYPE_SAVE);
-        return $this;
-    }
-
-    /**
      * Prepare data before save
      *
-     * @return \Magento\Core\Model\AbstractModel
+     * @return $this
      */
-    protected function _beforeSave()
+    public function beforeSave()
     {
         $this->_prepareData();
-        return parent::_beforeSave();
+        return parent::beforeSave();
     }
 
     /**
      * Prepare customer group data
      *
-     * @return \Magento\Customer\Model\Group
+     * @return $this
      */
     protected function _prepareData()
     {
-        $this->setCode(
-            substr($this->getCode(), 0, self::GROUP_CODE_MAX_LENGTH)
-        );
+        $this->setCode(substr($this->getCode(), 0, self::GROUP_CODE_MAX_LENGTH));
         return $this;
     }
 }

@@ -1,87 +1,90 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- * Adminhtml sales order edit address block
- *
- * @category    Magento
- * @package     Magento_Sales
- * @author      Magento Core Team <core@magentocommerce.com>
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Adminhtml\Order\Address;
 
-class Form
-    extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\Address
+use Magento\Framework\Pricing\PriceCurrencyInterface;
+
+/**
+ * Adminhtml sales order address block
+ * @SuppressWarnings(PHPMD.DepthOfInheritance)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class Form extends \Magento\Sales\Block\Adminhtml\Order\Create\Form\Address
 {
-    protected $_template = 'order/address/form.phtml';
+    /**
+     * Address form template
+     *
+     * @var string
+     */
+    protected $_template = 'Magento_Sales::order/address/form.phtml';
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param \Magento\Sales\Model\AdminOrder\Create $orderCreate
-     * @param \Magento\Data\FormFactory $formFactory
-     * @param \Magento\Customer\Model\AddressFactory $addressFactory
-     * @param \Magento\Customer\Model\FormFactory $customerFormFactory
-     * @param \Magento\Adminhtml\Helper\Addresses $adminhtmlAddresses
-     * @param \Magento\Core\Model\Registry $registry
+     * @param PriceCurrencyInterface $priceCurrency
+     * @param \Magento\Framework\Data\FormFactory $formFactory
+     * @param \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor
+     * @param \Magento\Directory\Helper\Data $directoryHelper
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\Customer\Model\Metadata\FormFactory $customerFormFactory
+     * @param \Magento\Customer\Model\Options $options
+     * @param \Magento\Customer\Helper\Address $addressHelper
+     * @param \Magento\Customer\Api\AddressRepositoryInterface $addressService
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $criteriaBuilder
+     * @param \Magento\Framework\Api\FilterBuilder $filterBuilder
+     * @param \Magento\Customer\Model\Address\Mapper $addressMapper
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
         \Magento\Sales\Model\AdminOrder\Create $orderCreate,
-        \Magento\Data\FormFactory $formFactory,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\Customer\Model\AddressFactory $addressFactory,
-        \Magento\Customer\Model\FormFactory $customerFormFactory,
-        \Magento\Adminhtml\Helper\Addresses $adminhtmlAddresses,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        PriceCurrencyInterface $priceCurrency,
+        \Magento\Framework\Data\FormFactory $formFactory,
+        \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor,
+        \Magento\Directory\Helper\Data $directoryHelper,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\Customer\Model\Metadata\FormFactory $customerFormFactory,
+        \Magento\Customer\Model\Options $options,
+        \Magento\Customer\Helper\Address $addressHelper,
+        \Magento\Customer\Api\AddressRepositoryInterface $addressService,
+        \Magento\Framework\Api\SearchCriteriaBuilder $criteriaBuilder,
+        \Magento\Framework\Api\FilterBuilder $filterBuilder,
+        \Magento\Customer\Model\Address\Mapper $addressMapper,
+        \Magento\Framework\Registry $registry,
+        array $data = []
     ) {
         $this->_coreRegistry = $registry;
+
         parent::__construct(
             $context,
             $sessionQuote,
             $orderCreate,
+            $priceCurrency,
             $formFactory,
-            $coreData,
+            $dataObjectProcessor,
+            $directoryHelper,
             $jsonEncoder,
-            $addressFactory,
             $customerFormFactory,
-            $adminhtmlAddresses,
+            $options,
+            $addressHelper,
+            $addressService,
+            $criteriaBuilder,
+            $filterBuilder,
+            $addressMapper,
             $data
         );
     }
@@ -99,22 +102,26 @@ class Form
     /**
      * Define form attributes (id, method, action)
      *
-     * @return \Magento\Sales\Block\Adminhtml\Order\Create\Billing\Address
+     * @return $this
      */
     protected function _prepareForm()
     {
         parent::_prepareForm();
         $this->_form->setId('edit_form');
+        $this->_form->setClass('admin__fieldset');
         $this->_form->setMethod('post');
-        $this->_form->setAction($this->getUrl('sales/*/addressSave', array('address_id'=>$this->_getAddress()->getId())));
+        $this->_form->setAction(
+            $this->getUrl('sales/*/addressSave', ['address_id' => $this->_getAddress()->getId()])
+        );
         $this->_form->setUseContainer(true);
+
         return $this;
     }
 
     /**
      * Form header text getter
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getHeaderText()
     {
@@ -129,5 +136,13 @@ class Form
     public function getFormValues()
     {
         return $this->_getAddress()->getData();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getAddressStoreId()
+    {
+        return $this->_getAddress()->getOrder()->getStoreId();
     }
 }

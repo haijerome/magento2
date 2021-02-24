@@ -1,66 +1,76 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
-require __DIR__ . '/../../../Magento/Catalog/_files/product_simple.php';
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Address as OrderAddress;
+use Magento\Sales\Model\Order\Item as OrderItem;
+use Magento\Sales\Model\Order\Payment;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
+
+Resolver::getInstance()->requireDataFixture('Magento/Sales/_files/default_rollback.php');
+Resolver::getInstance()->requireDataFixture('Magento/Catalog/_files/product_simple.php');
 /** @var \Magento\Catalog\Model\Product $product */
 
-$addressData = include(__DIR__ . '/address_data.php');
-$billingAddress = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Sales\Model\Order\Address', array('data' => $addressData));
+$addressData = include __DIR__ . '/address_data.php';
+
+$objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
+/** @var ProductRepositoryInterface $productRepository */
+$productRepository = $objectManager->create(ProductRepositoryInterface::class);
+$product = $productRepository->get('simple');
+$billingAddress = $objectManager->create(OrderAddress::class, ['data' => $addressData]);
 $billingAddress->setAddressType('billing');
 
 $shippingAddress = clone $billingAddress;
-$shippingAddress->setId(null)
-    ->setAddressType('shipping');
+$shippingAddress->setId(null)->setAddressType('shipping');
 
-$payment = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Sales\Model\Order\Payment');
-$payment->setMethod('checkmo');
+/** @var Payment $payment */
+$payment = $objectManager->create(Payment::class);
+$payment->setMethod('checkmo')
+    ->setAdditionalInformation('last_trans_id', '11122')
+    ->setAdditionalInformation(
+        'metadata',
+        [
+            'type' => 'free',
+            'fraudulent' => false,
+        ]
+    );
 
-/** @var \Magento\Sales\Model\Order\Item $orderItem */
-$orderItem = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Sales\Model\Order\Item');
-$orderItem->setProductId($product->getId())->setQtyOrdered(2);
+/** @var OrderItem $orderItem */
+$orderItem = $objectManager->create(OrderItem::class);
+$orderItem->setProductId($product->getId())
+    ->setQtyOrdered(2)
+    ->setBasePrice($product->getPrice())
+    ->setPrice($product->getPrice())
+    ->setRowTotal($product->getPrice())
+    ->setProductType('simple')
+    ->setName($product->getName())
+    ->setSku($product->getSku());
 
-/** @var \Magento\Sales\Model\Order $order */
-$order = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-    ->create('Magento\Sales\Model\Order');
+/** @var Order $order */
+$order = $objectManager->create(Order::class);
 $order->setIncrementId('100000001')
-    ->setState(\Magento\Sales\Model\Order::STATE_PROCESSING)
+    ->setState(Order::STATE_PROCESSING)
+    ->setStatus($order->getConfig()->getStateDefaultStatus(Order::STATE_PROCESSING))
     ->setSubtotal(100)
+    ->setGrandTotal(100)
     ->setBaseSubtotal(100)
+    ->setBaseGrandTotal(100)
+    ->setOrderCurrencyCode('USD')
+    ->setBaseCurrencyCode('USD')
     ->setCustomerIsGuest(true)
+    ->setCustomerEmail('customer@null.com')
     ->setBillingAddress($billingAddress)
     ->setShippingAddress($shippingAddress)
-    ->setCustomerEmail('customer@null.com')
-    ->setStoreId(
-        \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Model\StoreManagerInterface')
-            ->getStore()->getId()
-    )
+    ->setStoreId($objectManager->get(StoreManagerInterface::class)->getStore()->getId())
     ->addItem($orderItem)
     ->setPayment($payment);
-$order->save();
+
+/** @var OrderRepositoryInterface $orderRepository */
+$orderRepository = $objectManager->create(OrderRepositoryInterface::class);
+$orderRepository->save($order);

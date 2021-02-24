@@ -1,77 +1,130 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Model\Attribute\Backend;
 
+use Magento\Catalog\Model\AbstractModel;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\View\Model\Layout\Update\ValidatorFactory;
+use Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend;
+
 /**
- * Product url key attribute backend
+ * Layout update attribute backend
+ *
+ * @api
  *
  * @SuppressWarnings(PHPMD.LongVariable)
+ * @since 100.0.2
  */
-class Customlayoutupdate extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
+class Customlayoutupdate extends AbstractBackend
 {
-
     /**
-     * Layout update validator factory
-     *
-     * @var \Magento\Core\Model\Layout\Update\ValidatorFactory
+     * @var ValidatorFactory
+     * @deprecated 103.0.4 Is not used anymore.
      */
     protected $_layoutUpdateValidatorFactory;
 
     /**
-     * @param \Magento\Logger $logger
-     * @param \Magento\Core\Model\Layout\Update\ValidatorFactory $layoutUpdateValidatorFactory
+     * @param ValidatorFactory $layoutUpdateValidatorFactory
      */
-    public function __construct(
-        \Magento\Logger $logger,
-        \Magento\Core\Model\Layout\Update\ValidatorFactory $layoutUpdateValidatorFactory
-    ) {
+    public function __construct(ValidatorFactory $layoutUpdateValidatorFactory)
+    {
         $this->_layoutUpdateValidatorFactory = $layoutUpdateValidatorFactory;
-        parent::__construct($logger);
     }
 
+    /**
+     * Extract an attribute value.
+     *
+     * @param AbstractModel $object
+     * @return mixed
+     */
+    private function extractValue(AbstractModel $object)
+    {
+        $attributeCode = $attributeCode ?? $this->getAttribute()->getName();
+        $value = $object->getData($attributeCode);
+        if (!$value || !is_string($value)) {
+            $value = null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Extract old attribute value.
+     *
+     * @param AbstractModel $object
+     * @return mixed Old value or null.
+     */
+    private function extractOldValue(AbstractModel $object)
+    {
+        if (!empty($object->getId())) {
+            $attr = $this->getAttribute()->getAttributeCode();
+
+            if ($object->getOrigData()) {
+                return $object->getOrigData($attr);
+            }
+
+            $oldObject = clone $object;
+            $oldObject->unsetData();
+            $oldObject->load($object->getId());
+
+            return $oldObject->getData($attr);
+        }
+
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * @param AbstractModel $object
+     */
     public function validate($object)
     {
-        $attributeName = $this->getAttribute()->getName();
-        $xml = trim($object->getData($attributeName));
-
-        if (!$this->getAttribute()->getIsRequired() && empty($xml)) {
-            return true;
+        if (parent::validate($object)) {
+            if ($object instanceof AbstractModel) {
+                $value = $this->extractValue($object);
+                $oldValue = $this->extractOldValue($object);
+                if ($value && $oldValue !== $value) {
+                    throw new LocalizedException(__('Custom layout update text cannot be changed, only removed'));
+                }
+            }
         }
 
-        /** @var $validator \Magento\Core\Model\Layout\Update\Validator */
-        $validator = $this->_layoutUpdateValidatorFactory->create();
-        if (!$validator->isValid($xml)) {
-            $messages = $validator->getMessages();
-            //Add first message to exception
-            $massage = array_shift($messages);
-            $eavExc = new \Magento\Eav\Model\Entity\Attribute\Exception($massage);
-            $eavExc->setAttributeCode($attributeName);
-            throw $eavExc;
-        }
         return true;
+    }
+
+    /**
+     * Put an attribute value.
+     *
+     * @param AbstractModel $object
+     * @param string|null $value
+     * @return void
+     */
+    private function putValue(AbstractModel $object, ?string $value): void
+    {
+        $attributeCode = $this->getAttribute()->getName();
+        if ($object->hasData(AbstractModel::CUSTOM_ATTRIBUTES)) {
+            $object->setCustomAttribute($attributeCode, $value);
+        }
+        $object->setData($attributeCode, $value);
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * @param AbstractModel $object
+     * @throws LocalizedException
+     * @since 103.0.4
+     */
+    public function beforeSave($object)
+    {
+        //Validate first, validation might have been skipped.
+        $this->validate($object);
+        $this->putValue($object, $this->extractValue($object));
+
+        return parent::beforeSave($object);
     }
 }

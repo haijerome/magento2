@@ -1,56 +1,39 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Downloadable
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Downloadable\Block\Adminhtml\Catalog\Product\Edit\Tab\Downloadable;
 
 /**
  * Adminhtml catalog product downloadable items tab links section
  *
- * @category    Magento
- * @package     Magento_Downloadable
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ *
+ * @deprecated 100.3.1 in favor of new class which adds grid links
+ * @see \Magento\Downloadable\Ui\DataProvider\Product\Form\Modifier\Links
  */
-namespace Magento\Downloadable\Block\Adminhtml\Catalog\Product\Edit\Tab\Downloadable;
-
-class Links
-    extends \Magento\Backend\Block\Template
+class Links extends \Magento\Backend\Block\Template
 {
     /**
      * Block config data
      *
-     * @var \Magento\Object
+     * @var \Magento\Framework\DataObject
      */
     protected $_config;
 
     /**
      * Purchased Separately Attribute cache
      *
-     * @var \Magento\Catalog\Model\Resource\Eav\Attribute
+     * @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute
      */
     protected $_purchasedSeparatelyAttribute = null;
 
-    protected $_template = 'product/edit/downloadable/links.phtml';
+    /**
+     * @var string
+     */
+    protected $_template = 'Magento_Downloadable::product/edit/downloadable/links.phtml';
 
     /**
      * Downloadable file
@@ -62,14 +45,14 @@ class Links
     /**
      * Core file storage database
      *
-     * @var \Magento\Core\Helper\File\Storage\Database
+     * @var \Magento\MediaStorage\Helper\File\Storage\Database
      */
     protected $_coreFileStorageDb = null;
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry;
 
@@ -84,7 +67,7 @@ class Links
     protected $_link;
 
     /**
-     * @var \Magento\Backend\Model\Config\Source\Yesno
+     * @var \Magento\Config\Model\Config\Source\Yesno
      */
     protected $_sourceModel;
 
@@ -94,33 +77,34 @@ class Links
     protected $_urlFactory;
 
     /**
-     * @var \Magento\Json\EncoderInterface
+     * @var \Magento\Framework\Json\EncoderInterface
      */
     protected $_jsonEncoder;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Json\EncoderInterface $jsonEncoder
-     * @param \Magento\Core\Helper\File\Storage\Database $coreFileStorageDatabase
+     * @param \Magento\Framework\Json\EncoderInterface $jsonEncoder
+     * @param \Magento\MediaStorage\Helper\File\Storage\Database $coreFileStorageDatabase
      * @param \Magento\Downloadable\Helper\File $downloadableFile
-     * @param \Magento\Core\Model\Registry $coreRegistry
-     * @param \Magento\Backend\Model\Config\Source\Yesno $sourceModel
+     * @param \Magento\Framework\Registry $coreRegistry
+     * @param \Magento\Config\Model\Config\Source\Yesno $sourceModel
      * @param \Magento\Downloadable\Model\Link $link
      * @param \Magento\Eav\Model\Entity\AttributeFactory $attributeFactory
      * @param \Magento\Backend\Model\UrlFactory $urlFactory
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Json\EncoderInterface $jsonEncoder,
-        \Magento\Core\Helper\File\Storage\Database $coreFileStorageDatabase,
+        \Magento\Framework\Json\EncoderInterface $jsonEncoder,
+        \Magento\MediaStorage\Helper\File\Storage\Database $coreFileStorageDatabase,
         \Magento\Downloadable\Helper\File $downloadableFile,
-        \Magento\Core\Model\Registry $coreRegistry,
-        \Magento\Backend\Model\Config\Source\Yesno $sourceModel,
+        \Magento\Framework\Registry $coreRegistry,
+        \Magento\Config\Model\Config\Source\Yesno $sourceModel,
         \Magento\Downloadable\Model\Link $link,
         \Magento\Eav\Model\Entity\AttributeFactory $attributeFactory,
         \Magento\Backend\Model\UrlFactory $urlFactory,
-        array $data = array()
+        array $data = []
     ) {
         $this->_jsonEncoder = $jsonEncoder;
         $this->_coreRegistry = $coreRegistry;
@@ -136,6 +120,7 @@ class Links
     /**
      * Class constructor
      *
+     * @return void
      */
     protected function _construct()
     {
@@ -158,34 +143,30 @@ class Links
     /**
      * Retrieve Purchased Separately Attribute object
      *
-     * @return \Magento\Catalog\Model\Resource\Eav\Attribute
+     * @return \Magento\Catalog\Model\ResourceModel\Eav\Attribute
      */
     public function getPurchasedSeparatelyAttribute()
     {
-        if (is_null($this->_purchasedSeparatelyAttribute)) {
+        if ($this->_purchasedSeparatelyAttribute === null) {
             $_attributeCode = 'links_purchased_separately';
 
-            $this->_purchasedSeparatelyAttribute = $this->_attributeFactory->create()
-                ->loadByCode(\Magento\Catalog\Model\Product::ENTITY, $_attributeCode);
+            $this->_purchasedSeparatelyAttribute = $this->_attributeFactory->create()->loadByCode(
+                \Magento\Catalog\Model\Product::ENTITY,
+                $_attributeCode
+            );
         }
 
         return $this->_purchasedSeparatelyAttribute;
     }
 
     /**
-     * Retrieve Purchased Separately HTML select
+     * Get Links can be purchased separately value for current product
      *
-     * @return string
+     * @return bool
      */
-    public function getPurchasedSeparatelySelect()
+    public function isProductLinksCanBePurchasedSeparately()
     {
-        $select = $this->getLayout()->createBlock('Magento\View\Element\Html\Select')
-            ->setName('product[links_purchased_separately]')
-            ->setId('downloadable_link_purchase_type')
-            ->setOptions($this->_sourceModel->toOptionArray())
-            ->setValue($this->getProduct()->getLinksPurchasedSeparately());
-
-        return $select->getHtml();
+        return (bool) $this->getProduct()->getData('links_purchased_separately');
     }
 
     /**
@@ -195,13 +176,16 @@ class Links
      */
     public function getAddButtonHtml()
     {
-        $addButton = $this->getLayout()->createBlock('Magento\Adminhtml\Block\Widget\Button')
-            ->setData([
-                'label' => __('Add New Row'),
-                'id'    => 'add_link_item',
-                'class' => 'add',
+        $addButton = $this->getLayout()->createBlock(
+            \Magento\Backend\Block\Widget\Button::class
+        )->setData(
+            [
+                'label' => $this->escapeHtmlAttr(__('Add New Link')),
+                'id' => 'add_link_item',
+                'class' => 'action-add',
                 'data_attribute' => ['action' => 'add-link'],
-            ]);
+            ]
+        );
         return $addButton->toHtml();
     }
 
@@ -212,15 +196,19 @@ class Links
      */
     public function getLinksTitle()
     {
-        return $this->getProduct()->getId() && $this->getProduct()->getTypeId() == 'downloadable'
-            ? $this->getProduct()->getLinksTitle()
-            : $this->_storeConfig->getConfig(\Magento\Downloadable\Model\Link::XML_PATH_LINKS_TITLE);
+        return $this->getProduct()->getId() &&
+            $this->getProduct()->getTypeId() ==
+            'downloadable' ? $this->getProduct()->getLinksTitle() : $this->_scopeConfig->getValue(
+                \Magento\Downloadable\Model\Link::XML_PATH_LINKS_TITLE,
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
     }
 
     /**
      * Check exists defined links title
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getUsedDefault()
     {
@@ -231,11 +219,15 @@ class Links
      * Return true if price in website scope
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsPriceWebsiteScope()
     {
-        $scope =  (int) $this->_storeManager->getStore()->getConfig(\Magento\Core\Model\Store::XML_PATH_PRICE_SCOPE);
-        if ($scope == \Magento\Core\Model\Store::PRICE_SCOPE_WEBSITE) {
+        $scope = (int)$this->_scopeConfig->getValue(
+            \Magento\Store\Model\Store::XML_PATH_PRICE_SCOPE,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+        if ($scope == \Magento\Store\Model\Store::PRICE_SCOPE_WEBSITE) {
             return true;
         }
         return false;
@@ -245,10 +237,12 @@ class Links
      * Return array of links
      *
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function getLinkData()
     {
-        $linkArr = array();
+        $linkArr = [];
         if ($this->getProduct()->getTypeId() !== \Magento\Downloadable\Model\Product\Type::TYPE_DOWNLOADABLE) {
             return $linkArr;
         }
@@ -256,7 +250,7 @@ class Links
         $priceWebsiteScope = $this->getIsPriceWebsiteScope();
         $fileHelper = $this->_downloadableFile;
         foreach ($links as $item) {
-            $tmpLinkItem = array(
+            $tmpLinkItem = [
                 'link_id' => $item->getId(),
                 'title' => $this->escapeHtml($item->getTitle()),
                 'price' => $this->getCanReadPrice() ? $this->getPriceValue($item->getPrice()) : '',
@@ -268,41 +262,56 @@ class Links
                 'sample_url' => $item->getSampleUrl(),
                 'sample_type' => $item->getSampleType(),
                 'sort_order' => $item->getSortOrder(),
-            );
-            $file = $fileHelper->getFilePath(
-                $this->_link->getBasePath(), $item->getLinkFile()
-            );
+            ];
 
-            if ($item->getLinkFile() && !is_file($file)) {
-                $this->_coreFileStorageDb->saveFileToFilesystem($file);
+            $linkFile = $item->getLinkFile();
+            if ($linkFile) {
+                $file = $fileHelper->getFilePath($this->_link->getBasePath(), $linkFile);
+
+                $fileExist = $fileHelper->ensureFileInFilesystem($file);
+
+                if ($fileExist) {
+                    $name = '<a href="' . $this->getUrl(
+                        'adminhtml/downloadable_product_edit/link',
+                        ['id' => $item->getId(), 'type' => 'link', '_secure' => true]
+                    ) . '">' . $fileHelper->getFileFromPathFile(
+                        $linkFile
+                    ) . '</a>';
+                    $tmpLinkItem['file_save'] = [
+                        [
+                            'file' => $linkFile,
+                            'name' => $name,
+                            'size' => $fileHelper->getFileSize($file),
+                            'status' => 'old',
+                        ],
+                    ];
+                }
             }
 
-            if ($item->getLinkFile() && is_file($file)) {
-                $name = '<a href="'
-                    . $this->getUrl('adminhtml/downloadable_product_edit/link', array(
-                        'id' => $item->getId(),
-                        '_secure' => true
-                    )) . '">' . $fileHelper->getFileFromPathFile($item->getLinkFile()) . '</a>';
-                $tmpLinkItem['file_save'] = array(
-                    array(
-                        'file' => $item->getLinkFile(),
-                        'name' => $name,
-                        'size' => filesize($file),
-                        'status' => 'old'
-                    ));
+            $sampleFile = $item->getSampleFile();
+            if ($sampleFile) {
+                $file = $fileHelper->getFilePath($this->_link->getBaseSamplePath(), $sampleFile);
+
+                $fileExist = $fileHelper->ensureFileInFilesystem($file);
+
+                if ($fileExist) {
+                    $name = '<a href="' . $this->getUrl(
+                        'adminhtml/downloadable_product_edit/link',
+                        ['id' => $item->getId(), 'type' => 'sample', '_secure' => true]
+                    ) . '">' . $fileHelper->getFileFromPathFile(
+                        $sampleFile
+                    ) . '</a>';
+                    $tmpLinkItem['sample_file_save'] = [
+                        [
+                            'file' => $item->getSampleFile(),
+                            'name' => $name,
+                            'size' => $fileHelper->getFileSize($file),
+                            'status' => 'old',
+                        ],
+                    ];
+                }
             }
-            $sampleFile = $fileHelper->getFilePath(
-                $this->_link->getBaseSamplePath(), $item->getSampleFile()
-            );
-            if ($item->getSampleFile() && is_file($sampleFile)) {
-                $tmpLinkItem['sample_file_save'] = array(
-                    array(
-                        'file' => $item->getSampleFile(),
-                        'name' => $fileHelper->getFileFromPathFile($item->getSampleFile()),
-                        'size' => filesize($sampleFile),
-                        'status' => 'old'
-                    ));
-            }
+
             if ($item->getNumberOfDownloads() == '0') {
                 $tmpLinkItem['is_unlimited'] = ' checked="checked"';
             }
@@ -312,7 +321,7 @@ class Links
             if ($this->getProduct()->getStoreId() && $priceWebsiteScope) {
                 $tmpLinkItem['website_price'] = $item->getWebsitePrice();
             }
-            $linkArr[] = new \Magento\Object($tmpLinkItem);
+            $linkArr[] = new \Magento\Framework\DataObject($tmpLinkItem);
         }
         return $linkArr;
     }
@@ -320,8 +329,8 @@ class Links
     /**
      * Return formatted price with two digits after decimal point
      *
-     * @param decimal $value
-     * @return decimal
+     * @param float $value
+     * @return string
      */
     public function getPriceValue($value)
     {
@@ -335,21 +344,29 @@ class Links
      */
     public function getConfigMaxDownloads()
     {
-        return $this->_storeConfig->getConfig(\Magento\Downloadable\Model\Link::XML_PATH_DEFAULT_DOWNLOADS_NUMBER);
+        return $this->_scopeConfig->getValue(
+            \Magento\Downloadable\Model\Link::XML_PATH_DEFAULT_DOWNLOADS_NUMBER,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
     }
 
     /**
      * Prepare block Layout
      *
+     * @return void
      */
     protected function _prepareLayout()
     {
-        $this->addChild('upload_button', 'Magento\Adminhtml\Block\Widget\Button', array(
-            'id'      => '',
-            'label'   => __('Upload Files'),
-            'type'    => 'button',
-            'onclick' => 'Downloadable.massUploadByType(\'links\');Downloadable.massUploadByType(\'linkssample\')'
-        ));
+        $this->addChild(
+            'upload_button',
+            \Magento\Backend\Block\Widget\Button::class,
+            [
+                'id' => '',
+                'label' => __('Upload Files'),
+                'type' => 'button',
+                'onclick' => 'Downloadable.massUploadByType(\'links\');Downloadable.massUploadByType(\'linkssample\')'
+            ]
+        );
     }
 
     /**
@@ -373,7 +390,6 @@ class Links
         return $type;
     }
 
-
     /**
      * Retrieve Upload URL
      *
@@ -382,8 +398,10 @@ class Links
      */
     public function getUploadUrl($type)
     {
-        return $this->_urlFactory->create()->addSessionParam()
-            ->getUrl('adminhtml/downloadable_file/upload', array('type' => $type, '_secure' => true));
+        return $this->_urlFactory->create()->getUrl(
+            'adminhtml/downloadable_file/upload',
+            ['type' => $type, '_secure' => true]
+        );
     }
 
     /**
@@ -395,14 +413,9 @@ class Links
     public function getConfigJson($type = 'links')
     {
         $this->getConfig()->setUrl($this->getUploadUrl($type));
-        $this->getConfig()->setParams(array('form_key' => $this->getFormKey()));
+        $this->getConfig()->setParams(['form_key' => $this->getFormKey()]);
         $this->getConfig()->setFileField($this->getFileFieldName($type));
-        $this->getConfig()->setFilters(array(
-            'all'    => array(
-                'label' => __('All Files'),
-                'files' => array('*.*')
-            )
-        ));
+        $this->getConfig()->setFilters(['all' => ['label' => __('All Files'), 'files' => ['*.*']]]);
         $this->getConfig()->setReplaceBrowseWithRemove(true);
         $this->getConfig()->setWidth('32');
         $this->getConfig()->setHideUploadButton(true);
@@ -412,18 +425,20 @@ class Links
     /**
      * Retrieve config object
      *
-     * @return \Magento\Object
+     * @return \Magento\Framework\DataObject
      */
     public function getConfig()
     {
-        if (is_null($this->_config)) {
-            $this->_config = new \Magento\Object();
+        if ($this->_config === null) {
+            $this->_config = new \Magento\Framework\DataObject();
         }
 
         return $this->_config;
     }
 
     /**
+     * Is single store mode
+     *
      * @return bool
      */
     public function isSingleStoreMode()
@@ -432,11 +447,26 @@ class Links
     }
 
     /**
-     * @param null|string|bool|int|\Magento\Core\Model\Store $storeId $storeId
+     * Get base currency code
+     *
+     * @param null|string|bool|int|\Magento\Store\Model\Store $storeId $storeId
      * @return string
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     public function getBaseCurrencyCode($storeId)
     {
         return $this->_storeManager->getStore($storeId)->getBaseCurrencyCode();
+    }
+
+    /**
+     * Get base currency symbol
+     *
+     * @param null|string|bool|int|\Magento\Store\Model\Store $storeId $storeId
+     * @return string
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     */
+    public function getBaseCurrencySymbol($storeId)
+    {
+        return $this->_storeManager->getStore($storeId)->getBaseCurrency()->getCurrencySymbol();
     }
 }

@@ -1,71 +1,80 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Customer
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter;
+
+use Magento\Backend\Block\Template\Context;
+use Magento\Backend\Block\Widget\Grid\Extended;
+use Magento\Backend\Helper\Data;
+use Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Renderer\Action;
+use Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Renderer\Status;
+use Magento\Customer\Controller\RegistryConstants;
+use Magento\Customer\Model\Config\Share;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Registry;
+use Magento\Newsletter\Model\ResourceModel\Queue\CollectionFactory;
+use Magento\Store\Model\System\Store as SystemStore;
 
 /**
  * Adminhtml newsletter queue grid block
  *
- * @category   Magento
- * @package    Magento_Customer
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter;
-
-class Grid extends \Magento\Adminhtml\Block\Widget\Grid
+class Grid extends Extended
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var Registry|null
      */
     protected $_coreRegistry = null;
 
     /**
-     * @var \Magento\Newsletter\Model\Resource\Queue\CollectionFactory
+     * @var CollectionFactory
      */
     protected $_collectionFactory;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Newsletter\Model\Resource\Queue\CollectionFactory $collectionFactory
-     * @param \Magento\Core\Model\Registry $coreRegistry
+     * @var Share
+     */
+    private $shareConfig;
+
+    /**
+     * @var SystemStore
+     */
+    private $systemStore;
+
+    /**
+     * @param Context $context
+     * @param Data $backendHelper
+     * @param CollectionFactory $collectionFactory
+     * @param Registry $coreRegistry
      * @param array $data
+     * @param Share|null $shareConfig
+     * @param SystemStore|null $systemStore
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Newsletter\Model\Resource\Queue\CollectionFactory $collectionFactory,
-        \Magento\Core\Model\Registry $coreRegistry,
-        array $data = array()
+        Context $context,
+        Data $backendHelper,
+        CollectionFactory $collectionFactory,
+        Registry $coreRegistry,
+        array $data = [],
+        Share $shareConfig = null,
+        SystemStore $systemStore = null
     ) {
         $this->_coreRegistry = $coreRegistry;
         $this->_collectionFactory = $collectionFactory;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
+        $this->shareConfig = $shareConfig ?? ObjectManager::getInstance()->get(Share::class);
+        $this->systemStore = $systemStore ?? ObjectManager::getInstance()->get(SystemStore::class);
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -76,83 +85,134 @@ class Grid extends \Magento\Adminhtml\Block\Widget\Grid
         $this->setUseAjax(true);
 
         $this->setEmptyText(__('No Newsletter Found'));
-
     }
 
+    /**
+     * @inheritdoc
+     */
     public function getGridUrl()
     {
-        return $this->getUrl('customer/*/newsletter', array('_current' => true));
+        return $this->getUrl('customer/*/newsletter', ['_current' => true]);
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _prepareCollection()
     {
-        /** @var $collection \Magento\Newsletter\Model\Resource\Queue\Collection */
-        $collection = $this->_collectionFactory->create()
-            ->addTemplateInfo()
-            ->addSubscriberFilter($this->_coreRegistry->registry('subscriber')->getId());
-
+        $customerId = $this->getCurrentCustomerId();
+        $collection = $this->_collectionFactory->create()->addTemplateInfo()->addCustomerFilter($customerId);
         $this->setCollection($collection);
 
         return parent::_prepareCollection();
     }
 
+    /**
+     * @inheritdoc
+     */
     protected function _prepareColumns()
     {
-        $this->addColumn('queue_id', array(
-            'header'    =>  __('ID'),
-            'align'     =>  'left',
-            'index'     =>  'queue_id',
-            'width'     =>  10
-        ));
+        $this->addColumn(
+            'queue_id',
+            ['header' => __('ID'), 'align' => 'left', 'index' => 'queue_id', 'width' => 10]
+        );
 
-        $this->addColumn('start_at', array(
-            'header'    =>  __('Start date'),
-            'type'      =>  'datetime',
-            'align'     =>  'center',
-            'index'     =>  'queue_start_at',
-            'default'   =>  ' ---- '
-        ));
+        $this->addColumn(
+            'start_at',
+            [
+                'header' => __('Start date'),
+                'type' => 'datetime',
+                'align' => 'center',
+                'index' => 'queue_start_at',
+                'default' => ' ---- '
+            ]
+        );
 
-        $this->addColumn('finish_at', array(
-            'header'    =>  __('End Date'),
-            'type'      =>  'datetime',
-            'align'     =>  'center',
-            'index'     =>  'queue_finish_at',
-            'gmtoffset' => true,
-            'default'   =>  ' ---- '
-        ));
+        $this->addColumn(
+            'finish_at',
+            [
+                'header' => __('End Date'),
+                'type' => 'datetime',
+                'align' => 'center',
+                'index' => 'queue_finish_at',
+                'gmtoffset' => true,
+                'default' => ' ---- '
+            ]
+        );
 
-        $this->addColumn('letter_sent_at', array(
-            'header'    =>  __('Receive Date'),
-            'type'      =>  'datetime',
-            'align'     =>  'center',
-            'index'     =>  'letter_sent_at',
-            'gmtoffset' => true,
-            'default'   =>  ' ---- '
-        ));
+        $this->addColumn(
+            'letter_sent_at',
+            [
+                'header' => __('Receive Date'),
+                'type' => 'datetime',
+                'align' => 'center',
+                'index' => 'letter_sent_at',
+                'gmtoffset' => true,
+                'default' => ' ---- '
+            ]
+        );
 
-        $this->addColumn('template_subject', array(
-            'header'    =>  __('Subject'),
-            'align'     =>  'center',
-            'index'     =>  'template_subject'
-        ));
+        $this->addColumn(
+            'template_subject',
+            ['header' => __('Subject'), 'align' => 'center', 'index' => 'template_subject']
+        );
 
-         $this->addColumn('status', array(
-            'header'    =>  __('Status'),
-            'align'     =>  'center',
-            'filter'    =>  'Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Filter\Status',
-            'index'     => 'queue_status',
-            'renderer'  =>  'Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Renderer\Status'
-        ));
+        if ($this->isMultiplyWebsiteMode()) {
+            $this->addColumn(
+                'store_view',
+                [
+                    'header' => __('Store View'),
+                    'align' => 'center',
+                    'index' => 'subscriber_store_id',
+                    'type' => 'options',
+                    'option_groups' => $this->systemStore->getStoreValuesForForm(),
+                ]
+            );
+        }
 
-        $this->addColumn('action', array(
-            'header'    =>  __('Action'),
-            'align'     =>  'center',
-            'filter'    =>  false,
-            'sortable'  =>  false,
-            'renderer'  =>  'Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Renderer\Action'
-        ));
+        $this->addColumn(
+            'status',
+            [
+                'header' => __('Status'),
+                'align' => 'center',
+                'filter' => \Magento\Customer\Block\Adminhtml\Edit\Tab\Newsletter\Grid\Filter\Status::class,
+                'index' => 'queue_status',
+                'renderer' => Status::class
+            ]
+        );
+
+        $this->addColumn(
+            'action',
+            [
+                'header' => __('Action'),
+                'align' => 'center',
+                'filter' => false,
+                'sortable' => false,
+                'renderer' => Action::class
+            ]
+        );
 
         return parent::_prepareColumns();
+    }
+
+    /**
+     * Get current customer id
+     *
+     * @return int
+     */
+    private function getCurrentCustomerId(): int
+    {
+        return (int)$this->_coreRegistry->registry(RegistryConstants::CURRENT_CUSTOMER_ID);
+    }
+
+    /**
+     * Is multiply website mode
+     *
+     * @return bool
+     */
+    private function isMultiplyWebsiteMode(): bool
+    {
+        return $this->shareConfig->isGlobalScope()
+            && count($this->_storeManager->getWebsites()) > 1;
     }
 }

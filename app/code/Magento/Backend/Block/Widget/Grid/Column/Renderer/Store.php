@@ -1,55 +1,42 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-
-/**
- * Store grid column filter
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\Widget\Grid\Column\Renderer;
 
-class Store
-    extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
+/**
+ * Store grid column filter
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
+ * @since 100.0.2
+ */
+class Store extends \Magento\Backend\Block\Widget\Grid\Column\Renderer\AbstractRenderer
 {
+    /**
+     * @var bool
+     */
     protected $_skipAllStoresLabel = false;
+
+    /**
+     * @var bool
+     */
     protected $_skipEmptyStoresLabel = false;
 
     /**
-     * @var \Magento\Core\Model\System\Store
+     * @var \Magento\Store\Model\System\Store
      */
     protected $_systemStore;
 
     /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Core\Model\System\Store $systemStore
+     * @param \Magento\Store\Model\System\Store $systemStore
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
-        \Magento\Core\Model\System\Store $systemStore,
-        array $data = array()
+        \Magento\Store\Model\System\Store $systemStore,
+        array $data = []
     ) {
         $this->_systemStore = $systemStore;
         parent::__construct($context, $data);
@@ -58,7 +45,7 @@ class Store
     /**
      * Retrieve System Store model
      *
-     * @return \Magento\Core\Model\System\Store
+     * @return \Magento\Store\Model\System\Store
      */
     protected function _getStoreModel()
     {
@@ -69,41 +56,49 @@ class Store
      * Retrieve 'show all stores label' flag
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     protected function _getShowAllStoresLabelFlag()
     {
-        return $this->getColumn()->getData('skipAllStoresLabel')
-            ? $this->getColumn()->getData('skipAllStoresLabel')
-            : $this->_skipAllStoresLabel;
+        return $this->getColumn()->getData(
+            'skipAllStoresLabel'
+        ) ? $this->getColumn()->getData(
+            'skipAllStoresLabel'
+        ) : $this->_skipAllStoresLabel;
     }
 
     /**
      * Retrieve 'show empty stores label' flag
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     protected function _getShowEmptyStoresLabelFlag()
     {
-        return $this->getColumn()->getData('skipEmptyStoresLabel')
-            ? $this->getColumn()->getData('skipEmptyStoresLabel')
-            : $this->_skipEmptyStoresLabel;
+        return $this->getColumn()->getData(
+            'skipEmptyStoresLabel'
+        ) ? $this->getColumn()->getData(
+            'skipEmptyStoresLabel'
+        ) : $this->_skipEmptyStoresLabel;
     }
 
     /**
      * Render row store views
      *
-     * @param \Magento\Object $row
-     * @return string
+     * @param \Magento\Framework\DataObject $row
+     * @return \Magento\Framework\Phrase|string
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    public function render(\Magento\Object $row)
+    public function render(\Magento\Framework\DataObject $row)
     {
         $out = '';
         $skipAllStoresLabel = $this->_getShowAllStoresLabelFlag();
         $skipEmptyStoresLabel = $this->_getShowEmptyStoresLabelFlag();
         $origStores = $row->getData($this->getColumn()->getIndex());
 
-        if (is_null($origStores) && $row->getStoreName()) {
-            $scopes = array();
+        if ($origStores === null && $row->getStoreName()) {
+            $scopes = [];
             foreach (explode("\n", $row->getStoreName()) as $k => $label) {
                 $scopes[] = str_repeat('&nbsp;', $k * 3) . $label;
             }
@@ -115,7 +110,7 @@ class Store
             return '';
         }
         if (!is_array($origStores)) {
-            $origStores = array($origStores);
+            $origStores = [$origStores];
         }
 
         if (empty($origStores)) {
@@ -142,17 +137,18 @@ class Store
     /**
      * Render row store views for export
      *
-     * @param \Magento\Object $row
-     * @return string
+     * @param \Magento\Framework\DataObject $row
+     * @return \Magento\Framework\Phrase|string
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    public function renderExport(\Magento\Object $row)
+    public function renderExport(\Magento\Framework\DataObject $row)
     {
         $out = '';
         $skipAllStoresLabel = $this->_getShowAllStoresLabelFlag();
         $origStores = $row->getData($this->getColumn()->getIndex());
 
-        if (is_null($origStores) && $row->getStoreName()) {
-            $scopes = array();
+        if ($origStores === null && $row->getStoreName()) {
+            $scopes = [];
             foreach (explode("\n", $row->getStoreName()) as $k => $label) {
                 $scopes[] = str_repeat(' ', $k * 3) . $label;
             }
@@ -161,7 +157,7 @@ class Store
         }
 
         if (!is_array($origStores)) {
-            $origStores = array($origStores);
+            $origStores = [$origStores];
         }
 
         if (in_array(0, $origStores) && !$skipAllStoresLabel) {

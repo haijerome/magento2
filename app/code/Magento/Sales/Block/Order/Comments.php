@@ -1,45 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Block\Order;
 
-class Comments extends \Magento\View\Element\Template
+/**
+ * @api
+ * @since 100.0.2
+ */
+class Comments extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Sales\Model\ResourceFactory $resourceFactory
-     * @param array $data
+     * @var \Magento\Sales\Model\ResourceModel\Order\Invoice\Comment\CollectionFactory
      */
-    public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Sales\Model\ResourceFactory $resourceFactory,
-        array $data = array()
-    ) {
-        $this->_resourceFactory = $resourceFactory;
-        parent::__construct($context, $data);
-    }
+    protected $_invoiceCollectionFactory;
+
+    /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Creditmemo\Comment\CollectionFactory
+     */
+    protected $_memoCollectionFactory;
+
+    /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Shipment\Comment\CollectionFactory
+     */
+    protected $_shipmentCollectionFactory;
 
     /**
      * Current entity (model instance) with getCommentsCollection() method
@@ -51,20 +36,41 @@ class Comments extends \Magento\View\Element\Template
     /**
      * Current comments collection
      *
-     * @var \Magento\Sales\Model\Resource\Order\Comment\Collection\AbstractCollection
+     * @var \Magento\Sales\Model\ResourceModel\Order\Comment\Collection\AbstractCollection
      */
     protected $_commentCollection;
 
     /**
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Sales\Model\ResourceModel\Order\Invoice\Comment\CollectionFactory $invoiceCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Creditmemo\Comment\CollectionFactory $memoCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Shipment\Comment\CollectionFactory $shipmentCollectionFactory
+     * @param array $data
+     */
+    public function __construct(
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Sales\Model\ResourceModel\Order\Invoice\Comment\CollectionFactory $invoiceCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Creditmemo\Comment\CollectionFactory $memoCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Shipment\Comment\CollectionFactory $shipmentCollectionFactory,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->_invoiceCollectionFactory = $invoiceCollectionFactory;
+        $this->_memoCollectionFactory = $memoCollectionFactory;
+        $this->_shipmentCollectionFactory = $shipmentCollectionFactory;
+    }
+
+    /**
      * Sets comments parent model instance
      *
-     * @param \Magento\Sales\Model\AbstractModel
-     * @return \Magento\Sales\Block\Order\Comments
+     * @param \Magento\Sales\Model\AbstractModel $entity
+     * @return $this
      */
     public function setEntity($entity)
     {
         $this->_entity = $entity;
-        $this->_commentCollection = null; // Changing model and resource model can lead to change of comment collection
+        $this->_commentCollection = null;
+        // Changing model and resource model can lead to change of comment collection
         return $this;
     }
 
@@ -81,27 +87,24 @@ class Comments extends \Magento\View\Element\Template
     /**
      * Initialize model comments and return comment collection
      *
-     * @return \Magento\Sales\Model\Resource\Order\Comment\Collection\AbstractCollection
-     * @throws \Magento\Core\Exception
+     * @return \Magento\Sales\Model\ResourceModel\Order\Comment\Collection\AbstractCollection
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function getComments()
     {
-        if (is_null($this->_commentCollection)) {
+        if ($this->_commentCollection === null) {
             $entity = $this->getEntity();
             if ($entity instanceof \Magento\Sales\Model\Order\Invoice) {
-                $collectionClass = 'Magento\Sales\Model\Resource\Order\Invoice\Comment\Collection';
-            } else if ($entity instanceof \Magento\Sales\Model\Order\Creditmemo) {
-                $collectionClass = 'Magento\Sales\Model\Resource\Order\Creditmemo\Comment\Collection';
-            } else if ($entity instanceof \Magento\Sales\Model\Order\Shipment) {
-                $collectionClass = 'Magento\Sales\Model\Resource\Order\Shipment\Comment\Collection';
+                $this->_commentCollection = $this->_invoiceCollectionFactory->create();
+            } elseif ($entity instanceof \Magento\Sales\Model\Order\Creditmemo) {
+                $this->_commentCollection = $this->_memoCollectionFactory->create();
+            } elseif ($entity instanceof \Magento\Sales\Model\Order\Shipment) {
+                $this->_commentCollection = $this->_shipmentCollectionFactory->create();
             } else {
-                throw new \Magento\Core\Exception(__('We found an invalid entity model.'));
+                throw new \Magento\Framework\Exception\LocalizedException(__('We found an invalid entity model.'));
             }
 
-            $this->_commentCollection = $this->_resourceFactory->create($collectionClass);
-            $this->_commentCollection->setParentFilter($entity)
-               ->setCreatedAtOrder()
-               ->addVisibleOnFrontFilter();
+            $this->_commentCollection->setParentFilter($entity)->setCreatedAtOrder()->addVisibleOnFrontFilter();
         }
 
         return $this->_commentCollection;

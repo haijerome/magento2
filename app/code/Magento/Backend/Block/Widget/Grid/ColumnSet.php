@@ -1,40 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-/**
- *
- * @category    Magento
- * @package     Magento_Core
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\Widget\Grid;
 
 /**
+ * @api
+ * @deprecated 100.2.0 in favour of UI component implementation
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
-class ColumnSet extends \Magento\View\Element\Template
+class ColumnSet extends \Magento\Framework\View\Element\Template
 {
     /**
      * @var \Magento\Backend\Model\Widget\Grid\Row\UrlGenerator
@@ -62,12 +39,12 @@ class ColumnSet extends \Magento\View\Element\Template
      */
     protected $_emptyText;
 
-    /****
+    /**
      * Empty grid text CSS class
      *
-     * @var string|null
+     * @var string
      */
-    protected $_emptyTextCss    = 'a-center';
+    protected $_emptyTextCss = 'empty-text';
 
     /**
      * Label for empty cell
@@ -93,11 +70,11 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Columns to group by
      *
-     * @var array
+     * @var string[]
      */
-    protected $_groupedColumn = array();
+    protected $_groupedColumn = [];
 
-    /*
+    /**
      * @var boolean
      */
     protected $_isCollapsed;
@@ -120,47 +97,48 @@ class ColumnSet extends \Magento\View\Element\Template
     protected $_totals = null;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
+     * @param \Magento\Framework\View\Element\Template\Context $context
      * @param \Magento\Backend\Model\Widget\Grid\Row\UrlGeneratorFactory $generatorFactory
      * @param \Magento\Backend\Model\Widget\Grid\SubTotals $subtotals
      * @param \Magento\Backend\Model\Widget\Grid\Totals $totals
      * @param array $data
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
+        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Backend\Model\Widget\Grid\Row\UrlGeneratorFactory $generatorFactory,
         \Magento\Backend\Model\Widget\Grid\SubTotals $subtotals,
         \Magento\Backend\Model\Widget\Grid\Totals $totals,
-        array $data = array()
+        array $data = []
     ) {
-        $generatorClassName = 'Magento\Backend\Model\Widget\Grid\Row\UrlGenerator';
+        $generatorClassName = \Magento\Backend\Model\Widget\Grid\Row\UrlGenerator::class;
         if (isset($data['rowUrl'])) {
             $rowUrlParams = $data['rowUrl'];
             if (isset($rowUrlParams['generatorClass'])) {
                 $generatorClassName = $rowUrlParams['generatorClass'];
             }
-            $this->_rowUrlGenerator
-                = $generatorFactory->createUrlGenerator($generatorClassName, array('args' => $rowUrlParams));
+            $this->_rowUrlGenerator = $generatorFactory->createUrlGenerator(
+                $generatorClassName,
+                ['args' => $rowUrlParams]
+            );
         }
 
         $this->setFilterVisibility(
-            array_key_exists('filter_visibility', $data) ? (bool) $data['filter_visibility'] : true
+            array_key_exists('filter_visibility', $data) ? (bool)$data['filter_visibility'] : true
         );
 
         parent::__construct($context, $data);
 
-        $this->setEmptyText(__(
-            isset($data['empty_text'])? $data['empty_text'] : 'We couldn\'t find any records.'
-        ));
+        $this->setEmptyText(isset($data['empty_text']) ? $data['empty_text'] : __('We couldn\'t find any records.'));
 
-        $this->setEmptyCellLabel(__(
-            isset($data['empty_cell_label'])? $data['empty_cell_label'] : 'We couldn\'t find any records.'
-        ));
+        $this->setEmptyCellLabel(
+            isset($data['empty_cell_label']) ? $data['empty_cell_label'] : __('We couldn\'t find any records.')
+        );
 
-        $this->setCountSubTotals(isset($data['count_subtotals'])? (bool) $data['count_subtotals'] : false);
+        $this->setCountSubTotals(isset($data['count_subtotals']) ? (bool)$data['count_subtotals'] : false);
         $this->_subTotals = $subtotals;
 
-        $this->setCountTotals(isset($data['count_totals'])? (bool) $data['count_totals'] : false);
+        $this->setCountTotals(isset($data['count_totals']) ? (bool)$data['count_totals'] : false);
         $this->_totals = $totals;
     }
 
@@ -171,7 +149,6 @@ class ColumnSet extends \Magento\View\Element\Template
      */
     public function getColumns()
     {
-
         $columns = $this->getLayout()->getChildBlocks($this->getNameInLayout());
         foreach ($columns as $key => $column) {
             if (!$column->isDisplayed()) {
@@ -195,7 +172,7 @@ class ColumnSet extends \Magento\View\Element\Template
      * Set sortability flag for columns
      *
      * @param bool $value
-     * @return \Magento\Backend\Block\Widget\Grid\ColumnSet
+     * @return $this
      */
     public function setSortable($value)
     {
@@ -212,7 +189,7 @@ class ColumnSet extends \Magento\View\Element\Template
      *
      * @param string $type
      * @param string $className
-     * @return \Magento\Backend\Block\Widget\Grid\ColumnSet
+     * @return $this
      */
     public function setRendererType($type, $className)
     {
@@ -227,7 +204,7 @@ class ColumnSet extends \Magento\View\Element\Template
      *
      * @param string $type
      * @param string $className
-     * @return \Magento\Backend\Block\Widget\Grid\ColumnSet
+     * @return $this
      */
     public function setFilterType($type, $className)
     {
@@ -240,7 +217,7 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Prepare block for rendering
      *
-     * @return \Magento\View\Element\AbstractBlock
+     * @return void
      */
     protected function _beforeToHtml()
     {
@@ -261,7 +238,7 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Return row url for js event handlers
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return string
      */
     public function getRowUrl($item)
@@ -276,18 +253,19 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Get children of specified item
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return array
      */
     public function getMultipleRows($item)
     {
-        return $item->getChildren();
+        $children = $item->getChildren();
+        return $children ?: [];
     }
 
     /**
      * Has children of specified item
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return bool
      */
     public function hasMultipleRows($item)
@@ -311,14 +289,12 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Check whether subtotal should be rendered
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @return boolean
      */
     public function shouldRenderSubTotal($item)
     {
-        return ($this->getCountSubTotals() &&
-            count($this->getMultipleRows($item)) > 0
-        );
+        return $this->getCountSubTotals() && count($this->getMultipleRows($item)) > 0;
     }
 
     /**
@@ -328,23 +304,26 @@ class ColumnSet extends \Magento\View\Element\Template
      */
     public function shouldRenderTotal()
     {
-        return ($this->getCountTotals() &&
-            count($this->getCollection()) > 0
-        );
+        return $this->getCountTotals() && count($this->getCollection()) > 0;
     }
 
     /**
      * Retrieve rowspan number
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @param \Magento\Backend\Block\Widget\Grid\Column $column
-     * @return integer|boolean
+     * @return int|false
      */
     public function getRowspan($item, $column)
     {
         if ($this->isColumnGrouped($column)) {
-            return count($this->getMultipleRows($item)) + count($this->_groupedColumn) - 1
-                + (int)$this->shouldRenderSubTotal($item);
+            return count(
+                $this->getMultipleRows($item)
+            ) + count(
+                $this->_groupedColumn
+            ) - 1 + (int)$this->shouldRenderSubTotal(
+                $item
+            );
         }
         return false;
     }
@@ -354,7 +333,7 @@ class ColumnSet extends \Magento\View\Element\Template
      *
      * @param string|object $column
      * @param string $value
-     * @return boolean|\Magento\Backend\Block\Widget\Grid
+     * @return bool|$this
      */
     public function isColumnGrouped($column, $value = null)
     {
@@ -371,13 +350,13 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Check whether should render empty cell
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @param \Magento\Backend\Block\Widget\Grid\Column $column
      * @return boolean
      */
     public function shouldRenderEmptyCell($item, $column)
     {
-        return ($item->getIsEmpty() && in_array($column['index'], $this->_groupedColumn));
+        return $item->getIsEmpty() && in_array($column['index'], $this->_groupedColumn);
     }
 
     /**
@@ -393,7 +372,7 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Check whether should render cell
      *
-     * @param \Magento\Object $item
+     * @param \Magento\Framework\DataObject $item
      * @param \Magento\Backend\Block\Widget\Grid\Column $column
      * @return boolean
      */
@@ -412,6 +391,7 @@ class ColumnSet extends \Magento\View\Element\Template
      * Set visibility of column headers
      *
      * @param boolean $visible
+     * @return void
      */
     public function setHeadersVisibility($visible = true)
     {
@@ -431,7 +411,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Set visibility of filter
      *
-     * @param boolean $visible
+     * @param bool $visible
+     * @return void
      */
     public function setFilterVisibility($visible = true)
     {
@@ -452,7 +433,7 @@ class ColumnSet extends \Magento\View\Element\Template
      * Set empty text CSS class
      *
      * @param string $cssClass
-     * @return \Magento\Backend\Block\Widget\Grid
+     * @return $this
      */
     public function setEmptyTextClass($cssClass)
     {
@@ -484,7 +465,7 @@ class ColumnSet extends \Magento\View\Element\Template
      * Set label for empty cell
      *
      * @param string $label
-     * @return \Magento\Backend\Block\Widget\Grid\ColumnSet
+     * @return $this
      */
     public function setEmptyCellLabel($label)
     {
@@ -494,8 +475,9 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Set flag whether is collapsed
-     * @param $isCollapsed
-     * @return \Magento\Backend\Block\Widget\Grid\ColumnSet
+     *
+     * @param bool $isCollapsed
+     * @return $this
      */
     public function setIsCollapsed($isCollapsed)
     {
@@ -505,7 +487,9 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Retrieve flag is collapsed
-     * @return mixed
+     *
+     * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsCollapsed()
     {
@@ -514,6 +498,7 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Return grid of current column set
+     *
      * @return \Magento\Backend\Block\Widget\Grid
      */
     public function getGrid()
@@ -523,7 +508,8 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Return collection of current grid
-     * @return \Magento\Data\Collection
+     *
+     * @return \Magento\Framework\Data\Collection
      */
     public function getCollection()
     {
@@ -533,8 +519,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Set subtotals
      *
-     * @param boolean $flag
-     * @return \Magento\Backend\Block\Widget\Grid
+     * @param bool $flag
+     * @return $this
      */
     public function setCountSubTotals($flag = true)
     {
@@ -545,7 +531,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Return count subtotals
      *
-     * @return mixed
+     * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getCountSubTotals()
     {
@@ -555,8 +542,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Set totals
      *
-     * @param boolean $flag
-     * @return \Magento\Backend\Block\Widget\Grid
+     * @param bool $flag
+     * @return $this
      */
     public function setCountTotals($flag = true)
     {
@@ -567,7 +554,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Return count totals
      *
-     * @return mixed
+     * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getCountTotals()
     {
@@ -577,8 +565,8 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Retrieve subtotal for item
      *
-     * @param $item \Magento\Object
-     * @return \Magento\Object
+     * @param \Magento\Framework\DataObject $item
+     * @return \Magento\Framework\DataObject
      */
     public function getSubTotals($item)
     {
@@ -590,7 +578,7 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Retrieve subtotal items
      *
-     * @return \Magento\Object
+     * @return \Magento\Framework\DataObject
      */
     public function getTotals()
     {
@@ -602,13 +590,14 @@ class ColumnSet extends \Magento\View\Element\Template
     /**
      * Update item with first sub-item data
      *
-     * @param $item \Magento\Object
+     * @param \Magento\Framework\DataObject $item
+     * @return void
      */
-    public function updateItemByFirstMultiRow(\Magento\Object $item)
+    public function updateItemByFirstMultiRow(\Magento\Framework\DataObject $item)
     {
         $multiRows = $this->getMultipleRows($item);
-        if (is_object($multiRows) && $multiRows instanceof \Magento\Data\Collection) {
-            /** @var $multiRows \Magento\Data\Collection */
+        if (is_object($multiRows) && $multiRows instanceof \Magento\Framework\Data\Collection) {
+            /** @var $multiRows \Magento\Framework\Data\Collection */
             $item->addData($multiRows->getFirstItem()->getData());
         } elseif (is_array($multiRows)) {
             $firstItem = $multiRows[0];
@@ -618,6 +607,8 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Prepare sub-total object for counting sub-totals
+     *
+     * @return void
      */
     public function _prepareSubTotals()
     {
@@ -633,6 +624,8 @@ class ColumnSet extends \Magento\View\Element\Template
 
     /**
      * Prepare total object for counting totals
+     *
+     * @return void
      */
     public function _prepareTotals()
     {
@@ -645,5 +638,4 @@ class ColumnSet extends \Magento\View\Element\Template
             }
         }
     }
-
 }

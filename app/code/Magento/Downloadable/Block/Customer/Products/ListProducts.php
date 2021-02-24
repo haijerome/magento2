@@ -1,70 +1,51 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Downloadable
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Downloadable\Block\Customer\Products;
+
+use Magento\Downloadable\Model\Link\Purchased\Item;
 
 /**
  * Block to display downloadable links bought by customer
  *
- * @category    Magento
- * @package     Magento_Downloadable
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Downloadable\Block\Customer\Products;
-
-class ListProducts extends \Magento\View\Element\Template
+class ListProducts extends \Magento\Framework\View\Element\Template
 {
     /**
-     * @var \Magento\Customer\Model\Session
+     * @var \Magento\Customer\Helper\Session\CurrentCustomer
      */
-    protected $_customerSession;
+    protected $currentCustomer;
 
     /**
-     * @var \Magento\Downloadable\Model\Resource\Link\Purchased\CollectionFactory
+     * @var \Magento\Downloadable\Model\ResourceModel\Link\Purchased\CollectionFactory
      */
     protected $_linksFactory;
 
     /**
-     * @var \Magento\Downloadable\Model\Resource\Link\Purchased\Item\CollectionFactory
+     * @var \Magento\Downloadable\Model\ResourceModel\Link\Purchased\Item\CollectionFactory
      */
     protected $_itemsFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Downloadable\Model\Resource\Link\Purchased\CollectionFactory $linksFactory
-     * @param \Magento\Downloadable\Model\Resource\Link\Purchased\Item\CollectionFactory $itemsFactory
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer
+     * @param \Magento\Downloadable\Model\ResourceModel\Link\Purchased\CollectionFactory $linksFactory
+     * @param \Magento\Downloadable\Model\ResourceModel\Link\Purchased\Item\CollectionFactory $itemsFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Downloadable\Model\Resource\Link\Purchased\CollectionFactory $linksFactory,
-        \Magento\Downloadable\Model\Resource\Link\Purchased\Item\CollectionFactory $itemsFactory,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Customer\Helper\Session\CurrentCustomer $currentCustomer,
+        \Magento\Downloadable\Model\ResourceModel\Link\Purchased\CollectionFactory $linksFactory,
+        \Magento\Downloadable\Model\ResourceModel\Link\Purchased\Item\CollectionFactory $itemsFactory,
+        array $data = []
     ) {
-        $this->_customerSession = $customerSession;
+        $this->currentCustomer = $currentCustomer;
         $this->_linksFactory = $linksFactory;
         $this->_itemsFactory = $itemsFactory;
         parent::__construct($context, $data);
@@ -72,46 +53,51 @@ class ListProducts extends \Magento\View\Element\Template
 
     /**
      * Class constructor
+     *
+     * @return void
      */
     protected function _construct()
     {
         parent::_construct();
         $purchased = $this->_linksFactory->create()
-            ->addFieldToFilter('customer_id', $this->_customerSession->getCustomerId())
+            ->addFieldToFilter('customer_id', $this->currentCustomer->getCustomerId())
             ->addOrder('created_at', 'desc');
         $this->setPurchased($purchased);
-        $purchasedIds = array();
+        $purchasedIds = [];
         foreach ($purchased as $_item) {
             $purchasedIds[] = $_item->getId();
         }
         if (empty($purchasedIds)) {
-            $purchasedIds = array(null);
+            $purchasedIds = [null];
         }
-        $purchasedItems = $this->_itemsFactory->create()
-            ->addFieldToFilter('purchased_id', array('in' => $purchasedIds))
-            ->addFieldToFilter('status',
-                array(
-                    'nin' => array(
-                        \Magento\Downloadable\Model\Link\Purchased\Item::LINK_STATUS_PENDING_PAYMENT,
-                        \Magento\Downloadable\Model\Link\Purchased\Item::LINK_STATUS_PAYMENT_REVIEW
-                    )
-                )
-            )
-            ->setOrder('item_id', 'desc');
+        $purchasedItems = $this->_itemsFactory->create()->addFieldToFilter(
+            'purchased_id',
+            ['in' => $purchasedIds]
+        )->addFieldToFilter(
+            'status',
+            ['nin' => [Item::LINK_STATUS_PENDING_PAYMENT, Item::LINK_STATUS_PAYMENT_REVIEW]]
+        )->setOrder(
+            'item_id',
+            'desc'
+        );
         $this->setItems($purchasedItems);
     }
 
     /**
      * Enter description here...
      *
-     * @return \Magento\Downloadable\Block\Customer\Products\ListProducts
+     * @return $this
      */
     protected function _prepareLayout()
     {
         parent::_prepareLayout();
 
-        $pager = $this->getLayout()->createBlock('Magento\Theme\Block\Html\Pager', 'downloadable.customer.products.pager')
-            ->setCollection($this->getItems());
+        $pager = $this->getLayout()->createBlock(
+            \Magento\Theme\Block\Html\Pager::class,
+            'downloadable.customer.products.pager'
+        )->setCollection(
+            $this->getItems()
+        )->setPath('downloadable/customer/products');
         $this->setChild('pager', $pager);
         $this->getItems()->load();
         foreach ($this->getItems() as $item) {
@@ -128,7 +114,7 @@ class ListProducts extends \Magento\View\Element\Template
      */
     public function getOrderViewUrl($orderId)
     {
-        return $this->getUrl('sales/order/view', array('order_id' => $orderId));
+        return $this->getUrl('sales/order/view', ['order_id' => $orderId]);
     }
 
     /**
@@ -147,7 +133,8 @@ class ListProducts extends \Magento\View\Element\Template
     /**
      * Return number of left downloads or unlimited
      *
-     * @return string
+     * @param Item $item
+     * @return \Magento\Framework\Phrase|int
      */
     public function getRemainingDownloads($item)
     {
@@ -161,22 +148,25 @@ class ListProducts extends \Magento\View\Element\Template
     /**
      * Return url to download link
      *
-     * @param \Magento\Downloadable\Model\Link\Purchased\Item $item
+     * @param Item $item
      * @return string
      */
     public function getDownloadUrl($item)
     {
-        return $this->getUrl('*/download/link', array('id' => $item->getLinkHash(), '_secure' => true));
+        return $this->getUrl('downloadable/download/link', ['id' => $item->getLinkHash(), '_secure' => true]);
     }
 
     /**
      * Return true if target of link new window
      *
      * @return bool
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getIsOpenInNewWindow()
     {
-        return $this->_storeConfig->getConfigFlag(\Magento\Downloadable\Model\Link::XML_PATH_TARGET_NEW_WINDOW);
+        return $this->_scopeConfig->isSetFlag(
+            \Magento\Downloadable\Model\Link::XML_PATH_TARGET_NEW_WINDOW,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
     }
-
 }

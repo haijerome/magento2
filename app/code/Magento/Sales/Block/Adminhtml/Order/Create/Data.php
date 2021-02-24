@@ -1,72 +1,65 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create;
+
+use Magento\Framework\Pricing\PriceCurrencyInterface;
 
 /**
  * Order create data
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create;
-
 class Data extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
 {
     /**
+     * Currency factory
+     *
      * @var \Magento\Directory\Model\CurrencyFactory
      */
     protected $_currencyFactory;
 
     /**
+     * @var \Magento\Framework\Locale\CurrencyInterface
+     */
+    protected $_localeCurrency;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param \Magento\Sales\Model\AdminOrder\Create $orderCreate
+     * @param PriceCurrencyInterface $priceCurrency
      * @param \Magento\Directory\Model\CurrencyFactory $currencyFactory
+     * @param \Magento\Framework\Locale\CurrencyInterface $localeCurrency
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
         \Magento\Sales\Model\AdminOrder\Create $orderCreate,
+        PriceCurrencyInterface $priceCurrency,
         \Magento\Directory\Model\CurrencyFactory $currencyFactory,
-        array $data = array()
+        \Magento\Framework\Locale\CurrencyInterface $localeCurrency,
+        array $data = []
     ) {
         $this->_currencyFactory = $currencyFactory;
-        parent::__construct($context, $sessionQuote, $orderCreate, $data);
+        $this->_localeCurrency = $localeCurrency;
+        parent::__construct($context, $sessionQuote, $orderCreate, $priceCurrency, $data);
     }
 
     /**
-     * Retrieve avilable currency codes
+     * Retrieve available currency codes
      *
-     * @return unknown
+     * @return string[]
      */
     public function getAvailableCurrencies()
     {
         $dirtyCodes = $this->getStore()->getAvailableCurrencyCodes();
-        $codes = array();
+        $codes = [];
         if (is_array($dirtyCodes) && count($dirtyCodes)) {
             $rates = $this->_currencyFactory->create()->getCurrencyRates(
                 $this->_storeManager->getStore()->getBaseCurrency(),
@@ -82,25 +75,25 @@ class Data extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
     }
 
     /**
-     * Retrieve curency name by code
+     * Retrieve currency name by code
      *
-     * @param   string $code
-     * @return  string
+     * @param string $code
+     * @return string
      */
     public function getCurrencyName($code)
     {
-        return $this->_locale->currency($code)->getName();
+        return $this->_localeCurrency->getCurrency($code)->getName();
     }
 
     /**
-     * Retrieve curency name by code
+     * Retrieve currency name by code
      *
-     * @param   string $code
-     * @return  string
+     * @param string $code
+     * @return string
      */
     public function getCurrencySymbol($code)
     {
-        $currency = $this->_locale->currency($code);
+        $currency = $this->_localeCurrency->getCurrency($code);
         return $currency->getSymbol() ? $currency->getSymbol() : $currency->getShortName();
     }
 
@@ -113,5 +106,4 @@ class Data extends \Magento\Sales\Block\Adminhtml\Order\Create\AbstractCreate
     {
         return $this->getStore()->getCurrentCurrencyCode();
     }
-
 }

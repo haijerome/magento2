@@ -1,62 +1,52 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Reports\Block\Adminhtml\Product\Lowstock;
+
+use Magento\Backend\Block\Template\Context;
+use Magento\Backend\Helper\Data;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Framework\Data\Collection as DataCollection;
+use Magento\Reports\Model\ResourceModel\Product\Lowstock\Collection;
+use Magento\Reports\Model\ResourceModel\Product\Lowstock\CollectionFactory;
 
 /**
  * Adminhtml low stock products report grid block
  *
- * @category   Magento
- * @package    Magento_Reports
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Reports\Block\Adminhtml\Product\Lowstock;
-
 class Grid extends \Magento\Backend\Block\Widget\Grid
 {
     /**
-     * @var \Magento\Reports\Model\Resource\Product\Lowstock\CollectionFactory
+     * @var CollectionFactory
      */
     protected $_lowstocksFactory;
 
     /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Reports\Model\Resource\Product\Lowstock\CollectionFactory $lowstocksFactory
+     * @param Context $context
+     * @param Data $backendHelper
+     * @param CollectionFactory $lowstocksFactory
      * @param array $data
      */
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Reports\Model\Resource\Product\Lowstock\CollectionFactory $lowstocksFactory,
-        array $data = array()
+        Context $context,
+        Data $backendHelper,
+        CollectionFactory $lowstocksFactory,
+        array $data = []
     ) {
         $this->_lowstocksFactory = $lowstocksFactory;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
     /**
+     * @inheritDoc
+     *
      * @return \Magento\Backend\Block\Widget\Grid
      */
     protected function _prepareCollection()
@@ -68,24 +58,31 @@ class Grid extends \Magento\Backend\Block\Widget\Grid
         if ($website) {
             $storeIds = $this->_storeManager->getWebsite($website)->getStoreIds();
             $storeId = array_pop($storeIds);
-        } else if ($group) {
+        } elseif ($group) {
             $storeIds = $this->_storeManager->getGroup($group)->getStoreIds();
             $storeId = array_pop($storeIds);
-        } else if ($store) {
+        } elseif ($store) {
             $storeId = (int)$store;
         } else {
-            $storeId = '';
+            $storeId = null;
         }
 
-        /** @var $collection \Magento\Reports\Model\Resource\Product\Lowstock\Collection  */
-        $collection = $this->_lowstocksFactory->create()
-            ->addAttributeToSelect('*')
-            ->setStoreId($storeId)
-            ->filterByIsQtyProductTypes()
-            ->joinInventoryItem('qty')
-            ->useManageStockFilter($storeId)
-            ->useNotifyStockQtyFilter($storeId)
-            ->setOrder('qty', \Magento\Data\Collection::SORT_ORDER_ASC);
+        /** @var $collection Collection  */
+        $collection = $this->_lowstocksFactory->create()->addAttributeToSelect(
+            '*'
+        )->filterByIsQtyProductTypes()->joinInventoryItem(
+            'qty'
+        )->useManageStockFilter(
+            $storeId
+        )->useNotifyStockQtyFilter(
+            $storeId
+        )->setOrder(
+            'qty',
+            DataCollection::SORT_ORDER_ASC
+        )->addAttributeToFilter(
+            'status',
+            Status::STATUS_ENABLED
+        );
 
         if ($storeId) {
             $collection->addStoreFilter($storeId);

@@ -1,75 +1,84 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
+namespace Magento\Tax\Block\Adminhtml\Rate;
+
+use Magento\Tax\Controller\RegistryConstants;
 
 /**
  * Tax Rate Titles Renderer
  *
  * @author Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Tax\Block\Adminhtml\Rate;
-
-class Title extends \Magento\View\Element\Template
+class Title extends \Magento\Framework\View\Element\Template
 {
+    /**
+     * @var array
+     */
     protected $_titles;
 
-    protected $_template = 'rate/title.phtml';
-
     /**
-     * @var \Magento\Tax\Model\Calculation\Rate
+     * @var string
      */
-    protected $_rate;
+    protected $_template = 'Magento_Tax::rate/title.phtml';
 
     /**
-     * @var \Magento\Core\Model\StoreFactory
+     * @var \Magento\Store\Model\StoreFactory
      */
     protected $_storeFactory;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Core\Model\StoreFactory $storeFactory
-     * @param \Magento\Tax\Model\Calculation\Rate $rate
+     * @var \Magento\Framework\Registry
+     */
+    protected $_coreRegistry;
+
+    /**
+     * @var \Magento\Tax\Api\TaxRateRepositoryInterface
+     */
+    protected $_taxRateRepository;
+
+    /**
+     * Initialize dependencies
+     *
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Store\Model\StoreFactory $storeFactory
+     * @param \Magento\Framework\Registry $coreRegistry
+     * @param \Magento\Tax\Api\TaxRateRepositoryInterface $taxRateRepository
      * @param array $data
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Core\Model\StoreFactory $storeFactory,
-        \Magento\Tax\Model\Calculation\Rate $rate,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Store\Model\StoreFactory $storeFactory,
+        \Magento\Framework\Registry $coreRegistry,
+        \Magento\Tax\Api\TaxRateRepositoryInterface $taxRateRepository,
+        array $data = []
     ) {
-        $this->_rate = $rate;
+        $this->_coreRegistry = $coreRegistry;
+        $this->_taxRateRepository = $taxRateRepository;
         $this->_storeFactory = $storeFactory;
         parent::__construct($context, $data);
     }
 
+    /**
+     * Return the tax rate titles associated with a store view.
+     *
+     * @return array
+     */
     public function getTitles()
     {
-        if (is_null($this->_titles)) {
-            $this->_titles = array();
-            $titles = $this->_rate->getTitles();
+        if ($this->_titles === null) {
+            $this->_titles = [];
+
+            $taxRateId = $this->_coreRegistry->registry(RegistryConstants::CURRENT_TAX_RATE_ID);
+            $titles = [];
+            if ($taxRateId) {
+                $rate = $this->_taxRateRepository->get($taxRateId);
+                $titles = $rate->getTitles();
+            }
+
             foreach ($titles as $title) {
                 $this->_titles[$title->getStoreId()] = $title->getValue();
             }
@@ -82,14 +91,14 @@ class Title extends \Magento\View\Element\Template
         return $this->_titles;
     }
 
+    /**
+     * @return mixed
+     */
     public function getStores()
     {
         $stores = $this->getData('stores');
-        if (is_null($stores)) {
-            $stores = $this->_storeFactory->create()
-                ->getResourceCollection()
-                ->setLoadDefault(false)
-                ->load();
+        if ($stores === null) {
+            $stores = $this->_storeFactory->create()->getResourceCollection()->setLoadDefault(false)->load();
             $this->setData('stores', $stores);
         }
         return $stores;

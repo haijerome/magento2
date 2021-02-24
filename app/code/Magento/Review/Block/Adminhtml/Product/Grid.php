@@ -1,86 +1,73 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Review
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Review\Block\Adminhtml\Product;
 
 /**
  * Adminhtml product grid block
  *
- * @category   Magento
- * @package    Magento_Review
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @SuppressWarnings(PHPMD.DepthOfInheritance)
  */
-namespace Magento\Review\Block\Adminhtml\Product;
-
 class Grid extends \Magento\Catalog\Block\Adminhtml\Product\Grid
 {
     /**
-     * @var \Magento\Core\Model\Resource\Website\CollectionFactory
+     * Website collection
+     *
+     * @var \Magento\Store\Model\ResourceModel\Website\CollectionFactory
      */
     protected $_websitesFactory;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Core\Model\WebsiteFactory $websiteFactory
-     * @param \Magento\Eav\Model\Resource\Entity\Attribute\Set\CollectionFactory $setsFactory
+     * @param \Magento\Backend\Helper\Data $backendHelper
+     * @param \Magento\Store\Model\WebsiteFactory $websiteFactory
+     * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\CollectionFactory $setsFactory
      * @param \Magento\Catalog\Model\ProductFactory $productFactory
      * @param \Magento\Catalog\Model\Product\Type $type
-     * @param \Magento\Catalog\Model\Product\Status $status
+     * @param \Magento\Catalog\Model\Product\Attribute\Source\Status $status
      * @param \Magento\Catalog\Model\Product\Visibility $visibility
-     * @param \Magento\Catalog\Helper\Data $catalogData
-     * @param \Magento\Core\Model\Resource\Website\CollectionFactory $websitesFactory
+     * @param \Magento\Framework\Module\Manager $moduleManager
+     * @param \Magento\Store\Model\ResourceModel\Website\CollectionFactory $websitesFactory
      * @param array $data
+     *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Core\Model\WebsiteFactory $websiteFactory,
-        \Magento\Eav\Model\Resource\Entity\Attribute\Set\CollectionFactory $setsFactory,
+        \Magento\Backend\Helper\Data $backendHelper,
+        \Magento\Store\Model\WebsiteFactory $websiteFactory,
+        \Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\CollectionFactory $setsFactory,
         \Magento\Catalog\Model\ProductFactory $productFactory,
         \Magento\Catalog\Model\Product\Type $type,
-        \Magento\Catalog\Model\Product\Status $status,
+        \Magento\Catalog\Model\Product\Attribute\Source\Status $status,
         \Magento\Catalog\Model\Product\Visibility $visibility,
-        \Magento\Catalog\Helper\Data $catalogData,
-        \Magento\Core\Model\Resource\Website\CollectionFactory $websitesFactory,
-        array $data = array()
+        \Magento\Framework\Module\Manager $moduleManager,
+        \Magento\Store\Model\ResourceModel\Website\CollectionFactory $websitesFactory,
+        array $data = []
     ) {
         $this->_websitesFactory = $websitesFactory;
         parent::__construct(
             $context,
-            $urlModel,
+            $backendHelper,
             $websiteFactory,
             $setsFactory,
             $productFactory,
             $type,
             $status,
             $visibility,
-            $catalogData,
+            $moduleManager,
             $data
         );
     }
 
+    /**
+     * Initialize review
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -88,80 +75,92 @@ class Grid extends \Magento\Catalog\Block\Adminhtml\Product\Grid
         $this->setUseAjax(true);
     }
 
+    /**
+     * Prepare product review grid
+     *
+     * @return void
+     */
     protected function _prepareColumns()
     {
-        $this->addColumn('entity_id', array(
-                'header'    => __('ID'),
-                'width'     => '50px',
-                'index'     => 'entity_id',
-        ));
+        $this->addColumn(
+            'entity_id',
+            [
+                'header' => __('ID'),
+                'index' => 'entity_id',
+                'header_css_class' => 'col-id',
+                'column_css_class' => 'col-id'
+            ]
+        );
 
-        $this->addColumn('name', array(
-                'header'    => __('Name'),
-                'index'     => 'name',
-        ));
+        $this->addColumn('name', ['header' => __('Name'), 'index' => 'name']);
 
         if ((int)$this->getRequest()->getParam('store', 0)) {
-            $this->addColumn('custom_name', array(
-                    'header'    => __('Product Store Name'),
-                    'index'     => 'custom_name'
-            ));
+            $this->addColumn('custom_name', ['header' => __('Product Store Name'), 'index' => 'custom_name']);
         }
 
-        $this->addColumn('sku', array(
-                'header'    => __('SKU'),
-                'width'     => '80px',
-                'index'     => 'sku'
-        ));
+        $this->addColumn('sku', ['header' => __('SKU'), 'index' => 'sku']);
 
-        $this->addColumn('price', array(
-                'header'    => __('Price'),
-                'type'      => 'currency',
-                'index'     => 'price'
-        ));
+        $this->addColumn('price', ['header' => __('Price'), 'type' => 'currency', 'index' => 'price']);
 
-        $this->addColumn('qty', array(
-                'header'    => __('Quantity'),
-                'width'     => '130px',
-                'type'      => 'number',
-                'index'     => 'qty'
-        ));
+        $this->addColumn(
+            'qty',
+            ['header' => __('Quantity'), 'type' => 'number', 'index' => 'qty']
+        );
 
-        $this->addColumn('status', array(
-                'header'    => __('Status'),
-                'width'     => '90px',
-                'index'     => 'status',
-                'type'      => 'options',
-                'source'    => 'Magento\Catalog\Model\Product\Status',
-                'options'   => $this->_status->getOptionArray(),
-        ));
+        $this->addColumn(
+            'status',
+            [
+                'header' => __('Status'),
+                'index' => 'status',
+                'type' => 'options',
+                'source' => \Magento\Catalog\Model\Product\Attribute\Source\Status::class,
+                'options' => $this->_status->getOptionArray()
+            ]
+        );
 
         /**
          * Check is single store mode
          */
         if (!$this->_storeManager->isSingleStoreMode()) {
-            $this->addColumn('websites',
-                array(
-                    'header'=> __('Websites'),
-                    'width' => '100px',
-                    'sortable'  => false,
-                    'index'     => 'websites',
-                    'type'      => 'options',
-                    'options'   => $this->_websitesFactory->create()->toOptionHash(),
-            ));
+            $this->addColumn(
+                'websites',
+                [
+                    'header' => __('Websites'),
+                    'sortable' => false,
+                    'index' => 'websites',
+                    'type' => 'options',
+                    'options' => $this->_websitesFactory->create()->toOptionHash()
+                ]
+            );
         }
     }
 
+    /**
+     * Get catalog product grid url
+     *
+     * @return string
+     */
     public function getGridUrl()
     {
-        return $this->getUrl('catalog/*/productGrid', array('_current'=>true));
+        return $this->getUrl('review/product/productGrid', ['_current' => true]);
     }
 
+    /**
+     * Get catalog product row url
+     *
+     * @param \Magento\Framework\DataObject $row
+     * @return string
+     */
     public function getRowUrl($row)
     {
-        return $this->getUrl('catalog/*/jsonProductInfo', array('id' => $row->getId()));
+        return $this->getUrl('review/product/jsonProductInfo', ['id' => $row->getId()]);
     }
 
+    /**
+     * Prepare mass action
+     *
+     * @return $this
+     */
     protected function _prepareMassaction()
     {
         return $this;

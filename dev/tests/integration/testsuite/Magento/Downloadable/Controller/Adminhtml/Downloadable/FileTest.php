@@ -1,49 +1,151 @@
 <?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
 namespace Magento\Downloadable\Controller\Adminhtml\Downloadable;
+
+use Magento\Framework\Serialize\Serializer\Json;
+
 /**
  * Magento\Downloadable\Controller\Adminhtml\Downloadable\File
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  * @magentoAppArea adminhtml
  */
-class FileTest extends \Magento\Backend\Utility\Controller
+class FileTest extends \Magento\TestFramework\TestCase\AbstractBackendController
 {
+    /**
+     * @var Json
+     */
+    private $jsonSerializer;
+
+    /**
+     * @inheritdoc
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->jsonSerializer = $this->_objectManager->get(Json::class);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function tearDown(): void
+    {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        $filePath = dirname(__DIR__) . '/_files/sample.tmp';
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        if (is_file($filePath)) {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+            unlink($filePath);
+        }
+    }
+
     public function testUploadAction()
     {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
         copy(dirname(__DIR__) . '/_files/sample.txt', dirname(__DIR__) . '/_files/sample.tmp');
-        $_FILES = array(
-            'samples' => array(
+        // phpcs:ignore Magento2.Security.Superglobal
+        $_FILES = [
+            'samples' => [
                 'name' => 'sample.txt',
                 'type' => 'text/plain',
+                // phpcs:ignore Magento2.Functions.DiscouragedFunction
                 'tmp_name' => dirname(__DIR__) . '/_files/sample.tmp',
                 'error' => 0,
-                'size' => 0
-            )
-        );
-        
+                'size' => 0,
+            ],
+        ];
+
+        $this->getRequest()->setMethod('POST');
         $this->dispatch('backend/admin/downloadable_file/upload/type/samples');
         $body = $this->getResponse()->getBody();
-        $result = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->get('Magento\Core\Helper\Data')
-            ->jsonDecode($body);
+        $result = $this->jsonSerializer->unserialize($body);
         $this->assertEquals(0, $result['error']);
+    }
+
+    /**
+     * Checks a case when php files are not allowed to upload.
+     *
+     * @param string $fileName
+     * @dataProvider extensionsDataProvider
+     */
+    public function testUploadProhibitedExtensions($fileName)
+    {
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        $path = dirname(__DIR__) . '/_files/';
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
+        copy($path . 'sample.txt', $path . 'sample.tmp');
+        // phpcs:ignore Magento2.Security.Superglobal
+        $_FILES = [
+            'samples' => [
+                'name' => $fileName,
+                'type' => 'text/plain',
+                'tmp_name' => $path . 'sample.tmp',
+                'error' => 0,
+                'size' => 0,
+            ],
+        ];
+
+        $this->getRequest()->setMethod('POST');
+        $this->dispatch('backend/admin/downloadable_file/upload/type/samples');
+        $body = $this->getResponse()->getBody();
+        $result = $this->jsonSerializer->unserialize($body);
+
+        self::assertArrayHasKey('errorcode', $result);
+        self::assertEquals(0, $result['errorcode']);
+        self::assertEquals('Disallowed file type.', $result['error']);
+    }
+
+    /**
+     * Returns different php file extensions.
+     *
+     * @return array
+     */
+    public function extensionsDataProvider()
+    {
+        return [
+            ['sample.php'],
+            ['sample.php3'],
+            ['sample.php4'],
+            ['sample.php5'],
+            ['sample.php7'],
+        ];
+    }
+
+    /**
+     * @dataProvider uploadWrongUploadTypeDataProvider
+     * @return void
+     */
+    public function testUploadWrongUploadType($postData): void
+    {
+        $this->getRequest()->setPostValue($postData);
+        $this->getRequest()->setMethod('POST');
+
+        $this->dispatch('backend/admin/downloadable_file/upload');
+
+        $body = $this->getResponse()->getBody();
+        $result = $this->jsonSerializer->unserialize($body);
+        $this->assertEquals('Upload type can not be determined.', $result['error']);
+        $this->assertEquals(0, $result['errorcode']);
+    }
+
+    public function uploadWrongUploadTypeDataProvider(): array
+    {
+        return [
+            [
+                ['type' => 'test'],
+            ],
+            [
+                [
+                    'type' => [
+                        'type1' => 'test',
+                    ],
+                ],
+            ],
+        ];
     }
 }

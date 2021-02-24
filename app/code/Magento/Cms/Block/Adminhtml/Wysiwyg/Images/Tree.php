@@ -1,44 +1,22 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Cms
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Cms\Block\Adminhtml\Wysiwyg\Images;
 
 /**
  * Directory tree renderer for Cms Wysiwyg Images
  *
- * @category   Magento
- * @package    Magento_Cms
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Cms\Block\Adminhtml\Wysiwyg\Images;
-
 class Tree extends \Magento\Backend\Block\Template
 {
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
     protected $_coreRegistry = null;
 
@@ -50,19 +28,29 @@ class Tree extends \Magento\Backend\Block\Template
     protected $_cmsWysiwygImages = null;
 
     /**
+     * @var \Magento\Framework\Serialize\Serializer\Json
+     */
+    private $serializer;
+
+    /**
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\Cms\Helper\Wysiwyg\Images $cmsWysiwygImages
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Registry $registry
      * @param array $data
+     * @param \Magento\Framework\Serialize\Serializer\Json|null $serializer
+     * @throws \RuntimeException
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
         \Magento\Cms\Helper\Wysiwyg\Images $cmsWysiwygImages,
-        \Magento\Core\Model\Registry $registry,
-        array $data = array()
+        \Magento\Framework\Registry $registry,
+        array $data = [],
+        \Magento\Framework\Serialize\Serializer\Json $serializer = null
     ) {
         $this->_coreRegistry = $registry;
         $this->_cmsWysiwygImages = $cmsWysiwygImages;
+        $this->serializer = $serializer ?: \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\Serialize\Serializer\Json::class);
         parent::__construct($context, $data);
     }
 
@@ -70,22 +58,35 @@ class Tree extends \Magento\Backend\Block\Template
      * Json tree builder
      *
      * @return string
+     * @throws \Magento\Framework\Exception\ValidatorException
      */
     public function getTreeJson()
     {
         $storageRoot = $this->_cmsWysiwygImages->getStorageRoot();
-        $collection = $this->_coreRegistry->registry('storage')
-            ->getDirsCollection($this->_cmsWysiwygImages->getCurrentPath());
-        $jsonArray = array();
+        $collection = $this->_coreRegistry->registry(
+            'storage'
+        )->getDirsCollection(
+            $this->_cmsWysiwygImages->getCurrentPath()
+        );
+        $jsonArray = [];
         foreach ($collection as $item) {
-            $jsonArray[] = array(
-                'text'  => $this->_cmsWysiwygImages->getShortFilename($item->getBasename(), 20),
-                'id'    => $this->_cmsWysiwygImages->convertPathToId($item->getFilename()),
+            $data = [
+                'text' => $this->_cmsWysiwygImages->getShortFilename($item->getBasename(), 20),
+                'id' => $this->_cmsWysiwygImages->convertPathToId($item->getFilename()),
                 'path' => substr($item->getFilename(), strlen($storageRoot)),
-                'cls'   => 'folder'
-            );
+                'cls' => 'folder',
+            ];
+            $nestedDirectories = $this->getMediaDirectory()->readRecursively($item->getFilename());
+            $hasNestedDirectories = count($nestedDirectories) > 0;
+
+            // if no nested directories inside dir, add 'leaf' state so that jstree hides dropdown arrow next to dir
+            if (!$hasNestedDirectories) {
+                $data['state'] = 'leaf';
+            }
+
+            $jsonArray[] = $data;
         }
-        return \Zend_Json::encode($jsonArray);
+        return $this->serializer->serialize($jsonArray);
     }
 
     /**
@@ -95,13 +96,24 @@ class Tree extends \Magento\Backend\Block\Template
      */
     public function getTreeLoaderUrl()
     {
-        return $this->getUrl('cms/*/treeJson');
+        $params = [];
+
+        $currentTreePath = $this->getRequest()->getParam('current_tree_path');
+
+        if (strlen($currentTreePath)) {
+            $params['current_tree_path'] = $currentTreePath;
+        }
+
+        return $this->getUrl(
+            'cms/*/treeJson',
+            $params
+        );
     }
 
     /**
      * Root node name of tree
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getRootNodeName()
     {
@@ -115,32 +127,41 @@ class Tree extends \Magento\Backend\Block\Template
      */
     public function getTreeCurrentPath()
     {
-        $treePath = array('root');
-        if ($path = $this->_coreRegistry->registry('storage')->getSession()->getCurrentPath()) {
+        $treePath = ['root'];
+
+        if ($idEncodedPath = $this->getRequest()->getParam('current_tree_path')) {
+            $path = $this->_cmsWysiwygImages->idDecode($idEncodedPath);
+        } else {
+            $path = $this->_coreRegistry->registry('storage')->getSession()->getCurrentPath();
+        }
+
+        if (strlen($path)) {
             $path = str_replace($this->_cmsWysiwygImages->getStorageRoot(), '', $path);
-            $relative = array();
-            foreach (explode(DIRECTORY_SEPARATOR, $path) as $dirName) {
+            $relative = [];
+            foreach (explode('/', $path) as $dirName) {
                 if ($dirName) {
-                    $relative[] =  $dirName;
-                    $treePath[] =  $this->_cmsWysiwygImages->idEncode(implode(DIRECTORY_SEPARATOR, $relative));
+                    $relative[] = $dirName;
+                    $treePath[] = $this->_cmsWysiwygImages->idEncode(implode('/', $relative));
                 }
             }
         }
+
         return $treePath;
     }
 
     /**
      * Get tree widget options
+     *
      * @return array
      */
     public function getTreeWidgetOptions()
     {
-        return array(
-            "folderTree" => array(
+        return [
+            "folderTree" => [
                 "rootName" => $this->getRootNodeName(),
                 "url" => $this->getTreeLoaderUrl(),
-                "currentPath"=> array_reverse($this->getTreeCurrentPath()),
-            )
-        );
+                "currentPath" => array_reverse($this->getTreeCurrentPath()),
+            ]
+        ];
     }
 }

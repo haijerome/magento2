@@ -1,40 +1,30 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Adminhtml
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
  * Attribute form apply element
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author      Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Block\Adminhtml\Product\Helper\Form;
 
-class Apply extends \Magento\Data\Form\Element\Multiselect
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
+
+class Apply extends \Magento\Framework\Data\Form\Element\Multiselect
 {
+    /**
+     * @var SecureHtmlRenderer
+     */
+    private $secureRenderer;
+
+    /**
+     * Return html of the element.
+     *
+     * @return string
+     */
     public function getElementHtml()
     {
         $elementAttributeHtml = '';
@@ -47,21 +37,28 @@ class Apply extends \Magento\Data\Form\Element\Multiselect
             $elementAttributeHtml = $elementAttributeHtml . ' disabled="disabled"';
         }
 
-        $html = '<select onchange="toggleApplyVisibility(this)"' . $elementAttributeHtml . '>'
-              . '<option value="0">' . $this->getModeLabels('all'). '</option>'
-              . '<option value="1" ' . ($this->getValue()==null ? '' : 'selected') . '>' . $this->getModeLabels('custom'). '</option>'
-              . '</select><br /><br />';
+        $html = '<select id="' . $this->getHtmlId() . '"' . $elementAttributeHtml . '>'
+            . '<option value="0">' . $this->getModeLabels('all') . '</option>'
+            . '<option value="1" ' . ($this->getValue() == null ? '' : 'selected') . '>'
+            . $this->getModeLabels('custom') . '</option>' . '</select><br /><br />';
+
+        $html .= /* @noEscape */ $this->secureRenderer->renderEventListenerAsTag(
+            'onchange',
+            "toggleApplyVisibility(this)",
+            'select#' . $this->getHtmlId()
+        );
 
         $html .= parent::getElementHtml();
+
         return $html;
     }
 
     /**
-     * Dublicate interface of \Magento\Data\Form\Element\AbstractElement::setReadonly
+     * Dublicate interface of \Magento\Framework\Data\Form\Element\AbstractElement::setReadonly
      *
      * @param bool $readonly
      * @param bool $useDisabled
-     * @return \Magento\Catalog\Block\Adminhtml\Product\Helper\Form\Apply
+     * @return $this
      */
     public function setReadonly($readonly, $useDisabled = false)
     {
@@ -69,5 +66,4 @@ class Apply extends \Magento\Data\Form\Element\Multiselect
         $this->setData('disabled', $useDisabled);
         return $this;
     }
-
 }

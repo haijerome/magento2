@@ -1,38 +1,35 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Reports
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 namespace Magento\Reports\Block\Adminhtml\Grid;
 
+/**
+ * Backend reports grid
+ */
 class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
 {
-    protected $_resourceCollectionName  = '';
-    protected $_currentCurrencyCode     = null;
-    protected $_storeIds                = array();
-    protected $_aggregatedColumns       = null;
+    /**
+     * @var string
+     */
+    protected $_resourceCollectionName = '';
+
+    /**
+     * @var null
+     */
+    protected $_currentCurrencyCode = null;
+
+    /**
+     * @var array
+     */
+    protected $_storeIds = [];
+
+    /**
+     * @var null
+     */
+    protected $_aggregatedColumns = null;
 
     /**
      * Reports data
@@ -51,32 +48,37 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
     /**
      * Resource collection factory
      *
-     * @var \Magento\Reports\Model\Resource\Report\Collection\Factory
+     * @var \Magento\Reports\Model\ResourceModel\Report\Collection\Factory
      */
     protected $_resourceFactory;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
-     * @param \Magento\Core\Model\Url $urlModel
-     * @param \Magento\Reports\Model\Resource\Report\Collection\Factory $resourceFactory
+     * @param \Magento\Backend\Helper\Data $backendHelper
+     * @param \Magento\Reports\Model\ResourceModel\Report\Collection\Factory $resourceFactory
      * @param \Magento\Reports\Model\Grouped\CollectionFactory $collectionFactory
      * @param \Magento\Reports\Helper\Data $reportsData
      * @param array $data
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        \Magento\Core\Model\Url $urlModel,
-        \Magento\Reports\Model\Resource\Report\Collection\Factory $resourceFactory,
+        \Magento\Backend\Helper\Data $backendHelper,
+        \Magento\Reports\Model\ResourceModel\Report\Collection\Factory $resourceFactory,
         \Magento\Reports\Model\Grouped\CollectionFactory $collectionFactory,
         \Magento\Reports\Helper\Data $reportsData,
-        array $data = array()
+        array $data = []
     ) {
         $this->_resourceFactory = $resourceFactory;
         $this->_collectionFactory = $collectionFactory;
         $this->_reportsData = $reportsData;
-        parent::__construct($context, $urlModel, $data);
+        parent::__construct($context, $backendHelper, $data);
     }
 
+    /**
+     * Pseudo constructor
+     *
+     * @return void
+     */
     protected function _construct()
     {
         parent::_construct();
@@ -86,28 +88,44 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
         if (isset($this->_columnGroupBy)) {
             $this->isColumnGrouped($this->_columnGroupBy, true);
         }
-        $this->setEmptyCellLabel(__('We couldn\'t find records for this period.'));
+        $this->setEmptyCellLabel(__('We can\'t find records for this period.'));
     }
 
+    /**
+     * Get resource collection name
+     *
+     * @return string
+     * @codeCoverageIgnore
+     */
     public function getResourceCollectionName()
     {
         return $this->_resourceCollectionName;
     }
 
+    /**
+     * Return reports collection
+     *
+     * @return \Magento\Framework\Data\Collection
+     */
     public function getCollection()
     {
-        if (is_null($this->_collection)) {
+        if ($this->_collection === null) {
             $this->setCollection($this->_collectionFactory->create());
         }
         return $this->_collection;
     }
 
+    /**
+     * Retrieve array of columns that should be aggregated
+     *
+     * @return array
+     */
     protected function _getAggregatedColumns()
     {
-        if (is_null($this->_aggregatedColumns)) {
+        if ($this->_aggregatedColumns === null) {
             foreach ($this->getColumns() as $column) {
                 if (!is_array($this->_aggregatedColumns)) {
-                    $this->_aggregatedColumns = array();
+                    $this->_aggregatedColumns = [];
                 }
                 if ($column->hasTotal()) {
                     $this->_aggregatedColumns[$column->getId()] = "{$column->getTotal()}({$column->getIndex()})";
@@ -123,9 +141,9 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
      * It stands for conditional visibility of the column depending on filter field values
      * Value of visibility_filter supports (filter_field_name => filter_field_value) pairs
      *
-     * @param   string $columnId
-     * @param   array $column
-     * @return  \Magento\Reports\Block\Adminhtml\Grid\AbstractGrid
+     * @param string $columnId
+     * @param array $column
+     * @return $this
      */
     public function addColumn($columnId, $column)
     {
@@ -133,7 +151,7 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
             $filterData = $this->getFilterData();
             $visibilityFilter = $column['visibility_filter'];
             if (!is_array($visibilityFilter)) {
-                $visibilityFilter = array($visibilityFilter);
+                $visibilityFilter = [$visibilityFilter];
             }
             foreach ($visibilityFilter as $k => $v) {
                 if (is_int($k)) {
@@ -143,9 +161,7 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
                     $filterFieldId = $k;
                     $filterFieldValue = $v;
                 }
-                if (
-                    !$filterData->hasData($filterFieldId) ||
-                    $filterData->getData($filterFieldId) != $filterFieldValue
+                if (!$filterData->hasData($filterFieldId) || $filterData->getData($filterFieldId) != $filterFieldValue
                 ) {
                     return $this;  // don't add column
                 }
@@ -157,16 +173,11 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
     /**
      * Get allowed store ids array intersected with selected scope in store switcher
      *
-     * @return  array
+     * @return array
      */
     protected function _getStoreIds()
     {
-        $filterData = $this->getFilterData();
-        if ($filterData) {
-            $storeIds = explode(',', $filterData->getData('store_ids'));
-        } else {
-            $storeIds = array();
-        }
+        $storeIds = $this->getFilteredStores();
         // By default storeIds array contains only allowed stores
         $allowedStoreIds = array_keys($this->_storeManager->getStores());
         // And then array_intersect with post data for prevent unauthorized stores reports
@@ -181,6 +192,13 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
         return $storeIds;
     }
 
+    /**
+     * Apply sorting and filtering to collection
+     *
+     * @return $this|\Magento\Backend\Block\Widget\Grid
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     */
     protected function _prepareCollection()
     {
         $filterData = $this->getFilterData();
@@ -191,7 +209,7 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
             return parent::_prepareCollection();
         }
 
-        $storeIds = $this->_getStoreIds();;
+        $storeIds = $this->_getStoreIds();
 
         $orderStatuses = $filterData->getData('order_statuses');
         if (is_array($orderStatuses)) {
@@ -200,11 +218,18 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
             }
         }
 
-        $resourceCollection = $this->_resourceFactory->create($this->getResourceCollectionName())
-            ->setPeriod($filterData->getData('period_type'))
-            ->setDateRange($filterData->getData('from', null), $filterData->getData('to', null))
-            ->addStoreFilter($storeIds)
-            ->setAggregatedColumns($this->_getAggregatedColumns());
+        $resourceCollection = $this->_resourceFactory->create(
+            $this->getResourceCollectionName()
+        )->setPeriod(
+            $filterData->getData('period_type')
+        )->setDateRange(
+            $filterData->getData('from', null),
+            $filterData->getData('to', null)
+        )->addStoreFilter(
+            $storeIds
+        )->setAggregatedColumns(
+            $this->_getAggregatedColumns()
+        );
 
         $this->_addOrderStatusFilter($resourceCollection, $filterData);
         $this->_addCustomFilter($resourceCollection, $filterData);
@@ -228,12 +253,20 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
         }
 
         if ($this->getCountTotals()) {
-            $totalsCollection = $this->_resourceFactory->create($this->getResourceCollectionName())
-                ->setPeriod($filterData->getData('period_type'))
-                ->setDateRange($filterData->getData('from', null), $filterData->getData('to', null))
-                ->addStoreFilter($storeIds)
-                ->setAggregatedColumns($this->_getAggregatedColumns())
-                ->isTotals(true);
+            $totalsCollection = $this->_resourceFactory->create(
+                $this->getResourceCollectionName()
+            )->setPeriod(
+                $filterData->getData('period_type')
+            )->setDateRange(
+                $filterData->getData('from', null),
+                $filterData->getData('to', null)
+            )->addStoreFilter(
+                $storeIds
+            )->setAggregatedColumns(
+                $this->_getAggregatedColumns()
+            )->isTotals(
+                true
+            );
 
             $this->_addOrderStatusFilter($totalsCollection, $filterData);
             $this->_addCustomFilter($totalsCollection, $filterData);
@@ -250,21 +283,36 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
         return parent::_prepareCollection();
     }
 
+    /**
+     * Return count totals
+     *
+     * @return array
+     */
     public function getCountTotals()
     {
         if (!$this->getTotals()) {
             $filterData = $this->getFilterData();
-            $totalsCollection = $this->_resourceFactory->create($this->getResourceCollectionName())
-                ->setPeriod($filterData->getData('period_type'))
-                ->setDateRange($filterData->getData('from', null), $filterData->getData('to', null))
-                ->addStoreFilter($this->_getStoreIds())
-                ->setAggregatedColumns($this->_getAggregatedColumns())
-                ->isTotals(true);
+            $totalsCollection = $this->_resourceFactory->create(
+                $this->getResourceCollectionName()
+            )->setPeriod(
+                $filterData->getData('period_type')
+            )->setDateRange(
+                $filterData->getData('from', null),
+                $filterData->getData('to', null)
+            )->addStoreFilter(
+                $this->_getStoreIds()
+            )->setAggregatedColumns(
+                $this->_getAggregatedColumns()
+            )->isTotals(
+                true
+            );
 
             $this->_addOrderStatusFilter($totalsCollection, $filterData);
+            $this->_addCustomFilter($totalsCollection, $filterData);
 
-            if (count($totalsCollection->getItems()) < 1 || !$filterData->getData('from')) {
-                $this->setTotals(new \Magento\Object());
+            if ($totalsCollection->load()->getSize() < 1 || !$filterData->getData('from')) {
+                $this->setTotals(new \Magento\Framework\DataObject());
+                $this->setCountTotals(false);
             } else {
                 foreach ($totalsCollection->getItems() as $item) {
                     $this->setTotals($item);
@@ -272,18 +320,32 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
                 }
             }
         }
+
         return parent::getCountTotals();
     }
 
+    /**
+     * Retrieve subtotal items
+     *
+     * @return array
+     */
     public function getSubTotals()
     {
         $filterData = $this->getFilterData();
-        $subTotalsCollection = $this->_resourceFactory->create($this->getResourceCollectionName())
-            ->setPeriod($filterData->getData('period_type'))
-            ->setDateRange($filterData->getData('from', null), $filterData->getData('to', null))
-            ->addStoreFilter($this->_getStoreIds())
-            ->setAggregatedColumns($this->_getAggregatedColumns())
-            ->isSubTotals(true);
+        $subTotalsCollection = $this->_resourceFactory->create(
+            $this->getResourceCollectionName()
+        )->setPeriod(
+            $filterData->getData('period_type')
+        )->setDateRange(
+            $filterData->getData('from', null),
+            $filterData->getData('to', null)
+        )->addStoreFilter(
+            $this->_getStoreIds()
+        )->setAggregatedColumns(
+            $this->_getAggregatedColumns()
+        )->setIsSubTotals(
+            true
+        );
 
         $this->_addOrderStatusFilter($subTotalsCollection, $filterData);
         $this->_addCustomFilter($subTotalsCollection, $filterData);
@@ -292,27 +354,40 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
         return parent::getSubTotals();
     }
 
+    /**
+     * StoreIds setter
+     *
+     * @param array $storeIds
+     * @return $this
+     * @codeCoverageIgnore
+     */
     public function setStoreIds($storeIds)
     {
         $this->_storeIds = $storeIds;
         return $this;
     }
 
+    /**
+     * Return current currency code
+     *
+     * @return string|\Magento\Directory\Model\Currency $currencyCode
+     */
     public function getCurrentCurrencyCode()
     {
-        if (is_null($this->_currentCurrencyCode)) {
-            $this->_currentCurrencyCode = (count($this->_storeIds) > 0)
-                ? $this->_storeManager->getStore(array_shift($this->_storeIds))->getBaseCurrencyCode()
+        if ($this->_currentCurrencyCode === null) {
+            $this->_currentCurrencyCode = count($this->_storeIds) > 0
+                ? $this->_storeManager->getStore(array_shift($this->_storeIds))->getCurrentCurrencyCode()
                 : $this->_storeManager->getStore()->getBaseCurrencyCode();
         }
+
         return $this->_currentCurrencyCode;
     }
 
     /**
      * Get currency rate (base to given currency)
      *
-     * @param string|\Magento\Directory\Model\Currency $currencyCode
-     * @return double
+     * @param string|\Magento\Directory\Model\Currency $toCurrency
+     * @return float
      */
     public function getRate($toCurrency)
     {
@@ -322,9 +397,9 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
     /**
      * Add order status filter
      *
-     * @param \Magento\Reports\Model\Resource\Report\Collection\AbstractCollection $collection
-     * @param \Magento\Object $filterData
-     * @return \Magento\Reports\Block\Adminhtml\Grid\AbstractGrid
+     * @param \Magento\Reports\Model\ResourceModel\Report\Collection\AbstractCollection $collection
+     * @param \Magento\Framework\DataObject $filterData
+     * @return $this
      */
     protected function _addOrderStatusFilter($collection, $filterData)
     {
@@ -334,14 +409,48 @@ class AbstractGrid extends \Magento\Backend\Block\Widget\Grid\Extended
 
     /**
      * Adds custom filter to resource collection
+     *
      * Can be overridden in child classes if custom filter needed
      *
-     * @param \Magento\Reports\Model\Resource\Report\Collection\AbstractCollection $collection
-     * @param \Magento\Object $filterData
-     * @return \Magento\Reports\Block\Adminhtml\Grid\AbstractGrid
+     * @param \Magento\Reports\Model\ResourceModel\Report\Collection\AbstractCollection $collection
+     * @param \Magento\Framework\DataObject $filterData
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @codeCoverageIgnore
      */
     protected function _addCustomFilter($collection, $filterData)
     {
         return $this;
+    }
+
+    /**
+     * Return stores by website, group and store id
+     *
+     * @return array
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    private function getFilteredStores(): array
+    {
+        $storeIds = [];
+
+        $filterData = $this->getFilterData();
+        if ($filterData) {
+            if ($filterData->getWebsite()) {
+                $storeIds = array_keys(
+                    $this->_storeManager->getWebsite($filterData->getWebsite())->getStores()
+                );
+            }
+
+            if ($filterData->getGroup()) {
+                $storeIds = array_keys(
+                    $this->_storeManager->getGroup($filterData->getGroup())->getStores()
+                );
+            }
+
+            if ($filterData->getData('store_ids')) {
+                $storeIds = explode(',', $filterData->getData('store_ids'));
+            }
+        }
+        return is_array($storeIds) ? $storeIds : [];
     }
 }

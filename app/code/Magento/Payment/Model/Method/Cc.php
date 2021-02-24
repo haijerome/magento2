@@ -1,148 +1,107 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Payment
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\Payment\Model\Method;
 
+use Magento\Framework\DataObject;
+use Magento\Quote\Api\Data\PaymentInterface;
+use Magento\Quote\Model\Quote\Payment;
+
+/**
+ * Credit Card payment method legacy implementation.
+ *
+ * @method \Magento\Quote\Api\Data\PaymentMethodExtensionInterface getExtensionAttributes()
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @deprecated 100.0.8
+ */
 class Cc extends \Magento\Payment\Model\Method\AbstractMethod
 {
-    protected $_formBlockType = 'Magento\Payment\Block\Form\Cc';
-    protected $_infoBlockType = 'Magento\Payment\Block\Info\Cc';
-    protected $_canSaveCc     = false;
+    /**
+     * @var string
+     */
+    protected $_formBlockType = \Magento\Payment\Block\Form\Cc::class;
 
     /**
-     * @var \Magento\Module\ModuleListInterface
+     * @var string
+     */
+    protected $_infoBlockType = \Magento\Payment\Block\Info\Cc::class;
+
+    /**
+     * @var bool
+     */
+    protected $_canSaveCc = false;
+
+    /**
+     * @var \Magento\Framework\Module\ModuleListInterface
      */
     protected $_moduleList;
 
     /**
-     * Locale model
-     *
-     * @var \Magento\Core\Model\LocaleInterface
+     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
      */
-    protected $_locale;
+    protected $_localeDate;
 
     /**
-     * Centinel service model
-     *
-     * @var \Magento\Centinel\Model\Service
-     */
-    protected $_centinelService;
-
-    /**
-     * Construct
-     *
-     * @var \Magento\Logger
-     */
-    protected $_logger;
-
-    /**
-     * @param \Magento\Event\ManagerInterface $eventManager
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory
+     * @param \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory
      * @param \Magento\Payment\Helper\Data $paymentData
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory
-     * @param \Magento\Logger $logger
-     * @param \Magento\Module\ModuleListInterface $moduleList
-     * @param \Magento\Core\Model\LocaleInterface $locale
-     * @param \Magento\Centinel\Model\Service $centinelService
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param Logger $logger
+     * @param \Magento\Framework\Module\ModuleListInterface $moduleList
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Event\ManagerInterface $eventManager,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\Api\ExtensionAttributesFactory $extensionFactory,
+        \Magento\Framework\Api\AttributeValueFactory $customAttributeFactory,
         \Magento\Payment\Helper\Data $paymentData,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\Log\AdapterFactory $logAdapterFactory,
-        \Magento\Logger $logger,
-        \Magento\Module\ModuleListInterface $moduleList,
-        \Magento\Core\Model\LocaleInterface $locale,
-        \Magento\Centinel\Model\Service $centinelService,
-        array $data = array()
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Payment\Model\Method\Logger $logger,
+        \Magento\Framework\Module\ModuleListInterface $moduleList,
+        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        parent::__construct($eventManager, $paymentData, $coreStoreConfig, $logAdapterFactory, $data);
+        parent::__construct(
+            $context,
+            $registry,
+            $extensionFactory,
+            $customAttributeFactory,
+            $paymentData,
+            $scopeConfig,
+            $logger,
+            $resource,
+            $resourceCollection,
+            $data
+        );
         $this->_moduleList = $moduleList;
-        $this->_logger = $logger;
-        $this->_locale = $locale;
-        $this->_centinelService = $centinelService;
-    }
-
-    /**
-     * Assign data to info model instance
-     *
-     * @param   mixed $data
-     * @return  \Magento\Payment\Model\Info
-     */
-    public function assignData($data)
-    {
-        if (!($data instanceof \Magento\Object)) {
-            $data = new \Magento\Object($data);
-        }
-        $info = $this->getInfoInstance();
-        $info->setCcType($data->getCcType())
-            ->setCcOwner($data->getCcOwner())
-            ->setCcLast4(substr($data->getCcNumber(), -4))
-            ->setCcNumber($data->getCcNumber())
-            ->setCcCid($data->getCcCid())
-            ->setCcExpMonth($data->getCcExpMonth())
-            ->setCcExpYear($data->getCcExpYear())
-            ->setCcSsIssue($data->getCcSsIssue())
-            ->setCcSsStartMonth($data->getCcSsStartMonth())
-            ->setCcSsStartYear($data->getCcSsStartYear())
-            ;
-        return $this;
-    }
-
-    /**
-     * Prepare info instance for save
-     *
-     * @return \Magento\Payment\Model\Method\Cc
-     */
-    public function prepareSave()
-    {
-        $info = $this->getInfoInstance();
-        if ($this->_canSaveCc) {
-            $info->setCcNumberEnc($info->encrypt($info->getCcNumber()));
-        }
-        //$info->setCcCidEnc($info->encrypt($info->getCcCid()));
-        $info->setCcNumber(null)
-            ->setCcCid(null);
-        return $this;
+        $this->_localeDate = $localeDate;
     }
 
     /**
      * Validate payment method information object
      *
-     * @return \Magento\Payment\Model\Method\Cc
-     * @throws \Magento\Core\Exception
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     public function validate()
     {
         /*
-        * calling parent validate function
-        */
+         * calling parent validate function
+         */
         parent::validate();
 
         $info = $this->getInfoInstance();
@@ -158,51 +117,74 @@ class Cc extends \Magento\Payment\Model\Method\AbstractMethod
         $ccType = '';
 
         if (in_array($info->getCcType(), $availableTypes)) {
-            if ($this->validateCcNum($ccNumber)
+            if ($this->validateCcNum(
+                $ccNumber
+            ) || $this->otherCcType(
+                $info->getCcType()
+            ) && $this->validateCcNumOther(
                 // Other credit card type number validation
-                || ($this->otherCcType($info->getCcType()) && $this->validateCcNumOther($ccNumber))) {
-
-                $ccTypeRegExpList = array(
+                $ccNumber
+            )
+            ) {
+                $ccTypeRegExpList = [
                     //Solo, Switch or Maestro. International safe
                     'SO' => '/(^(6334)[5-9](\d{11}$|\d{13,14}$))|(^(6767)(\d{12}$|\d{14,15}$))/',
-                    'SM' => '/(^(5[0678])\d{11,18}$)|(^(6[^05])\d{11,18}$)|(^(601)[^1]\d{9,16}$)|(^(6011)\d{9,11}$)'
-                            . '|(^(6011)\d{13,16}$)|(^(65)\d{11,13}$)|(^(65)\d{15,18}$)'
-                            . '|(^(49030)[2-9](\d{10}$|\d{12,13}$))|(^(49033)[5-9](\d{10}$|\d{12,13}$))'
-                            . '|(^(49110)[1-2](\d{10}$|\d{12,13}$))|(^(49117)[4-9](\d{10}$|\d{12,13}$))'
-                            . '|(^(49118)[0-2](\d{10}$|\d{12,13}$))|(^(4936)(\d{12}$|\d{14,15}$))/',
+                    'SM' => '/(^(5[0678])\d{11,18}$)|(^(6[^05])\d{11,18}$)|(^(601)[^1]\d{9,16}$)|(^(6011)\d{9,11}$)' .
+                        '|(^(6011)\d{13,16}$)|(^(65)\d{11,13}$)|(^(65)\d{15,18}$)' .
+                        '|(^(49030)[2-9](\d{10}$|\d{12,13}$))|(^(49033)[5-9](\d{10}$|\d{12,13}$))' .
+                        '|(^(49110)[1-2](\d{10}$|\d{12,13}$))|(^(49117)[4-9](\d{10}$|\d{12,13}$))' .
+                        '|(^(49118)[0-2](\d{10}$|\d{12,13}$))|(^(4936)(\d{12}$|\d{14,15}$))/',
                     // Visa
-                    'VI'  => '/^4[0-9]{12}([0-9]{3})?$/',
+                    'VI' => '/^4[0-9]{12}([0-9]{3})?$/',
                     // Master Card
-                    'MC'  => '/^5[1-5][0-9]{14}$/',
+                    'MC' => '/^(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[0-9]{12}$/',
                     // American Express
-                    'AE'  => '/^3[47][0-9]{13}$/',
+                    'AE' => '/^3[47][0-9]{13}$/',
                     // Discover
-                    'DI'  => '/^(30[0-5][0-9]{13}|3095[0-9]{12}|35(2[8-9][0-9]{12}|[3-8][0-9]{13})'
-                        . '|36[0-9]{12}|3[8-9][0-9]{14}|6011(0[0-9]{11}|[2-4][0-9]{11}|74[0-9]{10}|7[7-9][0-9]{10}'
-                        . '|8[6-9][0-9]{10}|9[0-9]{11})|62(2(12[6-9][0-9]{10}|1[3-9][0-9]{11}|[2-8][0-9]{12}'
-                        . '|9[0-1][0-9]{11}|92[0-5][0-9]{10})|[4-6][0-9]{13}|8[2-8][0-9]{12})|6(4[4-9][0-9]{13}'
-                        . '|5[0-9]{14}))$/',
+                    'DI' => '/^(6011((0|9|[2-4])[0-9]{11,14}|(74|7[7-9]|8[6-9])[0-9]{10,13})|6(4[4-9][0-9]{13,16}|' .
+                        '5[0-9]{14,17}))/',
+                    'DN' => '/^3(0[0-5][0-9]{13,16}|095[0-9]{12,15}|(6|[8-9])[0-9]{14,17})/',
+                    // UnionPay
+                    'UN' => '/^622(1(2[6-9][0-9]{10,13}|[3-9][0-9]{11,14})|[3-8][0-9]{12,15}|9([[0-1][0-9]{11,14}|' .
+                        '2[0-5][0-9]{10,13}))|62[4-6][0-9]{13,16}|628[2-8][0-9]{12,15}/',
                     // JCB
-                    'JCB' => '/^(30[0-5][0-9]{13}|3095[0-9]{12}|35(2[8-9][0-9]{12}|[3-8][0-9]{13})|36[0-9]{12}'
-                        . '|3[8-9][0-9]{14}|6011(0[0-9]{11}|[2-4][0-9]{11}|74[0-9]{10}|7[7-9][0-9]{10}'
-                        . '|8[6-9][0-9]{10}|9[0-9]{11})|62(2(12[6-9][0-9]{10}|1[3-9][0-9]{11}|[2-8][0-9]{12}'
-                        . '|9[0-1][0-9]{11}|92[0-5][0-9]{10})|[4-6][0-9]{13}|8[2-8][0-9]{12})|6(4[4-9][0-9]{13}'
-                        . '|5[0-9]{14}))$/'
-                );
+                    'JCB' => '/^35(2[8-9][0-9]{12,15}|[3-8][0-9]{13,16})/',
+                    'MI' => '/^(5(0|[6-9])|63|67(?!59|6770|6774))\d*$/',
+                    'MD' => '/^(6759(?!24|38|40|6[3-9]|70|76)|676770|676774)\d*$/',
 
-                $ccNumAndTypeMatches = isset($ccTypeRegExpList[$info->getCcType()])
-                    && preg_match($ccTypeRegExpList[$info->getCcType()], $ccNumber);
+                    //Hipercard
+                    'HC' => '/^((606282)|(637095)|(637568)|(637599)|(637609)|(637612))\d*$/',
+                    //Elo
+                    'ELO' => '/^((509091)|(636368)|(636297)|(504175)|(438935)|(40117[8-9])|(45763[1-2])|' .
+                        '(457393)|(431274)|(50990[0-2])|(5099[7-9][0-9])|(50996[4-9])|(509[1-8][0-9][0-9])|' .
+                        '(5090(0[0-2]|0[4-9]|1[2-9]|[24589][0-9]|3[1-9]|6[0-46-9]|7[0-24-9]))|' .
+                        '(5067(0[0-24-8]|1[0-24-9]|2[014-9]|3[0-379]|4[0-9]|5[0-3]|6[0-5]|7[0-8]))|' .
+                        '(6504(0[5-9]|1[0-9]|2[0-9]|3[0-9]))|' .
+                        '(6504(8[5-9]|9[0-9])|6505(0[0-9]|1[0-9]|2[0-9]|3[0-8]))|' .
+                        '(6505(4[1-9]|5[0-9]|6[0-9]|7[0-9]|8[0-9]|9[0-8]))|' .
+                        '(6507(0[0-9]|1[0-8]))|(65072[0-7])|(6509(0[1-9]|1[0-9]|20))|' .
+                        '(6516(5[2-9]|6[0-9]|7[0-9]))|(6550(0[0-9]|1[0-9]))|' .
+                        '(6550(2[1-9]|3[0-9]|4[0-9]|5[0-8])))\d*$/',
+                    //Aura
+                    'AU' => '/^5078\d*$/'
+                ];
+
+                $ccNumAndTypeMatches = isset(
+                    $ccTypeRegExpList[$info->getCcType()]
+                ) && preg_match(
+                    $ccTypeRegExpList[$info->getCcType()],
+                    $ccNumber
+                );
                 $ccType = $ccNumAndTypeMatches ? $info->getCcType() : 'OT';
 
                 if (!$ccNumAndTypeMatches && !$this->otherCcType($info->getCcType())) {
-                    $errorMsg = __('Credit card number mismatch with credit card type.');
+                    $errorMsg = __('The credit card number doesn\'t match the credit card type.');
                 }
             } else {
                 $errorMsg = __('Invalid Credit Card Number');
             }
-
         } else {
-            $errorMsg = __('Credit card type is not allowed for this payment method.');
+            $errorMsg = __('This credit card type is not allowed for this payment method.');
         }
 
         //validate credit card verification number
@@ -215,60 +197,119 @@ class Cc extends \Magento\Payment\Model\Method\AbstractMethod
         }
 
         if ($ccType != 'SS' && !$this->_validateExpDate($info->getCcExpYear(), $info->getCcExpMonth())) {
-            $errorMsg = __('We found an incorrect credit card expiration date.');
+            $errorMsg = __('Please enter a valid credit card expiration date.');
         }
 
         if ($errorMsg) {
-            throw new \Magento\Core\Exception($errorMsg);
-        }
-
-        //This must be after all validation conditions
-        if ($this->getIsCentinelValidationEnabled()) {
-            $this->getCentinelValidator()->validate($this->getCentinelValidationData());
+            throw new \Magento\Framework\Exception\LocalizedException($errorMsg);
         }
 
         return $this;
     }
 
+    /**
+     * Check if verification should be used.
+     *
+     * @return bool
+     * @api
+     */
     public function hasVerification()
     {
         $configData = $this->getConfigData('useccv');
-        if (is_null($configData)) {
+        if ($configData === null) {
             return true;
         }
-        return (bool) $configData;
+        return (bool)$configData;
     }
 
+    /**
+     * Get list of credit cards verification reg exp.
+     *
+     * @return array
+     * @api
+     */
     public function getVerificationRegEx()
     {
-        $verificationExpList = array(
-            'VI' => '/^[0-9]{3}$/', // Visa
-            'MC' => '/^[0-9]{3}$/',       // Master Card
-            'AE' => '/^[0-9]{4}$/',        // American Express
-            'DI' => '/^[0-9]{3}$/',          // Discovery
+        $verificationExpList = [
+            'VI' => '/^[0-9]{3}$/',
+            'MC' => '/^[0-9]{3}$/',
+            'AE' => '/^[0-9]{4}$/',
+            'DI' => '/^[0-9]{3}$/',
+            'DN' => '/^[0-9]{3}$/',
+            'UN' => '/^[0-9]{3}$/',
             'SS' => '/^[0-9]{3,4}$/',
-            'SM' => '/^[0-9]{3,4}$/', // Switch or Maestro
-            'SO' => '/^[0-9]{3,4}$/', // Solo
+            'SM' => '/^[0-9]{3,4}$/',
+            'SO' => '/^[0-9]{3,4}$/',
             'OT' => '/^[0-9]{3,4}$/',
-            'JCB' => '/^[0-9]{3,4}$/' //JCB
-        );
+            'JCB' => '/^[0-9]{3,4}$/',
+            'MI' => '/^[0-9]{3}$/',
+            'MD' => '/^[0-9]{3}$/',
+        ];
         return $verificationExpList;
     }
 
+    /**
+     * Validate expiration date
+     *
+     * @param string $expYear
+     * @param string $expMonth
+     * @return bool
+     */
     protected function _validateExpDate($expYear, $expMonth)
     {
-        $date = $this->_locale->date();
-        if (!$expYear || !$expMonth || ($date->compareYear($expYear) == 1)
-            || ($date->compareYear($expYear) == 0 && ($date->compareMonth($expMonth) == 1))
+        $date = new \DateTime();
+        if (!$expYear || !$expMonth || (int)$date->format('Y') > $expYear
+            || (int)$date->format('Y') == $expYear && (int)$date->format('m') > $expMonth
         ) {
             return false;
         }
         return true;
     }
 
+    /**
+     * Assign data to info model instance
+     *
+     * @param \Magento\Framework\DataObject|mixed $data
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function assignData(\Magento\Framework\DataObject $data)
+    {
+        $additionalData = $data->getData(PaymentInterface::KEY_ADDITIONAL_DATA);
+        if (!is_object($additionalData)) {
+            $additionalData = new DataObject($additionalData ?: []);
+        }
+
+        /** @var DataObject $info */
+        $info = $this->getInfoInstance();
+        $info->addData(
+            [
+                'cc_type' => $additionalData->getCcType(),
+                'cc_owner' => $additionalData->getCcOwner(),
+                'cc_last_4' => substr($additionalData->getCcNumber(), -4),
+                'cc_number' => $additionalData->getCcNumber(),
+                'cc_cid' => $additionalData->getCcCid(),
+                'cc_exp_month' => $additionalData->getCcExpMonth(),
+                'cc_exp_year' => $additionalData->getCcExpYear(),
+                'cc_ss_issue' => $additionalData->getCcSsIssue(),
+                'cc_ss_start_month' => $additionalData->getCcSsStartMonth(),
+                'cc_ss_start_year' => $additionalData->getCcSsStartYear()
+            ]
+        );
+
+        return $this;
+    }
+
+    /**
+     * Get code for "other" credit cards.
+     *
+     * @param string $type
+     * @return bool
+     * @api
+     */
     public function otherCcType($type)
     {
-        return $type=='OT';
+        return $type == 'OT';
     }
 
     /**
@@ -276,13 +317,14 @@ class Cc extends \Magento\Payment\Model\Method\AbstractMethod
      *
      * @param   string $ccNumber
      * @return  bool
+     * @api
      */
     public function validateCcNum($ccNumber)
     {
         $cardNumber = strrev($ccNumber);
         $numSum = 0;
 
-        for ($i=0; $i<strlen($cardNumber); $i++) {
+        for ($i = 0; $i < strlen($cardNumber); $i++) {
             $currentNum = substr($cardNumber, $i, 1);
 
             /**
@@ -307,14 +349,15 @@ class Cc extends \Magento\Payment\Model\Method\AbstractMethod
         /**
          * If the total has no remainder it's OK
          */
-        return ($numSum % 10 == 0);
+        return $numSum % 10 == 0;
     }
 
     /**
      * Other credit cart type number validation
      *
      * @param string $ccNumber
-     * @return boolean
+     * @return bool
+     * @api
      */
     public function validateCcNumOther($ccNumber)
     {
@@ -324,124 +367,11 @@ class Cc extends \Magento\Payment\Model\Method\AbstractMethod
     /**
      * Check whether there are CC types set in configuration
      *
-     * @param \Magento\Sales\Model\Quote|null $quote
+     * @param \Magento\Quote\Api\Data\CartInterface|null $quote
      * @return bool
      */
-    public function isAvailable($quote = null)
+    public function isAvailable(\Magento\Quote\Api\Data\CartInterface $quote = null)
     {
-        return $this->getConfigData('cctypes', ($quote ? $quote->getStoreId() : null))
-            && parent::isAvailable($quote);
-    }
-
-    /**
-     * Whether centinel service is enabled
-     *
-     * @return bool
-     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
-     */
-    public function getIsCentinelValidationEnabled()
-    {
-        return null !== $this->_moduleList->getModule('Magento_Centinel') && 1 == $this->getConfigData('centinel');
-    }
-
-    /**
-     * Instantiate centinel validator model
-     *
-     * @return \Magento\Centinel\Model\Service
-     */
-    public function getCentinelValidator()
-    {
-        $this->_centinelService
-            ->setIsModeStrict($this->getConfigData('centinel_is_mode_strict'))
-            ->setCustomApiEndpointUrl($this->getConfigData('centinel_api_url'))
-            ->setStore($this->getStore())
-            ->setIsPlaceOrder($this->_isPlaceOrder());
-        return $this->_centinelService;
-    }
-
-    /**
-     * Return data for Centinel validation
-     *
-     * @return \Magento\Object
-     */
-    public function getCentinelValidationData()
-    {
-        $info = $this->getInfoInstance();
-        $params = new \Magento\Object();
-        $params
-            ->setPaymentMethodCode($this->getCode())
-            ->setCardType($info->getCcType())
-            ->setCardNumber($info->getCcNumber())
-            ->setCardExpMonth($info->getCcExpMonth())
-            ->setCardExpYear($info->getCcExpYear())
-            ->setAmount($this->_getAmount())
-            ->setCurrencyCode($this->_getCurrencyCode())
-            ->setOrderNumber($this->_getOrderId());
-        return $params;
-    }
-
-    /**
-     * Order increment ID getter (either real from order or a reserved from quote)
-     *
-     * @return string
-     */
-    private function _getOrderId()
-    {
-        $info = $this->getInfoInstance();
-
-        if ($this->_isPlaceOrder()) {
-            return $info->getOrder()->getIncrementId();
-        } else {
-            if (!$info->getQuote()->getReservedOrderId()) {
-                $info->getQuote()->reserveOrderId();
-            }
-            return $info->getQuote()->getReservedOrderId();
-        }
-    }
-
-    /**
-     * Grand total getter
-     *
-     * @return string
-     */
-    private function _getAmount()
-    {
-        $info = $this->getInfoInstance();
-        if ($this->_isPlaceOrder()) {
-            return (double)$info->getOrder()->getQuoteBaseGrandTotal();
-        } else {
-            return (double)$info->getQuote()->getBaseGrandTotal();
-        }
-    }
-
-    /**
-     * Currency code getter
-     *
-     * @return string
-     */
-    private function _getCurrencyCode()
-    {
-        $info = $this->getInfoInstance();
-
-        if ($this->_isPlaceOrder()) {
-            return $info->getOrder()->getBaseCurrencyCode();
-        } else {
-            return $info->getQuote()->getBaseCurrencyCode();
-        }
-    }
-
-    /**
-     * Whether current operation is order placement
-     *
-     * @return bool
-     */
-    private function _isPlaceOrder()
-    {
-        $info = $this->getInfoInstance();
-        if ($info instanceof \Magento\Sales\Model\Quote\Payment) {
-            return false;
-        } elseif ($info instanceof \Magento\Sales\Model\Order\Payment) {
-            return true;
-        }
+        return $this->getConfigData('cctypes', $quote ? $quote->getStoreId() : null) && parent::isAvailable($quote);
     }
 }

@@ -1,99 +1,109 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
+namespace Magento\Test\Annotation;
+
+use Magento\TestFramework\Annotation\AdminConfigFixture;
+use Magento\TestFramework\Workaround\Override\Fixture\Resolver;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Test class for \Magento\TestFramework\Annotation\AdminConfigFixture.
  */
-namespace Magento\Test\Annotation;
-
-class AdminConfigFixtureTest extends \PHPUnit_Framework_TestCase
+class AdminConfigFixtureTest extends TestCase
 {
     /**
-     * @var \Magento\TestFramework\Annotation\AdminConfigFixture|\PHPUnit_Framework_MockObject_MockObject
+     * @var AdminConfigFixture|\PHPUnit\Framework\MockObject\MockObject
      */
-    protected $_object;
+    protected $object;
 
-    protected function setUp()
+    /**
+     * @inheritdoc
+     */
+    protected function setUp(): void
     {
-        $this->_object = $this->getMock(
-            'Magento\TestFramework\Annotation\AdminConfigFixture',
-            array('_getConfigValue', '_setConfigValue')
+        $this->object = $this->createPartialMock(
+            AdminConfigFixture::class,
+            ['_getConfigValue', '_setConfigValue']
         );
     }
 
     /**
      * @magentoAdminConfigFixture any_config some_value
+     *
+     * @return void
      */
-    public function testConfig()
+    public function testConfig(): void
     {
-        $this->_object
-            ->expects($this->at(0))
-            ->method('_getConfigValue')
-            ->with('any_config')
-            ->will($this->returnValue('some_value'));
-        $this->_object
-            ->expects($this->at(1))
-            ->method('_setConfigValue')
-            ->with('any_config', 'some_value');
-        $this->_object->startTest($this);
+        $this->createResolverMock();
+        $this->object->expects(
+            $this->at(0)
+        )->method(
+            '_getConfigValue'
+        )->with(
+            'any_config'
+        )->willReturn(
+            'some_value'
+        );
+        $this->object->expects($this->at(1))->method('_setConfigValue')->with('any_config', 'some_value');
+        $this->object->startTest($this);
 
-        $this->_object
-            ->expects($this->once())
-            ->method('_setConfigValue')
-            ->with('any_config', 'some_value');
-        $this->_object->endTest($this);
+        $this->object->expects($this->once())->method('_setConfigValue')->with('any_config', 'some_value');
+        $this->object->endTest($this);
     }
 
-    public function testInitStoreAfterOfScope()
+    /**
+     * @return void
+     */
+    public function testInitStoreAfterOfScope(): void
     {
-        $this->_object
-            ->expects($this->never())
-            ->method('_getConfigValue');
-        $this->_object
-            ->expects($this->never())
-            ->method('_setConfigValue');
-        $this->_object->initStoreAfter();
+        $this->object->expects($this->never())->method('_getConfigValue');
+        $this->object->expects($this->never())->method('_setConfigValue');
+        $this->object->initStoreAfter();
     }
 
     /**
      * @magentoAdminConfigFixture any_config some_value
+     *
+     * @return void
      */
-    public function testInitStoreAfter()
+    public function testInitStoreAfter(): void
     {
-        $this->_object->startTest($this);
-        $this->_object
-            ->expects($this->at(0))
-            ->method('_getConfigValue')
-            ->with('any_config')
-            ->will($this->returnValue('some_value'));
-        $this->_object
-            ->expects($this->at(1))
-            ->method('_setConfigValue')
-            ->with('any_config', 'some_value');
-        $this->_object->initStoreAfter();
+        $this->createResolverMock();
+        $this->object->startTest($this);
+        $this->object->expects(
+            $this->at(0)
+        )->method(
+            '_getConfigValue'
+        )->with(
+            'any_config'
+        )->willReturn(
+            'some_value'
+        );
+        $this->object->expects($this->at(1))->method('_setConfigValue')->with('any_config', 'some_value');
+        $this->object->initStoreAfter();
+    }
+
+    /**
+     * Create mock for Resolver object
+     *
+     * @return void
+     */
+    private function createResolverMock(): void
+    {
+        $mock = $this->getMockBuilder(Resolver::class)
+            ->disableOriginalConstructor()
+            ->setMethods(['applyConfigFixtures'])
+            ->getMock();
+        $mock->method('applyConfigFixtures')
+            ->willReturn($this->getAnnotations()['method'][$this->object::ANNOTATION]);
+        $reflection = new \ReflectionClass(Resolver::class);
+        $reflectionProperty = $reflection->getProperty('instance');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue(Resolver::class, $mock);
     }
 }

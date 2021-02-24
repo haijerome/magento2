@@ -1,114 +1,175 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Backend\Block\Widget\Grid\Column\Filter;
+
+use Magento\Framework\Stdlib\DateTime\DateTimeFormatterInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Date grid column filter
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Backend\Block\Widget\Grid\Column\Filter;
-
-class Date
-    extends \Magento\Backend\Block\Widget\Grid\Column\Filter\AbstractFilter
+class Date extends \Magento\Backend\Block\Widget\Grid\Column\Filter\AbstractFilter
 {
     /**
-     * @var \Magento\Math\Random
+     * @var \Magento\Framework\Math\Random
      */
     protected $mathRandom;
 
     /**
+     * @var \Magento\Framework\Locale\ResolverInterface
+     */
+    protected $localeResolver;
+
+    /**
+     * @var DateTimeFormatterInterface
+     */
+    protected $dateTimeFormatter;
+
+    /**
+     * @var SecureHtmlRenderer
+     */
+    protected $secureHtmlRenderer;
+
+    /**
      * @param \Magento\Backend\Block\Context $context
-     * @param \Magento\Core\Model\Resource\Helper $resourceHelper
-     * @param \Magento\Math\Random $mathRandom
+     * @param \Magento\Framework\DB\Helper $resourceHelper
+     * @param \Magento\Framework\Math\Random $mathRandom
+     * @param \Magento\Framework\Locale\ResolverInterface $localeResolver
+     * @param DateTimeFormatterInterface $dateTimeFormatter
      * @param array $data
+     * @param SecureHtmlRenderer|null $secureHtmlRenderer
      */
     public function __construct(
         \Magento\Backend\Block\Context $context,
-        \Magento\Core\Model\Resource\Helper $resourceHelper,
-        \Magento\Math\Random $mathRandom,
-        array $data = array()
+        \Magento\Framework\DB\Helper $resourceHelper,
+        \Magento\Framework\Math\Random $mathRandom,
+        \Magento\Framework\Locale\ResolverInterface $localeResolver,
+        DateTimeFormatterInterface $dateTimeFormatter,
+        array $data = [],
+        ?SecureHtmlRenderer $secureHtmlRenderer = null
     ) {
         $this->mathRandom = $mathRandom;
+        $this->localeResolver = $localeResolver;
         parent::__construct($context, $resourceHelper, $data);
+        $this->dateTimeFormatter = $dateTimeFormatter;
+        $this->secureHtmlRenderer = $secureHtmlRenderer ?? ObjectManager::getInstance()->get(SecureHtmlRenderer::class);
     }
 
-    protected function _prepareLayout()
-    {
-        if ($head = $this->getLayout()->getBlock('head')) {
-            $head->setCanLoadCalendarJs(true);
-        }
-        return $this;
-    }
-
+    /**
+     * @inheritDoc
+     */
     public function getHtml()
     {
         $htmlId = $this->mathRandom->getUniqueHash($this->_getHtmlId());
-        $format = $this->getLocale()->getDateFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT);
-        $html = '<div class="range" id="' . $htmlId . '_range"><div class="range-line date">'
-            . '<input type="text" name="' . $this->_getHtmlName() . '[from]" id="' . $htmlId . '_from"'
-                . ' value="' . $this->getEscapedValue('from') . '" class="input-text no-changes" placeholder="' . __('From') . '" '
-                . $this->getUiId('filter', $this->_getHtmlName(), 'from') . '/>'
-            . '</div>';
-        $html .= '<div class="range-line date">'
-            . '<input type="text" name="' . $this->_getHtmlName() . '[to]" id="' . $htmlId . '_to"'
-                . ' value="' . $this->getEscapedValue('to') . '" class="input-text no-changes" placeholder="' . __('To') . '" '
-                . $this->getUiId('filter', $this->_getHtmlName(), 'to') . '/>'
-            . '</div></div>';
-        $html .= '<input type="hidden" name="' . $this->_getHtmlName() . '[locale]"'
-            . ' value="' . $this->getLocale()->getLocaleCode() . '"/>';
-        $html .= '<script type="text/javascript">
-            (function( $ ) {
-                $("#' . $htmlId . '_range").dateRange({
-                    dateFormat: "' . $format . '",
-                    buttonImage: "' . $this->getViewFileUrl('images/grid-cal.gif') . '",
-                    buttonText: "' . $this->escapeHtml(__('Date selector')) . '",
+        $format = $this->_localeDate->getDateFormat(\IntlDateFormatter::SHORT);
+        $html = '<div class="range" id="' .
+            $htmlId .
+            '_range"><div class="range-line date">' .
+            '<input type="text" name="' .
+            $this->_getHtmlName() .
+            '[from]" id="' .
+            $htmlId .
+            '_from"' .
+            ' value="' .
+            $this->getEscapedValue(
+                'from'
+            ) . '" class="admin__control-text input-text no-changes" placeholder="' . __(
+                'From'
+            ) . '" ' . $this->getUiId(
+                'filter',
+                $this->_getHtmlName(),
+                'from'
+            ) . '/>' . '</div>';
+        $html .= '<div class="range-line date">' .
+            '<input type="text" name="' .
+            $this->_getHtmlName() .
+            '[to]" id="' .
+            $htmlId .
+            '_to"' .
+            ' value="' .
+            $this->getEscapedValue(
+                'to'
+            ) . '" class="input-text admin__control-text no-changes" placeholder="' . __(
+                'To'
+            ) . '" ' . $this->getUiId(
+                'filter',
+                $this->_getHtmlName(),
+                'to'
+            ) . '/>' . '</div></div>';
+        $html .= '<input type="hidden" name="' .
+            $this->_getHtmlName() .
+            '[locale]"' .
+            ' value="' .
+            $this->localeResolver->getLocale() .
+            '"/>';
+        $scriptString = '
+            require(["jquery", "mage/calendar"], function($){
+                $("#' .
+            $htmlId .
+            '_range").dateRange({
+                    dateFormat: "' .
+            $format .
+            '",
+                        buttonText: "' . $this->escapeHtml(__('Date selector')) .
+            '",
                     from: {
-                        id: "' . $htmlId . '_from"
+                        id: "' .
+            $htmlId .
+            '_from"
                     },
                     to: {
-                        id: "' . $htmlId . '_to"
+                        id: "' .
+            $htmlId .
+            '_to"
                     }
                 })
-            })(jQuery)
-        </script>';
+            });';
+        $html .= $this->secureHtmlRenderer->renderTag('script', [], $scriptString, false);
+
         return $html;
     }
 
-    public function getEscapedValue($index=null)
+    /**
+     * Return escaped value.
+     *
+     * @param string|null $index
+     * @return array|string|int|float|null
+     */
+    public function getEscapedValue($index = null)
     {
         $value = $this->getValue($index);
-        if ($value instanceof \Zend_Date) {
-            return $value->toString($this->getLocale()->getDateFormat(\Magento\Core\Model\LocaleInterface::FORMAT_TYPE_SHORT));
+        if ($value instanceof \DateTimeInterface) {
+            return $this->dateTimeFormatter->formatObject(
+                $value,
+                $this->_localeDate->getDateFormat(\IntlDateFormatter::SHORT)
+            );
         }
+
+        if (is_string($value)) {
+            return $this->escapeHtml($value);
+        }
+
         return $value;
     }
 
-    public function getValue($index=null)
+    /**
+     * Return value.
+     *
+     * @param string|null $index
+     * @return array|string|int|float|null
+     */
+    public function getValue($index = null)
     {
         if ($index) {
             if ($data = $this->getData('value', 'orig_' . $index)) {
-                return $data;//date('Y-m-d', strtotime($data));
+                return $data;
             }
             return null;
         }
@@ -119,6 +180,11 @@ class Date
         return $value;
     }
 
+    /**
+     * Return conditions.
+     *
+     * @return array|string|int|float|null
+     */
     public function getCondition()
     {
         $value = $this->getValue();
@@ -126,16 +192,22 @@ class Date
         return $value;
     }
 
+    /**
+     * Set value.
+     *
+     * @param array|string|int|float $value
+     * @return $this
+     */
     public function setValue($value)
     {
         if (isset($value['locale'])) {
             if (!empty($value['from'])) {
                 $value['orig_from'] = $value['from'];
-                $value['from'] = $this->_convertDate($value['from'], $value['locale']);
+                $value['from'] = $this->_convertDate($value['from']);
             }
             if (!empty($value['to'])) {
                 $value['orig_to'] = $value['to'];
-                $value['to'] = $this->_convertDate($value['to'], $value['locale']);
+                $value['to'] = $this->_convertDate($value['to']);
             }
         }
         if (empty($value['from']) && empty($value['to'])) {
@@ -146,46 +218,25 @@ class Date
     }
 
     /**
-     * Retrieve locale
-     *
-     * @return \Magento\Core\Model\LocaleInterface
-     */
-    public function getLocale()
-    {
-        return $this->_locale;
-    }
-
-    /**
      * Convert given date to default (UTC) timezone
      *
      * @param string $date
-     * @param string $locale
-     * @return \Zend_Date
+     * @return \DateTime|null
      */
-    protected function _convertDate($date, $locale)
+    protected function _convertDate($date)
     {
-        try {
-            $dateObj = $this->getLocale()->date(null, null, $locale, false);
-
-            //set default timezone for store (admin)
-            $dateObj->setTimezone(
-                $this->_storeConfig->getConfig(\Magento\Core\Model\LocaleInterface::XML_PATH_DEFAULT_TIMEZONE)
-            );
-
-            //set beginning of day
-            $dateObj->setHour(00);
-            $dateObj->setMinute(00);
-            $dateObj->setSecond(00);
-
-            //set date with applying timezone of store
-            $dateObj->set($date, \Zend_Date::DATE_SHORT, $locale);
-
-            //convert store date to default date in UTC timezone without DST
-            $dateObj->setTimezone(\Magento\Core\Model\LocaleInterface::DEFAULT_TIMEZONE);
-
-            return $dateObj;
-        } catch (\Exception $e) {
-            return null;
-        }
+        $timezone = $this->getColumn()->getTimezone() !== false ? $this->_localeDate->getConfigTimezone() : 'UTC';
+        $adminTimeZone = new \DateTimeZone($timezone);
+        $formatter = new \IntlDateFormatter(
+            $this->localeResolver->getLocale(),
+            \IntlDateFormatter::SHORT,
+            \IntlDateFormatter::NONE,
+            $adminTimeZone
+        );
+        $simpleRes = new \DateTime(null, $adminTimeZone);
+        $simpleRes->setTimestamp($formatter->parse($date));
+        $simpleRes->setTime(0, 0, 0);
+        $simpleRes->setTimezone(new \DateTimeZone('UTC'));
+        return $simpleRes;
     }
 }

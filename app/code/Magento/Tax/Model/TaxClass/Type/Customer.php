@@ -1,42 +1,32 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Tax
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Tax\Model\TaxClass\Type;
+
+use Magento\Customer\Api\Data\GroupInterface as CustomerGroup;
+use Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 
 /**
  * Customer Tax Class
  */
-namespace Magento\Tax\Model\TaxClass\Type;
-
-class Customer
-    extends \Magento\Tax\Model\TaxClass\AbstractType
-    implements \Magento\Tax\Model\TaxClass\Type\TypeInterface
+class Customer extends \Magento\Tax\Model\TaxClass\AbstractType
 {
     /**
-     * @var \Magento\Customer\Model\Group
+     * @var CustomerGroupRepository
      */
-    protected $_modelCustomerGroup;
+    protected $customerGroupRepository;
+
+    /**
+     * @var \Magento\Framework\Api\FilterBuilder
+     */
+    protected $filterBuilder;
+
+    /**
+     * @var \Magento\Framework\Api\SearchCriteriaBuilder
+     */
+    protected $searchCriteriaBuilder;
 
     /**
      * Class Type
@@ -47,34 +37,45 @@ class Customer
 
     /**
      * @param \Magento\Tax\Model\Calculation\Rule $calculationRule
-     * @param \Magento\Customer\Model\Group $modelCustomerGroup
+     * @param CustomerGroupRepository $customerGroupRepository
+     * @param \Magento\Framework\Api\FilterBuilder $filterBuilder
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
      * @param array $data
      */
     public function __construct(
         \Magento\Tax\Model\Calculation\Rule $calculationRule,
-        \Magento\Customer\Model\Group $modelCustomerGroup,
-        array $data = array()
+        CustomerGroupRepository $customerGroupRepository,
+        \Magento\Framework\Api\FilterBuilder $filterBuilder,
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
+        array $data = []
     ) {
         parent::__construct($calculationRule, $data);
-        $this->_modelCustomerGroup = $modelCustomerGroup;
+        $this->customerGroupRepository = $customerGroupRepository;
+        $this->filterBuilder = $filterBuilder;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
     }
 
     /**
-     * Get Customer Groups with this tax class
-     *
-     * @return \Magento\Core\Model\Resource\Db\Collection\AbstractCollection
+     * {@inheritdoc}
      */
-    public function getAssignedToObjects()
+    public function isAssignedToObjects()
     {
-        return $this->_modelCustomerGroup
-            ->getCollection()
-            ->addFieldToFilter('tax_class_id', $this->getId());
+        $searchCriteria = $this->searchCriteriaBuilder
+            ->addFilters(
+                [
+                    $this->filterBuilder->setField(CustomerGroup::TAX_CLASS_ID)->setValue($this->getId())->create(),
+                ]
+            )
+            ->create();
+        $result = $this->customerGroupRepository->getList($searchCriteria);
+        $items = $result->getItems();
+        return !empty($items);
     }
 
     /**
      * Get Name of Objects that use this Tax Class Type
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getObjectTypeName()
     {

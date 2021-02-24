@@ -1,34 +1,13 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Eav
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
+namespace Magento\Eav\Model\Form;
 
 /**
  * Eav Form Type Model
  *
- * @method \Magento\Eav\Model\Resource\Form\Type getResource()
  * @method string getCode()
  * @method \Magento\Eav\Model\Form\Type setCode(string $value)
  * @method string getLabel()
@@ -40,13 +19,9 @@
  * @method int getStoreId()
  * @method \Magento\Eav\Model\Form\Type setStoreId(int $value)
  *
- * @category    Magento
- * @package     Magento_Eav
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-namespace Magento\Eav\Model\Form;
-
-class Type extends \Magento\Core\Model\AbstractModel
+class Type extends \Magento\Framework\Model\AbstractModel
 {
     /**
      * Prefix of model events names
@@ -66,22 +41,23 @@ class Type extends \Magento\Core\Model\AbstractModel
     protected $_elementFactory;
 
     /**
-     * @param \Magento\Core\Model\Context $context
-     * @param \Magento\Core\Model\Registry $registry
+     * @param \Magento\Framework\Model\Context $context
+     * @param \Magento\Framework\Registry $registry
      * @param \Magento\Eav\Model\Form\FieldsetFactory $fieldsetFactory
      * @param \Magento\Eav\Model\Form\ElementFactory $elementFactory
-     * @param \Magento\Core\Model\Resource\AbstractResource $resource
-     * @param \Magento\Data\Collection\Db $resourceCollection
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\Core\Model\Context $context,
-        \Magento\Core\Model\Registry $registry,
+        \Magento\Framework\Model\Context $context,
+        \Magento\Framework\Registry $registry,
         \Magento\Eav\Model\Form\FieldsetFactory $fieldsetFactory,
         \Magento\Eav\Model\Form\ElementFactory $elementFactory,
-        \Magento\Core\Model\Resource\AbstractResource $resource = null,
-        \Magento\Data\Collection\Db $resourceCollection = null,
-        array $data = array()
+        \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
+        \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
         $this->_fieldsetFactory = $fieldsetFactory;
@@ -90,30 +66,13 @@ class Type extends \Magento\Core\Model\AbstractModel
 
     /**
      * Initialize resource model
+     *
+     * @return void
+     * @codeCoverageIgnore
      */
     protected function _construct()
     {
-        $this->_init('Magento\Eav\Model\Resource\Form\Type');
-    }
-
-    /**
-     * Retrieve resource instance wrapper
-     *
-     * @return \Magento\Eav\Model\Resource\Form\Type
-     */
-    protected function _getResource()
-    {
-        return parent::_getResource();
-    }
-
-    /**
-     * Retrieve resource collection instance wrapper
-     *
-     * @return \Magento\Eav\Model\Resource\Form\Type\Collection
-     */
-    public function getCollection()
-    {
-        return parent::getCollection();
+        $this->_init(\Magento\Eav\Model\ResourceModel\Form\Type::class);
     }
 
     /**
@@ -133,7 +92,7 @@ class Type extends \Magento\Core\Model\AbstractModel
      * Set assigned Eav Entity types
      *
      * @param array $entityTypes
-     * @return \Magento\Eav\Model\Form\Type
+     * @return $this
      */
     public function setEntityTypes(array $entityTypes)
     {
@@ -145,7 +104,7 @@ class Type extends \Magento\Core\Model\AbstractModel
      * Assign Entity Type to Form Type
      *
      * @param int $entityTypeId
-     * @return \Magento\Eav\Model\Form\Type
+     * @return $this
      */
     public function addEntityType($entityTypeId)
     {
@@ -161,28 +120,29 @@ class Type extends \Magento\Core\Model\AbstractModel
      * Copy Form Type properties from skeleton form type
      *
      * @param \Magento\Eav\Model\Form\Type $skeleton
-     * @return \Magento\Eav\Model\Form\Type
+     * @return $this
      */
     public function createFromSkeleton(\Magento\Eav\Model\Form\Type $skeleton)
     {
-        $fieldsetCollection = $this->_fieldsetFactory->create()
-            ->getCollection()
-            ->addTypeFilter($skeleton)
-            ->setSortOrder();
-        $elementCollection = $this->_elementFactory->create()
-            ->getCollection()
-            ->addTypeFilter($skeleton)
-            ->setSortOrder();
+        $fieldsetCollection = $this->_fieldsetFactory->create()->getCollection()->addTypeFilter(
+            $skeleton
+        )->setSortOrder();
+        $elementCollection = $this->_elementFactory->create()->getCollection()->addTypeFilter(
+            $skeleton
+        )->setSortOrder();
 
         // copy fieldsets
-        $fieldsetMap = array();
+        $fieldsetMap = [];
         foreach ($fieldsetCollection as $skeletonFieldset) {
-            $this->_fieldsetFactory->create()
-                ->setTypeId($this->getId())
-                ->setCode($skeletonFieldset->getCode())
-                ->setLabels($skeletonFieldset->getLabels())
-                ->setSortOrder($skeletonFieldset->getSortOrder())
-                ->save();
+            $this->_fieldsetFactory->create()->setTypeId(
+                $this->getId()
+            )->setCode(
+                $skeletonFieldset->getCode()
+            )->setLabels(
+                $skeletonFieldset->getLabels()
+            )->setSortOrder(
+                $skeletonFieldset->getSortOrder()
+            )->save();
             $fieldsetMap[$skeletonFieldset->getId()] = $this->_fieldsetFactory->create()->getId();
         }
 
@@ -192,11 +152,15 @@ class Type extends \Magento\Core\Model\AbstractModel
             if ($skeletonElement->getFieldsetId()) {
                 $fieldsetId = $fieldsetMap[$skeletonElement->getFieldsetId()];
             }
-            $this->_elementFactory->create()
-                ->setTypeId($this->getId())
-                ->setFieldsetId($fieldsetId)
-                ->setAttributeId($skeletonElement->getAttributeId())
-                ->setSortOrder($skeletonElement->getSortOrder());
+            $this->_elementFactory->create()->setTypeId(
+                $this->getId()
+            )->setFieldsetId(
+                $fieldsetId
+            )->setAttributeId(
+                $skeletonElement->getAttributeId()
+            )->setSortOrder(
+                $skeletonElement->getSortOrder()
+            );
         }
 
         return $this;

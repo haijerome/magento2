@@ -1,36 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Checkout
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
- */
-
-
-/**
- * Controller for onepage and multishipping checkouts
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Checkout\Controller;
 
-abstract class Action extends \Magento\App\Action\Action
+use Magento\Customer\Api\AccountManagementInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
+
+/**
+ * Controller for onepage checkouts
+ */
+abstract class Action extends \Magento\Framework\App\Action\Action
 {
     /**
      * @var \Magento\Customer\Model\Session
@@ -38,39 +20,62 @@ abstract class Action extends \Magento\App\Action\Action
     protected $_customerSession;
 
     /**
-     * @param \Magento\App\Action\Context $context
+     * @var CustomerRepositoryInterface
+     */
+    protected $customerRepository;
+
+    /**
+     * @var AccountManagementInterface
+     */
+    protected $accountManagement;
+
+    /**
+     * @param \Magento\Framework\App\Action\Context $context
      * @param \Magento\Customer\Model\Session $customerSession
+     * @param CustomerRepositoryInterface $customerRepository
+     * @param AccountManagementInterface $accountManagement
+     * @codeCoverageIgnore
      */
     public function __construct(
-        \Magento\App\Action\Context $context,
-        \Magento\Customer\Model\Session $customerSession
+        \Magento\Framework\App\Action\Context $context,
+        \Magento\Customer\Model\Session $customerSession,
+        CustomerRepositoryInterface $customerRepository,
+        AccountManagementInterface $accountManagement
     ) {
         $this->_customerSession = $customerSession;
+        $this->customerRepository = $customerRepository;
+        $this->accountManagement = $accountManagement;
         parent::__construct($context);
     }
 
     /**
      * Make sure customer is valid, if logged in
+     *
      * By default will add error messages and redirect to customer edit form
      *
      * @param bool $redirect - stop dispatch and redirect?
      * @param bool $addErrors - add error messages?
-     * @return bool
+     * @return bool|\Magento\Framework\Controller\Result\Redirect
      */
     protected function _preDispatchValidateCustomer($redirect = true, $addErrors = true)
     {
-        $customer = $this->_customerSession->getCustomer();
-        if ($customer && $customer->getId()) {
-            $validationResult = $customer->validate();
-            if ((true !== $validationResult) && is_array($validationResult)) {
+        try {
+            $customer = $this->customerRepository->getById($this->_customerSession->getCustomerId());
+        } catch (NoSuchEntityException $e) {
+            return true;
+        }
+
+        if (isset($customer)) {
+            $validationResult = $this->accountManagement->validate($customer);
+            if (!$validationResult->isValid()) {
                 if ($addErrors) {
-                    foreach ($validationResult as $error) {
-                        $this->_customerSession->addError($error);
+                    foreach ($validationResult->getMessages() as $error) {
+                        $this->messageManager->addErrorMessage($error);
                     }
                 }
                 if ($redirect) {
-                    $this->_redirect('customer/account/edit');
                     $this->_actionFlag->set('', self::FLAG_NO_DISPATCH, true);
+                    return $this->resultRedirectFactory->create()->setPath('customer/account/edit');
                 }
                 return false;
             }

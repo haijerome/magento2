@@ -1,37 +1,35 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Backend\App;
 
+use Magento\Backend\App\Action\Context;
+use Magento\Backend\Helper\Data as BackendHelper;
+use Magento\Backend\Model\Auth;
+use Magento\Backend\Model\Session;
+use Magento\Backend\Model\UrlInterface;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\AuthorizationInterface;
+use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\View\Element\AbstractBlock;
+use Magento\Framework\Encryption\Helper\Security;
+
 /**
  * Generic backend controller
  *
+ * @deprecated 102.0.0 Use \Magento\Framework\App\ActionInterface
+ *
+ * phpcs:disable Magento2.Classes.AbstractApi
+ * @api
  * @SuppressWarnings(PHPMD.NumberOfChildren)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
-abstract class AbstractAction extends \Magento\App\Action\Action
+abstract class AbstractAction extends \Magento\Framework\App\Action\Action
 {
     /**
      * Name of "is URLs checked" flag
@@ -44,11 +42,16 @@ abstract class AbstractAction extends \Magento\App\Action\Action
     const SESSION_NAMESPACE = 'adminhtml';
 
     /**
+     * Authorization level of a basic admin session
+     */
+    const ADMIN_RESOURCE = 'Magento_Backend::admin';
+
+    /**
      * Array of actions which can be processed without secret key validation
      *
      * @var array
      */
-    protected $_publicActions = array();
+    protected $_publicActions = [];
 
     /**
      * Namespace for session.
@@ -58,34 +61,34 @@ abstract class AbstractAction extends \Magento\App\Action\Action
     protected $_sessionNamespace = self::SESSION_NAMESPACE;
 
     /**
-     * @var \Magento\Backend\Helper\Data
+     * @var BackendHelper
      */
     protected $_helper;
 
     /**
-     * @var \Magento\Backend\Model\Session
+     * @var Session
      */
     protected $_session;
 
     /**
-     * @var \Magento\AuthorizationInterface
+     * @var AuthorizationInterface
      */
     protected $_authorization;
 
     /**
-     * @var \Magento\Backend\Model\Auth
+     * @var Auth
      */
     protected $_auth;
 
     /**
-     * @var \Magento\Backend\Model\Url
+     * @var UrlInterface
      */
     protected $_backendUrl;
 
     /**
-     * @var \Magento\Core\Model\LocaleInterface
+     * @var ResolverInterface
      */
-    protected $_locale;
+    protected $_localeResolver;
 
     /**
      * @var bool
@@ -93,19 +96,14 @@ abstract class AbstractAction extends \Magento\App\Action\Action
     protected $_canUseBaseUrl;
 
     /**
-     * @var \Magento\Core\App\Action\FormKeyValidator
+     * @var FormKeyValidator
      */
     protected $_formKeyValidator;
 
     /**
-     * @var \Magento\App\Action\Title
+     * @param Context $context
      */
-    protected $_title;
-
-    /**
-     * @param \Magento\Backend\App\Action\Context $context
-     */
-    public function __construct(Action\Context $context)
+    public function __construct(Context $context)
     {
         parent::__construct($context);
         $this->_authorization = $context->getAuthorization();
@@ -113,112 +111,30 @@ abstract class AbstractAction extends \Magento\App\Action\Action
         $this->_helper = $context->getHelper();
         $this->_backendUrl = $context->getBackendUrl();
         $this->_formKeyValidator = $context->getFormKeyValidator();
-        $this->_title = $context->getTitle();
-        $this->_locale = $context->getLocale();
+        $this->_localeResolver = $context->getLocaleResolver();
         $this->_canUseBaseUrl = $context->getCanUseBaseUrl();
         $this->_session = $context->getSession();
     }
 
-    protected function _isAllowed()
-    {
-        return true;
-    }
-
     /**
-     * Retrieve adminhtml session model object
+     * Dispatches the Action
      *
-     * @return \Magento\Backend\Model\Session
+     * @param RequestInterface $request
+     * @return \Magento\Framework\App\ResponseInterface
      */
-    protected function _getSession()
+    public function dispatch(RequestInterface $request)
     {
-        return $this->_session;
-    }
-
-    /**
-     * Define active menu item in menu block
-     * @param string $itemId current active menu item
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    protected function _setActiveMenu($itemId)
-    {
-        /** @var $menuBlock \Magento\Backend\Block\Menu */
-        $menuBlock = $this->_view->getLayout()->getBlock('menu');
-        $menuBlock->setActive($itemId);
-        $parents = $menuBlock->getMenuModel()->getParentItems($itemId);
-        $parents = array_reverse($parents);
-        foreach ($parents as $item) {
-            /** @var $item \Magento\Backend\Model\Menu\Item */
-            $this->_title->add($item->getTitle(), true);
-        }
-        return $this;
-    }
-
-    /**
-     * @param $label
-     * @param $title
-     * @param null $link
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    protected function _addBreadcrumb($label, $title, $link=null)
-    {
-        $this->_view->getLayout()->getBlock('breadcrumbs')->addLink($label, $title, $link);
-        return $this;
-    }
-
-    /**
-     * @param \Magento\View\Element\AbstractBlock $block
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    protected function _addContent(\Magento\View\Element\AbstractBlock $block)
-    {
-        return $this->_moveBlockToContainer($block, 'content');
-    }
-
-    /**
-     * @param \Magento\View\Element\AbstractBlock $block
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    protected function _addLeft(\Magento\View\Element\AbstractBlock $block)
-    {
-        return $this->_moveBlockToContainer($block, 'left');
-    }
-
-    /**
-     * @param \Magento\View\Element\AbstractBlock $block
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    protected function _addJs(\Magento\View\Element\AbstractBlock $block)
-    {
-        return $this->_moveBlockToContainer($block, 'js');
-    }
-
-    /**
-     * Set specified block as an anonymous child to specified container
-     *
-     * The block will be moved to the container from previous parent after all other elements
-     *
-     * @param \Magento\View\Element\AbstractBlock $block
-     * @param string $containerName
-     * @return \Magento\Backend\App\AbstractAction
-     */
-    private function _moveBlockToContainer(\Magento\View\Element\AbstractBlock $block, $containerName)
-    {
-        $this->_view->getLayout()->setChild($containerName, $block->getNameInLayout(), '');
-        return $this;
-    }
-
-    /**
-     * @param \Magento\App\RequestInterface $request
-     * @return $this|mixed
-     */
-    public function dispatch(\Magento\App\RequestInterface $request)
-    {
-        if (!$this->_processUrlKeys()) {
-            return parent::dispatch($request);
-        }
-
         if ($request->isDispatched() && $request->getActionName() !== 'denied' && !$this->_isAllowed()) {
-            return $this->_forward('denied');
+            $this->_response->setStatusHeader(403, '1.1', 'Forbidden');
+            if (!$this->_auth->isLoggedIn()) {
+                return $this->_redirect('*/auth/login');
+            }
+
+            $this->_view->loadLayout(['default', 'adminhtml_denied'], true, true, false);
+            $this->_view->renderLayout();
+            $this->_request->setDispatched(true);
+
+            return $this->_response;
         }
 
         if ($this->_isUrlChecked()) {
@@ -227,26 +143,20 @@ abstract class AbstractAction extends \Magento\App\Action\Action
 
         $this->_processLocaleSettings();
 
-        return parent::dispatch($request);
-    }
+        // Need to preload isFirstPageAfterLogin (see https://github.com/magento/magento2/issues/15510)
+        if ($this->_auth->isLoggedIn()) {
+            $this->_auth->getAuthStorage()->isFirstPageAfterLogin();
+        }
 
-    /**
-     * Check whether url is checked
-     *
-     * @return bool
-     */
-    protected function _isUrlChecked()
-    {
-        return !$this->_actionFlag->get('', self::FLAG_IS_URLS_CHECKED)
-            && !$this->getRequest()->getParam('forwarded')
-            && !$this->_getSession()->getIsUrlNotice(true)
-            && !$this->_canUseBaseUrl;
+        return parent::dispatch($request);
     }
 
     /**
      * Check url keys. If non valid - redirect
      *
      * @return bool
+     *
+     * @see \Magento\Backend\App\Request\BackendValidator for default request validation.
      */
     public function _processUrlKeys()
     {
@@ -266,10 +176,13 @@ abstract class AbstractAction extends \Magento\App\Action\Action
             $this->_actionFlag->set('', self::FLAG_NO_DISPATCH, true);
             $this->_actionFlag->set('', self::FLAG_NO_POST_DISPATCH, true);
             if ($this->getRequest()->getQuery('isAjax', false) || $this->getRequest()->getQuery('ajax', false)) {
-                $this->getResponse()->setBody($this->_objectManager->get('Magento\Core\Helper\Data')->jsonEncode(array(
-                    'error' => true,
-                    'message' => $_keyErrorMsg
-                )));
+                $this->getResponse()->representJson(
+                    $this->_objectManager->get(
+                        \Magento\Framework\Json\Helper\Data::class
+                    )->jsonEncode(
+                        ['error' => true, 'message' => $_keyErrorMsg]
+                    )
+                );
             } else {
                 $this->_redirect($this->_backendUrl->getStartupPageUrl());
             }
@@ -279,80 +192,187 @@ abstract class AbstractAction extends \Magento\App\Action\Action
     }
 
     /**
-     * Set session locale,
-     * process force locale set through url params
+     * Generate url by route and parameters
      *
-     * @return \Magento\Backend\App\AbstractAction
+     * @param string $route
+     * @param array $params
+     * @return string
+     */
+    public function getUrl($route = '', $params = [])
+    {
+        return $this->_helper->getUrl($route, $params);
+    }
+
+    /**
+     * Determines whether current user is allowed to access Action
+     *
+     * @return bool
+     */
+    protected function _isAllowed()
+    {
+        return $this->_authorization->isAllowed(static::ADMIN_RESOURCE);
+    }
+
+    /**
+     * Retrieve adminhtml session model object
+     *
+     * @return \Magento\Backend\Model\Session
+     */
+    protected function _getSession()
+    {
+        return $this->_session;
+    }
+
+    /**
+     * Returns instantiated Message\ManagerInterface.
+     *
+     * @return \Magento\Framework\Message\ManagerInterface
+     */
+    protected function getMessageManager()
+    {
+        return $this->messageManager;
+    }
+
+    /**
+     * Define active menu item in menu block
+     *
+     * @param string $itemId current active menu item
+     * @return $this
+     */
+    protected function _setActiveMenu($itemId)
+    {
+        /** @var $menuBlock \Magento\Backend\Block\Menu */
+        $menuBlock = $this->_view->getLayout()->getBlock('menu');
+        $menuBlock->setActive($itemId);
+        $parents = $menuBlock->getMenuModel()->getParentItems($itemId);
+        foreach ($parents as $item) {
+            /** @var $item \Magento\Backend\Model\Menu\Item */
+            $this->_view->getPage()->getConfig()->getTitle()->prepend($item->getTitle());
+        }
+        return $this;
+    }
+
+    /**
+     * Adds element to Breadcrumbs block
+     *
+     * @param string $label
+     * @param string $title
+     * @param string|null $link
+     * @return $this
+     */
+    protected function _addBreadcrumb($label, $title, $link = null)
+    {
+        $this->_view->getLayout()->getBlock('breadcrumbs')->addLink($label, $title, $link);
+        return $this;
+    }
+
+    /**
+     * Adds block to `content` block
+     *
+     * @param AbstractBlock $block
+     * @return $this
+     */
+    protected function _addContent(AbstractBlock $block)
+    {
+        return $this->_moveBlockToContainer($block, 'content');
+    }
+
+    /**
+     * Moves Block to `left` container
+     *
+     * @param AbstractBlock $block
+     * @return $this
+     */
+    protected function _addLeft(AbstractBlock $block)
+    {
+        return $this->_moveBlockToContainer($block, 'left');
+    }
+
+    /**
+     * Adds Block to `js` container
+     *
+     * @param AbstractBlock $block
+     * @return $this
+     */
+    protected function _addJs(AbstractBlock $block)
+    {
+        return $this->_moveBlockToContainer($block, 'js');
+    }
+
+    /**
+     * Set specified block as an anonymous child to specified container.
+     *
+     * @param AbstractBlock $block
+     * @param string $containerName
+     * @return $this
+     */
+    private function _moveBlockToContainer(AbstractBlock $block, $containerName)
+    {
+        $this->_view->getLayout()->setChild($containerName, $block->getNameInLayout(), '');
+        return $this;
+    }
+
+    /**
+     * Check whether url is checked
+     *
+     * @return bool
+     */
+    protected function _isUrlChecked()
+    {
+        return !$this->_actionFlag->get('', self::FLAG_IS_URLS_CHECKED)
+            && !$this->getRequest()->isForwarded()
+            && !$this->_getSession()->getIsUrlNotice(true)
+            && !$this->_canUseBaseUrl;
+    }
+
+    /**
+     * Set session locale, process force locale set through url params
+     *
+     * @return $this
      */
     protected function _processLocaleSettings()
     {
         $forceLocale = $this->getRequest()->getParam('locale', null);
-        if ($this->_objectManager->get('Magento\Core\Model\Locale\Validator')->isValid($forceLocale)) {
+        if ($this->_objectManager->get(\Magento\Framework\Validator\Locale::class)->isValid($forceLocale)) {
             $this->_getSession()->setSessionLocale($forceLocale);
         }
 
-        if (is_null($this->_getSession()->getLocale())) {
-            $this->_getSession()->setLocale($this->_locale->getLocaleCode());
+        if ($this->_getSession()->getLocale() === null) {
+            $this->_getSession()->setLocale($this->_localeResolver->getLocale());
         }
 
         return $this;
-    }
-
-    public function deniedAction()
-    {
-        $this->getResponse()->setHeader('HTTP/1.1', '403 Forbidden');
-        if (!$this->_auth->isLoggedIn()) {
-            $this->_redirect('*/auth/login');
-            return;
-        }
-        $this->_view->loadLayout(array('default', 'adminhtml_denied'));
-        $this->_view->renderLayout();
-    }
-
-    /**
-     * No route action
-     *
-     * @param null $coreRoute
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    public function norouteAction($coreRoute = null)
-    {
-        $this->getResponse()->setHeader('HTTP/1.1', '404 Not Found');
-        $this->getResponse()->setHeader('Status', '404 File not found');
-        $this->_view->loadLayout(array('default', 'adminhtml_noroute'));
-        $this->_view->renderLayout();
     }
 
     /**
      * Set redirect into response
      *
-     * @param   string $path
-     * @param   array $arguments
-     * @return \Magento\Backend\App\AbstractAction
+     * @TODO MAGETWO-28356: Refactor controller actions to new ResultInterface
+     * @param string $path
+     * @param array $arguments
+     * @return \Magento\Framework\App\ResponseInterface
      */
-    protected function _redirect($path, $arguments=array())
+    protected function _redirect($path, $arguments = [])
     {
         $this->_getSession()->setIsUrlNotice($this->_actionFlag->get('', self::FLAG_IS_URLS_CHECKED));
         $this->getResponse()->setRedirect($this->getUrl($path, $arguments));
-        return $this;
-    }
-
-    protected function _forward($action, $controller = null, $module = null, array $params = null)
-    {
-        $this->_getSession()->setIsUrlNotice($this->_actionFlag->get('', self::FLAG_IS_URLS_CHECKED));
-        return parent::_forward($action, $controller, $module, $params);
+        return $this->getResponse();
     }
 
     /**
-     * Generate url by route and parameters
+     * Forward to action
      *
-     * @param   string $route
-     * @param   array $params
-     * @return  string
+     * @TODO MAGETWO-28356: Refactor controller actions to new ResultInterface
+     * @param string $action
+     * @param string|null $controller
+     * @param string|null $module
+     * @param array|null $params
+     * @return void
      */
-    public function getUrl($route = '', $params=array())
+    protected function _forward($action, $controller = null, $module = null, array $params = null)
     {
-        return $this->_helper->getUrl($route, $params);
+        $this->_getSession()->setIsUrlNotice($this->_actionFlag->get('', self::FLAG_IS_URLS_CHECKED));
+        parent::_forward($action, $controller, $module, $params);
     }
 
     /**
@@ -366,29 +386,10 @@ abstract class AbstractAction extends \Magento\App\Action\Action
             return true;
         }
 
-        $secretKey = $this->getRequest()->getParam(\Magento\Backend\Model\Url::SECRET_KEY_PARAM_NAME, null);
-        if (!$secretKey || $secretKey != $this->_backendUrl->getSecretKey()) {
+        $secretKey = $this->getRequest()->getParam(UrlInterface::SECRET_KEY_PARAM_NAME, null);
+        if (!$secretKey || !Security::compareStrings($secretKey, $this->_backendUrl->getSecretKey())) {
             return false;
         }
         return true;
-    }
-
-    /**
-     * Render specified template
-     *
-     * @param string $tplName
-     * @param array $data parameters required by template
-     */
-    protected function _outTemplate($tplName, $data = array())
-    {
-        $this->_view->getLayout()->initMessages('Magento\Backend\Model\Session');
-        $block = $this->_view->getLayout()
-            ->createBlock('Magento\Backend\Block\Template')->setTemplate("{$tplName}.phtml");
-        foreach ($data as $index => $value) {
-            $block->assign($index, $value);
-        }
-        $html = $block->toHtml();
-        $this->_objectManager->get('Magento\Core\Model\Translate')->processResponseBody($html);
-        $this->getResponse()->setBody($html);
     }
 }

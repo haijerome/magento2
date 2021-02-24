@@ -1,32 +1,13 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_SalesRule
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
-
 namespace Magento\SalesRule\Model\Rule\Condition;
 
+/**
+ * Address rule condition data model.
+ */
 class Address extends \Magento\Rule\Model\Condition\AbstractCondition
 {
     /**
@@ -63,7 +44,7 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
         \Magento\Directory\Model\Config\Source\Allregion $directoryAllregion,
         \Magento\Shipping\Model\Config\Source\Allmethods $shippingAllmethods,
         \Magento\Payment\Model\Config\Source\Allmethods $paymentAllmethods,
-        array $data = array()
+        array $data = []
     ) {
         parent::__construct($context, $data);
         $this->_directoryCountry = $directoryCountry;
@@ -73,11 +54,15 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
     }
 
     /**
+     * Load attribute options
+     *
      * @return $this
      */
     public function loadAttributeOptions()
     {
-        $attributes = array(
+        $attributes = [
+            'base_subtotal_with_discount' => __('Subtotal (Excl. Tax)'),
+            'base_subtotal_total_incl_tax' => __('Subtotal (Incl. Tax)'),
             'base_subtotal' => __('Subtotal'),
             'total_qty' => __('Total Items Quantity'),
             'weight' => __('Total Weight'),
@@ -87,13 +72,18 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
             'region' => __('Shipping Region'),
             'region_id' => __('Shipping State/Province'),
             'country_id' => __('Shipping Country'),
-        );
+        ];
 
         $this->setAttributeOption($attributes);
 
         return $this;
     }
 
+    /**
+     * Get attribute element
+     *
+     * @return $this
+     */
     public function getAttributeElement()
     {
         $element = parent::getAttributeElement();
@@ -102,33 +92,48 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
     }
 
     /**
+     * Get input type
+     *
      * @return string
      */
     public function getInputType()
     {
         switch ($this->getAttribute()) {
-            case 'base_subtotal': case 'weight': case 'total_qty':
+            case 'base_subtotal':
+            case 'base_subtotal_total_incl_tax':
+            case 'weight':
+            case 'total_qty':
                 return 'numeric';
 
-            case 'shipping_method': case 'payment_method': case 'country_id': case 'region_id':
+            case 'shipping_method':
+            case 'payment_method':
+            case 'country_id':
+            case 'region_id':
                 return 'select';
         }
         return 'string';
     }
 
     /**
+     * Get value element type
+     *
      * @return string
      */
     public function getValueElementType()
     {
         switch ($this->getAttribute()) {
-            case 'shipping_method': case 'payment_method': case 'country_id': case 'region_id':
+            case 'shipping_method':
+            case 'payment_method':
+            case 'country_id':
+            case 'region_id':
                 return 'select';
         }
         return 'text';
     }
 
     /**
+     * Get value select options
+     *
      * @return array|mixed
      */
     public function getValueSelectOptions()
@@ -152,7 +157,7 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
                     break;
 
                 default:
-                    $options = array();
+                    $options = [];
             }
             $this->setData('value_select_options', $options);
         }
@@ -162,23 +167,22 @@ class Address extends \Magento\Rule\Model\Condition\AbstractCondition
     /**
      * Validate Address Rule Condition
      *
-     * @param \Magento\Object $object
+     * @param \Magento\Framework\Model\AbstractModel $model
      * @return bool
      */
-    public function validate(\Magento\Object $object)
+    public function validate(\Magento\Framework\Model\AbstractModel $model)
     {
-        $address = $object;
-        if (!$address instanceof \Magento\Sales\Model\Quote\Address) {
-            if ($object->getQuote()->isVirtual()) {
-                $address = $object->getQuote()->getBillingAddress();
-            }
-            else {
-                $address = $object->getQuote()->getShippingAddress();
+        $address = $model;
+        if (!$address instanceof \Magento\Quote\Model\Quote\Address) {
+            if ($model->getQuote()->isVirtual()) {
+                $address = $model->getQuote()->getBillingAddress();
+            } else {
+                $address = $model->getQuote()->getShippingAddress();
             }
         }
 
-        if ('payment_method' == $this->getAttribute() && ! $address->hasPaymentMethod()) {
-            $address->setPaymentMethod($object->getQuote()->getPayment()->getMethod());
+        if ('payment_method' == $this->getAttribute() && !$address->hasPaymentMethod()) {
+            $address->setPaymentMethod($model->getQuote()->getPayment()->getMethod());
         }
 
         return parent::validate($address);

@@ -1,67 +1,60 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\View\Tab;
 
 /**
  * Order transactions tab
  *
- * @category   Magento
- * @package    Magento_Sales
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\View\Tab;
-
-class Transactions
-    extends \Magento\Sales\Block\Adminhtml\Transactions\Grid
-    implements \Magento\Adminhtml\Block\Widget\Tab\TabInterface
+class Transactions extends \Magento\Framework\View\Element\Text\ListText implements
+    \Magento\Backend\Block\Widget\Tab\TabInterface
 {
+    /**
+     * @var \Magento\Framework\AuthorizationInterface
+     */
+    protected $_authorization;
 
     /**
-     * Retrieve grid url
+     * Core registry
      *
-     * @return string
+     * @var \Magento\Framework\Registry
      */
-    public function getGridUrl()
-    {
-        return $this->getUrl('sales/order/transactions', array('_current' => true));
+    protected $_coreRegistry = null;
+
+    /**
+     * @param \Magento\Framework\View\Element\Context $context
+     * @param \Magento\Framework\AuthorizationInterface $authorization
+     * @param \Magento\Framework\Registry $registry
+     * @param array $data
+     */
+    public function __construct(
+        \Magento\Framework\View\Element\Context $context,
+        \Magento\Framework\AuthorizationInterface $authorization,
+        \Magento\Framework\Registry $registry,
+        array $data = []
+    ) {
+        $this->_authorization = $authorization;
+        $this->_coreRegistry = $registry;
+        parent::__construct($context, $data);
     }
 
     /**
-     * Retrieve grid row url
+     * Retrieve order model instance
      *
-     * @return string
+     * @return \Magento\Sales\Model\Order
      */
-    public function getRowUrl($item)
+    public function getOrder()
     {
-        return $this->getUrl('sales/transactions/view', array('_current' => true, 'txn_id' => $item->getId()));
+        return $this->_coreRegistry->registry('current_order');
     }
 
     /**
-     * Retrieve tab label
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getTabLabel()
     {
@@ -69,9 +62,7 @@ class Transactions
     }
 
     /**
-     * Retrieve tab title
-     *
-     * @return string
+     * {@inheritdoc}
      */
     public function getTabTitle()
     {
@@ -79,19 +70,15 @@ class Transactions
     }
 
     /**
-     * Check whether can show tab
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function canShowTab()
     {
-        return true;
+        return !$this->getOrder()->getPayment()->getMethodInstance()->isOffline();
     }
 
     /**
-     * Check whether tab is hidden
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function isHidden()
     {

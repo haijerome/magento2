@@ -1,63 +1,50 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Sales
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+namespace Magento\Sales\Block\Adminhtml\Order\Create\Billing\Method;
 
 /**
  * Adminhtml sales order create payment method form block
  *
- * @category   Magento
- * @package    Magento_Sales
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
-namespace Magento\Sales\Block\Adminhtml\Order\Create\Billing\Method;
-
 class Form extends \Magento\Payment\Block\Form\Container
 {
     /**
-     * @var \Magento\Adminhtml\Model\Session\Quote
+     * Session quote
+     *
+     * @var \Magento\Backend\Model\Session\Quote
      */
     protected $_sessionQuote;
 
     /**
-     * @param \Magento\View\Element\Template\Context $context
-     * @param \Magento\Adminhtml\Model\Session\Quote $sessionQuote
+     * @param \Magento\Framework\View\Element\Template\Context $context
+     * @param \Magento\Payment\Helper\Data $paymentHelper
+     * @param \Magento\Payment\Model\Checks\SpecificationFactory $methodSpecificationFactory
+     * @param \Magento\Backend\Model\Session\Quote $sessionQuote
      * @param array $data
+     * @param array $additionalChecks
      */
     public function __construct(
-        \Magento\View\Element\Template\Context $context,
-        \Magento\Adminhtml\Model\Session\Quote $sessionQuote,
-        array $data = array()
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Payment\Helper\Data $paymentHelper,
+        \Magento\Payment\Model\Checks\SpecificationFactory $methodSpecificationFactory,
+        \Magento\Backend\Model\Session\Quote $sessionQuote,
+        array $data = [],
+        array $additionalChecks = []
     ) {
         $this->_sessionQuote = $sessionQuote;
-        parent::__construct($context, $data);
+        parent::__construct($context, $paymentHelper, $methodSpecificationFactory, $data, $additionalChecks);
     }
 
     /**
      * Check payment method model
      *
-     * @param \Magento\Payment\Model\Method\AbstractMethod|null $method
+     * @param \Magento\Payment\Model\MethodInterface|null $method
      * @return bool
      */
     protected function _canUseMethod($method)
@@ -107,24 +94,26 @@ class Form extends \Magento\Payment\Block\Form\Container
     /**
      * Enter description here...
      *
-     * @return \Magento\Sales\Model\Quote
+     * @return \Magento\Quote\Model\Quote
      */
     public function getQuote()
     {
         return $this->_sessionQuote->getQuote();
     }
 
-    /*
-    * Whether switch/solo card type available
-    */
+    /**
+     * Whether switch/solo card type available
+     *
+     * @return true
+     * @deprecated 100.1.0 unused
+     */
     public function hasSsCardType()
     {
         $availableTypes = explode(',', $this->getQuote()->getPayment()->getMethod()->getConfigData('cctypes'));
-        $ssPresenations = array_intersect(array('SS', 'SM', 'SO'), $availableTypes);
+        $ssPresenations = array_intersect(['SS', 'SM', 'SO'], $availableTypes);
         if ($availableTypes && count($ssPresenations) > 0) {
             return true;
         }
         return false;
     }
-
 }

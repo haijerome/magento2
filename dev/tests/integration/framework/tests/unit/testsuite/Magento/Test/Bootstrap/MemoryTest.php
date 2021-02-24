@@ -1,28 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -30,7 +9,9 @@
  */
 namespace Magento\Test\Bootstrap;
 
-class MemoryTest extends \PHPUnit_Framework_TestCase
+use Magento\TestFramework\MemoryLimit;
+
+class MemoryTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\TestFramework\Bootstrap\Memory
@@ -38,26 +19,28 @@ class MemoryTest extends \PHPUnit_Framework_TestCase
     protected $_object;
 
     /**
-     * @var \Magento\TestFramework\MemoryLimit|\PHPUnit_Framework_MockObject_MockObject
+     * @var MemoryLimit|\PHPUnit\Framework\MockObject\MockObject
      */
     protected $_memoryLimit;
 
     /**
-     * @var \PHPUnit_Framework_MockObject_MockObject
+     * @var \PHPUnit\Framework\MockObject\MockObject
      */
     protected $_activationPolicy;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_memoryLimit = $this->getMock(
-            'Magento\TestFramework\MemoryLimit', array('printStats'), array(), '', false);
-        $this->_activationPolicy = $this->getMock('stdClass', array('register_shutdown_function'));
+        $this->_memoryLimit = $this->createPartialMock(MemoryLimit::class, ['printStats']);
+        $this->_activationPolicy = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['register_shutdown_function'])
+            ->getMock();
         $this->_object = new \Magento\TestFramework\Bootstrap\Memory(
-            $this->_memoryLimit, array($this->_activationPolicy, 'register_shutdown_function')
+            $this->_memoryLimit,
+            [$this->_activationPolicy, 'register_shutdown_function']
         );
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         $this->_memoryLimit = null;
         $this->_activationPolicy = null;
@@ -65,11 +48,12 @@ class MemoryTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Activation policy is expected to be a callable.
      */
     public function testConstructorException()
     {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Activation policy is expected to be a callable.');
+
         new \Magento\TestFramework\Bootstrap\Memory($this->_memoryLimit, 'non_existing_callable');
     }
 
@@ -77,31 +61,37 @@ class MemoryTest extends \PHPUnit_Framework_TestCase
     {
         $eol = PHP_EOL;
         $this->expectOutputString("{$eol}=== Memory Usage System Stats ==={$eol}Dummy Statistics{$eol}");
-        $this->_memoryLimit
-            ->expects($this->once())
-            ->method('printStats')
-            ->will($this->returnValue('Dummy Statistics'))
-        ;
+        $this->_memoryLimit->expects(
+            $this->once()
+        )->method(
+            'printStats'
+        )->willReturn(
+            'Dummy Statistics'
+        );
         $this->_object->displayStats();
     }
 
     public function testActivateStatsDisplaying()
     {
-        $this->_activationPolicy
-            ->expects($this->once())
-            ->method('register_shutdown_function')
-            ->with($this->identicalTo(array($this->_object, 'displayStats')))
-        ;
+        $this->_activationPolicy->expects(
+            $this->once()
+        )->method(
+            'register_shutdown_function'
+        )->with(
+            $this->identicalTo([$this->_object, 'displayStats'])
+        );
         $this->_object->activateStatsDisplaying();
     }
 
     public function testActivateLimitValidation()
     {
-        $this->_activationPolicy
-            ->expects($this->once())
-            ->method('register_shutdown_function')
-            ->with($this->identicalTo(array($this->_memoryLimit, 'validateUsage')))
-        ;
+        $this->_activationPolicy->expects(
+            $this->once()
+        )->method(
+            'register_shutdown_function'
+        )->with(
+            $this->identicalTo([$this->_memoryLimit, 'validateUsage'])
+        );
         $this->_object->activateLimitValidation();
     }
 }

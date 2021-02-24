@@ -1,46 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_ImportExport
- * @subpackage  integration_tests
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 namespace Magento\ImportExport\Model;
+
+use Magento\Framework\Phrase;
+use Magento\ImportExport\Model\Import\ErrorProcessing\ProcessingErrorAggregatorInterface;
+use Magento\ImportExport\Model\Import\ImageDirectoryBaseProvider;
+use Magento\TestFramework\Helper\Bootstrap;
 
 /**
  * @magentoDataFixture Magento/ImportExport/_files/import_data.php
  */
-class ImportTest extends \PHPUnit_Framework_TestCase
+class ImportTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Model object which is used for tests
      *
-     * @var \Magento\ImportExport\Model\Import
+     * @var Import
      */
     protected $_model;
 
     /**
-     * @var \Magento\ImportExport\Model\Import\Config
+     * @var Import\Config
      */
     protected $_importConfig;
 
@@ -49,45 +32,71 @@ class ImportTest extends \PHPUnit_Framework_TestCase
      *
      * @var array
      */
-    protected $_entityBehaviors = array(
-        'catalog_product' => array(
-            'token' => 'Magento\ImportExport\Model\Source\Import\Behavior\Basic',
-            'code'  => 'basic_behavior',
-        ),
-        'customer_composite' => array(
-            'token' => 'Magento\ImportExport\Model\Source\Import\Behavior\Basic',
-            'code'  => 'basic_behavior',
-        ),
-        'customer' => array(
-            'token' => 'Magento\ImportExport\Model\Source\Import\Behavior\Custom',
-            'code'  => 'custom_behavior',
-        ),
-        'customer_address' => array(
-            'token' => 'Magento\ImportExport\Model\Source\Import\Behavior\Custom',
-            'code'  => 'custom_behavior',
-        ),
-    );
+    protected $_entityBehaviors = [
+        'catalog_product' => [
+            'token' => \Magento\ImportExport\Model\Source\Import\Behavior\Basic::class,
+            'code' => 'basic_behavior',
+            'notes' => [],
+        ],
+        'customer_composite' => [
+            'token' => \Magento\ImportExport\Model\Source\Import\Behavior\Basic::class,
+            'code' => 'basic_behavior',
+            'notes' => [],
+        ],
+        'customer' => [
+            'token' => \Magento\ImportExport\Model\Source\Import\Behavior\Custom::class,
+            'code' => 'custom_behavior',
+            'notes' => [],
+        ],
+        'customer_address' => [
+            'token' => \Magento\ImportExport\Model\Source\Import\Behavior\Custom::class,
+            'code' => 'custom_behavior',
+            'notes' => [],
+        ],
+    ];
 
     /**
      * Expected unique behaviors
      *
      * @var array
      */
-    protected $_uniqueBehaviors = array(
-        'basic_behavior'  => 'Magento\ImportExport\Model\Source\Import\Behavior\Basic',
-        'custom_behavior' => 'Magento\ImportExport\Model\Source\Import\Behavior\Custom',
-    );
+    protected $_uniqueBehaviors = [
+        'basic_behavior' => \Magento\ImportExport\Model\Source\Import\Behavior\Basic::class,
+        'custom_behavior' => \Magento\ImportExport\Model\Source\Import\Behavior\Custom::class,
+    ];
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->_importConfig = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\ImportExport\Model\Import\Config');
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\ImportExport\Model\Import',
-            array(
-                'importConfig' => $this->_importConfig,
-            )
+        $this->_importConfig = Bootstrap::getObjectManager()->create(
+            Import\Config::class
         );
+        /** @var ImageDirectoryBaseProvider $provider */
+        $provider = Bootstrap::getObjectManager()->get(ImageDirectoryBaseProvider::class);
+        $this->_model = Bootstrap::getObjectManager()->create(
+            Import::class,
+            [
+                'importConfig' => $this->_importConfig
+            ]
+        );
+        $this->_model->setData('images_base_directory', $provider->getDirectory());
+    }
+
+    /**
+     * Test validation of images directory against provided base directory.
+     *
+     * @return void
+     */
+    public function testImagesDirBase(): void
+    {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+        $this->expectExceptionMessage('Images file directory is outside required directory');
+
+        $this->_model->setData(
+            Import::FIELD_NAME_VALIDATION_STRATEGY,
+            ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_SKIP_ERRORS
+        );
+        $this->_model->setData(Import::FIELD_NAME_IMG_FILE_DIR, '../_files');
+        $this->_model->importSource();
     }
 
     /**
@@ -95,15 +104,20 @@ class ImportTest extends \PHPUnit_Framework_TestCase
      */
     public function testImportSource()
     {
-        /** @var $customersCollection \Magento\Customer\Model\Resource\Customer\Collection */
-        $customersCollection = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()
-            ->create('Magento\Customer\Model\Resource\Customer\Collection');
+        /** @var $customersCollection \Magento\Customer\Model\ResourceModel\Customer\Collection */
+        $customersCollection = Bootstrap::getObjectManager()->create(
+            \Magento\Customer\Model\ResourceModel\Customer\Collection::class
+        );
 
         $existCustomersCount = count($customersCollection->load());
 
         $customersCollection->resetData();
         $customersCollection->clear();
 
+        $this->_model->setData(
+            Import::FIELD_NAME_VALIDATION_STRATEGY,
+            ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_SKIP_ERRORS
+        );
         $this->_model->importSource();
 
         $customers = $customersCollection->getItems();
@@ -115,39 +129,63 @@ class ImportTest extends \PHPUnit_Framework_TestCase
 
     public function testValidateSource()
     {
+        $validationStrategy = ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_STOP_ON_ERROR;
+
         $this->_model->setEntity('catalog_product');
-        /** @var \Magento\ImportExport\Model\Import\AbstractSource|\PHPUnit_Framework_MockObject_MockObject $source */
-        $source = $this->getMockForAbstractClass('Magento\ImportExport\Model\Import\AbstractSource', array(
-            array('sku', 'name')
-        ));
-        $source->expects($this->any())->method('_getNextRow')->will($this->returnValue(false));
+        $this->_model->setData(Import::FIELD_NAME_VALIDATION_STRATEGY, $validationStrategy);
+        $this->_model->setData(Import::FIELD_NAME_ALLOWED_ERROR_COUNT, 0);
+
+        /** @var \Magento\ImportExport\Model\Import\AbstractSource|\PHPUnit\Framework\MockObject\MockObject $source */
+        $source = $this->getMockForAbstractClass(
+            \Magento\ImportExport\Model\Import\AbstractSource::class,
+            [['sku', 'name']]
+        );
+        $source->expects($this->any())->method('_getNextRow')->willReturn(false);
         $this->assertTrue($this->_model->validateSource($source));
     }
 
     /**
-     * @expectedException \Magento\Core\Exception
-     * @expectedExceptionMessage Entity is unknown
      */
     public function testValidateSourceException()
     {
-        $source = $this->getMockForAbstractClass('Magento\ImportExport\Model\Import\AbstractSource',
-            array(), '', false);
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+        $this->expectExceptionMessage('Entity is unknown');
+
+        $source = $this->getMockForAbstractClass(
+            \Magento\ImportExport\Model\Import\AbstractSource::class,
+            [],
+            '',
+            false
+        );
         $this->_model->validateSource($source);
     }
 
-    public function testGetEntity()
+    /**
+     */
+    public function testGetUnknownEntity()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+        $this->expectExceptionMessage('Entity is unknown');
+
         $entityName = 'entity_name';
         $this->_model->setEntity($entityName);
         $this->assertSame($entityName, $this->_model->getEntity());
     }
 
+    public function testGetEntity()
+    {
+        $entityName = 'catalog_product';
+        $this->_model->setEntity($entityName);
+        $this->assertSame($entityName, $this->_model->getEntity());
+    }
+
     /**
-     * @expectedException \Magento\Core\Exception
-     * @expectedExceptionMessage Entity is unknown
      */
     public function testGetEntityEntityIsNotSet()
     {
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+        $this->expectExceptionMessage('Entity is unknown');
+
         $this->_model->getEntity();
     }
 
@@ -159,6 +197,8 @@ class ImportTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetEntityBehaviors()
     {
+        $this->prepareProductNotes();
+
         $importModel = $this->_model;
         $actualBehaviors = $importModel->getEntityBehaviors();
 
@@ -171,16 +211,15 @@ class ImportTest extends \PHPUnit_Framework_TestCase
     /**
      * Test getEntityBehaviors with not existing behavior class
      *
-     * @expectedException \Magento\Core\Exception
-     * @expectedExceptionMessage Invalid behavior token for customer
      */
     public function testGetEntityBehaviorsWithUnknownBehavior()
     {
-        $this->_importConfig->merge(array(
-            'entities' => array(
-                'customer' => array('behaviorModel' => 'Unknown_Behavior_Class'),
-            )
-        ));
+        $this->expectException(\Magento\Framework\Exception\LocalizedException::class);
+        $this->expectExceptionMessage('The behavior token for customer is invalid.');
+
+        $this->_importConfig->merge(
+            ['entities' => ['customer' => ['behaviorModel' => 'Unknown_Behavior_Class']]]
+        );
         $importModel = $this->_model;
         $actualBehaviors = $importModel->getEntityBehaviors();
         $this->assertArrayNotHasKey('customer', $actualBehaviors);
@@ -201,5 +240,25 @@ class ImportTest extends \PHPUnit_Framework_TestCase
             $this->assertArrayHasKey($behaviorCode, $actualBehaviors);
             $this->assertEquals($behaviorClass, $actualBehaviors[$behaviorCode]);
         }
+    }
+
+    /**
+     * Add Catalog Product Notes to expected results.
+     *
+     * @return void
+     * @ SuppressWarnings(PHPMD.)
+     */
+    private function prepareProductNotes(): void
+    {
+        $this->_entityBehaviors['catalog_product']['notes'] =
+            [
+                Import::BEHAVIOR_APPEND => new Phrase('New product data is added to the existing product data for'
+                    . ' the existing entries in the database. All fields except sku can be updated.'),
+                Import::BEHAVIOR_REPLACE => new Phrase('The existing product data is replaced with new data.'
+                    . ' <b>Exercise caution when replacing data because the existing product data will be completely'
+                    . ' cleared and all references in the system will be lost.</b>'),
+                Import::BEHAVIOR_DELETE => new  Phrase('Any entities in the import data that already exist in the'
+                    . ' database are deleted from the database.'),
+            ];
     }
 }

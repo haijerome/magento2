@@ -1,38 +1,27 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
+
+namespace Magento\Catalog\Model\Product\Type;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\File\UploaderFactory;
 
 /**
  * Abstract model for product type implementation
  *
- * @category    Magento
- * @package     Magento_Catalog
- * @author      Magento Core Team <core@magentocommerce.com>
+ * phpcs:disable Magento2.Classes.AbstractApi
+ * @api
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.ExcessivePublicCount)
+ * @SuppressWarnings(PHPMD.TooManyFields)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-namespace Magento\Catalog\Model\Product\Type;
-
 abstract class AbstractType
 {
     /**
@@ -43,7 +32,6 @@ abstract class AbstractType
     protected $_typeId;
 
     /**
-     *
      * @var array
      */
     protected $_editableAttributes;
@@ -56,7 +44,7 @@ abstract class AbstractType
     protected $_isComposite = false;
 
     /**
-     * Is a configurable product type
+     * If product can be configured
      *
      * @var bool
      */
@@ -67,24 +55,26 @@ abstract class AbstractType
      *
      * @var bool
      */
-    protected $_canUseQtyDecimals  = true;
+    protected $_canUseQtyDecimals = true;
 
     /**
      * File queue array
      *
      * @var array
      */
-    protected $_fileQueue       = array();
+    protected $_fileQueue = [];
 
     const CALCULATE_CHILD = 0;
+
     const CALCULATE_PARENT = 1;
 
-    /**
+    /**#@+
      * values for shipment type (invoice etc)
-     *
      */
     const SHIPMENT_SEPARATELY = 1;
+
     const SHIPMENT_TOGETHER = 0;
+    /**#@-*/
 
     /**
      * Process modes
@@ -107,43 +97,51 @@ abstract class AbstractType
     const OPTION_PREFIX = 'option_';
 
     /**
-     * @var \Magento\Filesystem
+     * @var \Magento\Framework\Filesystem
      */
     protected $_filesystem;
 
     /**
-     * @var \Magento\Core\Helper\Data
-     */
-    protected $_coreData;
-
-    /**
-     * @var \Magento\Core\Helper\File\Storage\Database
+     * @var \Magento\MediaStorage\Helper\File\Storage\Database
      */
     protected $_fileStorageDb;
+
+    /**
+     * Cache key for Product Attributes
+     *
+     * @var string
+     */
+    protected $_cacheProductSetAttributes = '_cache_instance_product_set_attributes';
+
+    /**
+     * @var UploaderFactory
+     */
+    private $uploaderFactory;
 
     /**
      * Delete data specific for this product type
      *
      * @param \Magento\Catalog\Model\Product $product
+     * @return void
      */
     abstract public function deleteTypeSpecificData(\Magento\Catalog\Model\Product $product);
 
     /**
      * Core registry
      *
-     * @var \Magento\Core\Model\Registry
+     * @var \Magento\Framework\Registry
      */
-    protected $_coreRegistry = null;
+    protected $_coreRegistry;
 
     /**
      * Core event manager proxy
      *
-     * @var \Magento\Event\ManagerInterface
+     * @var \Magento\Framework\Event\ManagerInterface
      */
-    protected $_eventManager = null;
+    protected $_eventManager;
 
     /**
-     * @var \Magento\Logger
+     * @var \Psr\Log\LoggerInterface
      */
     protected $_logger;
 
@@ -169,50 +167,57 @@ abstract class AbstractType
     protected $_catalogProductOption;
 
     /**
-     * Product factory
-     *
-     * @var \Magento\Catalog\Model\ProductFactory
+     * @var ProductRepositoryInterface
      */
-    protected $_productFactory;
+    protected $productRepository;
 
     /**
-     * Construct
+     * Serializer interface instance.
      *
-     * @param \Magento\Catalog\Model\ProductFactory $productFactory
+     * @var \Magento\Framework\Serialize\Serializer\Json
+     * @since 102.0.0
+     */
+    protected $serializer;
+
+    /**
      * @param \Magento\Catalog\Model\Product\Option $catalogProductOption
      * @param \Magento\Eav\Model\Config $eavConfig
      * @param \Magento\Catalog\Model\Product\Type $catalogProductType
-     * @param \Magento\Event\ManagerInterface $eventManager
-     * @param \Magento\Core\Helper\Data $coreData
-     * @param \Magento\Core\Helper\File\Storage\Database $fileStorageDb
-     * @param \Magento\Filesystem $filesystem
-     * @param \Magento\Core\Model\Registry $coreRegistry
-     * @param \Magento\Logger $logger
-     * @param array $data
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
+     * @param \Magento\MediaStorage\Helper\File\Storage\Database $fileStorageDb
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Registry $coreRegistry
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param ProductRepositoryInterface $productRepository
+     * @param \Magento\Framework\Serialize\Serializer\Json|null $serializer
+     * @param UploaderFactory $uploaderFactory
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
-        \Magento\Catalog\Model\ProductFactory $productFactory,
         \Magento\Catalog\Model\Product\Option $catalogProductOption,
         \Magento\Eav\Model\Config $eavConfig,
         \Magento\Catalog\Model\Product\Type $catalogProductType,
-        \Magento\Event\ManagerInterface $eventManager,
-        \Magento\Core\Helper\Data $coreData,
-        \Magento\Core\Helper\File\Storage\Database $fileStorageDb,
-        \Magento\Filesystem $filesystem,
-        \Magento\Core\Model\Registry $coreRegistry,
-        \Magento\Logger $logger,
-        array $data = array()
+        \Magento\Framework\Event\ManagerInterface $eventManager,
+        \Magento\MediaStorage\Helper\File\Storage\Database $fileStorageDb,
+        \Magento\Framework\Filesystem $filesystem,
+        \Magento\Framework\Registry $coreRegistry,
+        \Psr\Log\LoggerInterface $logger,
+        ProductRepositoryInterface $productRepository,
+        \Magento\Framework\Serialize\Serializer\Json $serializer = null,
+        UploaderFactory $uploaderFactory = null
     ) {
-        $this->_productFactory = $productFactory;
         $this->_catalogProductOption = $catalogProductOption;
         $this->_eavConfig = $eavConfig;
         $this->_catalogProductType = $catalogProductType;
         $this->_coreRegistry = $coreRegistry;
         $this->_eventManager = $eventManager;
-        $this->_coreData = $coreData;
         $this->_fileStorageDb = $fileStorageDb;
         $this->_filesystem = $filesystem;
         $this->_logger = $logger;
+        $this->productRepository = $productRepository;
+        $this->serializer = $serializer ?: ObjectManager::getInstance()
+            ->get(\Magento\Framework\Serialize\Serializer\Json::class);
+        $this->uploaderFactory = $uploaderFactory ?: ObjectManager::getInstance()->get(UploaderFactory::class);
     }
 
     /**
@@ -230,11 +235,11 @@ abstract class AbstractType
     /**
      * Return relation info about used products for specific type instance
      *
-     * @return \Magento\Object Object with information data
+     * @return \Magento\Framework\DataObject Object with information data
      */
     public function getRelationInfo()
     {
-        return new \Magento\Object();
+        return new \Magento\Framework\DataObject();
     }
 
     /**
@@ -243,37 +248,45 @@ abstract class AbstractType
      *   group => array(ids)
      * )
      *
+     * @deplacated TODO: refactor to child relation manager
+     *
      * @param int $parentId
      * @param bool $required
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function getChildrenIds($parentId, $required = true)
     {
-        return array();
+        return [];
     }
 
     /**
-     * Retrieve parent ids array by requered child
+     * Retrieve parent ids array by required child
      *
      * @param int|array $childId
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function getParentIdsByChild($childId)
     {
-        return array();
+        return [];
     }
 
     /**
      * Get array of product set attributes
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return array
+     * @return \Magento\Eav\Model\Entity\Attribute\AbstractAttribute[]
      */
     public function getSetAttributes($product)
     {
-        return $product->getResource()
-            ->loadAllAttributes($product)
-            ->getSortedAttributes($product->getAttributeSetId());
+        if (!$product->hasData($this->_cacheProductSetAttributes)) {
+            $setAttributes = $product->getResource()
+                ->loadAllAttributes($product)
+                ->getSortedAttributes($product->getAttributeSetId());
+            $product->setData($this->_cacheProductSetAttributes, $setAttributes);
+        }
+        return $product->getData($this->_cacheProductSetAttributes);
     }
 
     /**
@@ -285,35 +298,21 @@ abstract class AbstractType
      */
     public function attributesCompare($attributeOne, $attributeTwo)
     {
-        $sortOne =  ($attributeOne->getGroupSortPath() * 1000) + ($attributeOne->getSortPath() * 0.0001);
-        $sortTwo =  ($attributeTwo->getGroupSortPath() * 1000) + ($attributeTwo->getSortPath() * 0.0001);
+        $sortOne = $attributeOne->getGroupSortPath() * 1000 + $attributeOne->getSortPath() * 0.0001;
+        $sortTwo = $attributeTwo->getGroupSortPath() * 1000 + $attributeTwo->getSortPath() * 0.0001;
 
-        if ($sortOne > $sortTwo) {
-            return 1;
-        } elseif ($sortOne < $sortTwo) {
-            return -1;
-        }
-
-        return 0;
+        return $sortOne <=> $sortTwo;
     }
 
     /**
      * Retrieve product type attributes
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return array
+     * @return \Magento\Eav\Model\Entity\Attribute\AbstractAttribute[]
      */
     public function getEditableAttributes($product)
     {
-        $cacheKey = '_cache_editable_attributes';
-        if (!$product->hasData($cacheKey)) {
-            $editableAttributes = array();
-            foreach ($this->getSetAttributes($product) as $attributeCode => $attribute) {
-                $editableAttributes[$attributeCode] = $attribute;
-            }
-            $product->setData($cacheKey, $editableAttributes);
-        }
-        return $product->getData($cacheKey);
+        return $this->getSetAttributes($product);
     }
 
     /**
@@ -321,7 +320,7 @@ abstract class AbstractType
      *
      * @param  int $attributeId
      * @param  \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Resource\Eav\Attribute|null
+     * @return \Magento\Catalog\Model\ResourceModel\Eav\Attribute|null
      */
     public function getAttributeById($attributeId, $product)
     {
@@ -340,6 +339,7 @@ abstract class AbstractType
      *
      * @param \Magento\Catalog\Model\Product $product
      * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function isVirtual($product)
     {
@@ -354,29 +354,31 @@ abstract class AbstractType
      */
     public function isSalable($product)
     {
-        $salable = $product->getStatus() == \Magento\Catalog\Model\Product\Status::STATUS_ENABLED;
+        $salable = $product->getStatus() == \Magento\Catalog\Model\Product\Attribute\Source\Status::STATUS_ENABLED;
         if ($salable && $product->hasData('is_salable')) {
             $salable = $product->getData('is_salable');
         }
 
-        return (boolean)(int)$salable;
+        return (bool)(int)$salable;
     }
 
     /**
      * Prepare product and its configuration to be added to some products list.
+     *
      * Perform standard preparation process and then prepare options belonging to specific product type.
      *
-     * @param  \Magento\Object $buyRequest
+     * @param  \Magento\Framework\DataObject $buyRequest
      * @param  \Magento\Catalog\Model\Product $product
      * @param  string $processMode
      * @return array|string
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    protected function _prepareProduct(\Magento\Object $buyRequest, $product, $processMode)
+    protected function _prepareProduct(\Magento\Framework\DataObject $buyRequest, $product, $processMode)
     {
         // try to add custom options
         try {
             $options = $this->_prepareOptions($buyRequest, $product, $processMode);
-        } catch (\Magento\Core\Exception $e) {
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
             return $e->getMessage();
         }
 
@@ -384,37 +386,33 @@ abstract class AbstractType
             return $options;
         }
         // try to found super product configuration
-        // (if product was buying within grouped product)
         $superProductConfig = $buyRequest->getSuperProductConfig();
-        if (!empty($superProductConfig['product_id'])
-            && !empty($superProductConfig['product_type'])
-        ) {
+        if (!empty($superProductConfig['product_id']) && !empty($superProductConfig['product_type'])) {
             $superProductId = (int)$superProductConfig['product_id'];
             if ($superProductId) {
+                /** @var \Magento\Catalog\Model\Product $superProduct */
                 $superProduct = $this->_coreRegistry->registry('used_super_product_' . $superProductId);
                 if (!$superProduct) {
-                    $superProduct = $this->_productFactory->create()->load($superProductId);
-                    $this->_coreRegistry->register('used_super_product_'.$superProductId, $superProduct);
+                    $superProduct = $this->productRepository->getById($superProductId);
+                    $this->_coreRegistry->register('used_super_product_' . $superProductId, $superProduct);
                 }
-                if ($superProduct->getId()) {
-                    $assocProductIds = $superProduct->getTypeInstance()->getAssociatedProductIds($superProduct);
-                    if (in_array($product->getId(), $assocProductIds)) {
-                        $productType = $superProductConfig['product_type'];
-                        $product->addCustomOption('product_type', $productType, $superProduct);
+                $assocProductIds = $superProduct->getTypeInstance()->getAssociatedProductIds($superProduct);
+                if (in_array($product->getId(), $assocProductIds)) {
+                    $productType = $superProductConfig['product_type'];
+                    $product->addCustomOption('product_type', $productType, $superProduct);
 
-                        $buyRequest->setData('super_product_config', array(
-                            'product_type' => $productType,
-                            'product_id'   => $superProduct->getId()
-                        ));
-                    }
+                    $buyRequest->setData(
+                        'super_product_config',
+                        ['product_type' => $productType, 'product_id' => $superProduct->getId()]
+                    );
                 }
             }
         }
 
         $product->prepareCustomOptions();
-        $buyRequest->unsetData('_processing_params'); // One-time params only
-        $product->addCustomOption('info_buyRequest', serialize($buyRequest->getData()));
-
+        $buyRequest->unsetData('_processing_params');
+        // One-time params only
+        $product->addCustomOption('info_buyRequest', $this->serializer->serialize($buyRequest->getData()));
         if ($options) {
             $optionIds = array_keys($options);
             $product->addCustomOption('option_ids', implode(',', $optionIds));
@@ -429,37 +427,38 @@ abstract class AbstractType
         }
         $product->setQty($buyRequest->getQty());
 
-        return array($product);
+        return [$product];
     }
 
     /**
      * Process product configuration
      *
-     * @param \Magento\Object $buyRequest
+     * @param \Magento\Framework\DataObject $buyRequest
      * @param \Magento\Catalog\Model\Product $product
      * @param string $processMode
      * @return array|string
      */
-    public function processConfiguration(\Magento\Object $buyRequest, $product,
+    public function processConfiguration(
+        \Magento\Framework\DataObject $buyRequest,
+        $product,
         $processMode = self::PROCESS_MODE_LITE
     ) {
-        $_products = $this->_prepareProduct($buyRequest, $product, $processMode);
-
+        $products = $this->_prepareProduct($buyRequest, $product, $processMode);
         $this->processFileQueue();
-
-        return $_products;
+        return $products;
     }
 
     /**
      * Initialize product(s) for add to cart process.
+     *
      * Advanced version of func to prepare product for cart - processMode can be specified there.
      *
-     * @param \Magento\Object $buyRequest
+     * @param \Magento\Framework\DataObject $buyRequest
      * @param \Magento\Catalog\Model\Product $product
      * @param null|string $processMode
      * @return array|string
      */
-    public function prepareForCartAdvanced(\Magento\Object $buyRequest, $product, $processMode = null)
+    public function prepareForCartAdvanced(\Magento\Framework\DataObject $buyRequest, $product, $processMode = null)
     {
         if (!$processMode) {
             $processMode = self::PROCESS_MODE_FULL;
@@ -472,11 +471,11 @@ abstract class AbstractType
     /**
      * Initialize product(s) for add to cart process
      *
-     * @param \Magento\Object $buyRequest
+     * @param \Magento\Framework\DataObject $buyRequest
      * @param \Magento\Catalog\Model\Product $product
      * @return array|string
      */
-    public function prepareForCart(\Magento\Object $buyRequest, $product)
+    public function prepareForCart(\Magento\Framework\DataObject $buyRequest, $product)
     {
         return $this->prepareForCartAdvanced($buyRequest, $product, self::PROCESS_MODE_FULL);
     }
@@ -484,8 +483,11 @@ abstract class AbstractType
     /**
      * Process File Queue
      *
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
-     * @throws \Magento\Core\Exception
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     * phpcs:disable Generic.Metrics.NestingLevel
      */
     public function processFileQueue()
     {
@@ -494,41 +496,29 @@ abstract class AbstractType
         }
 
         foreach ($this->_fileQueue as &$queueOptions) {
-            if (isset($queueOptions['operation']) && $operation = $queueOptions['operation']) {
+            if (isset($queueOptions['operation']) && ($operation = $queueOptions['operation'])) {
                 switch ($operation) {
                     case 'receive_uploaded_file':
-                        $src = isset($queueOptions['src_name']) ? $queueOptions['src_name'] : '';
-                        $dst = isset($queueOptions['dst_name']) ? $queueOptions['dst_name'] : '';
+                        $src = $queueOptions['src_name'] ?? '';
+                        $dst = $queueOptions['dst_name'] ?? '';
                         /** @var $uploader \Zend_File_Transfer_Adapter_Http */
-                        $uploader = isset($queueOptions['uploader']) ? $queueOptions['uploader'] : null;
+                        $uploader = $queueOptions['uploader'] ?? null;
+                        $isUploaded = false;
+                        if ($uploader && $uploader->isValid($src)) {
+                            // phpcs:ignore Magento2.Functions.DiscouragedFunction
+                            $path = pathinfo($dst, PATHINFO_DIRNAME);
+                            $uploader = $this->uploaderFactory->create(['fileId' => $src]);
+                            $uploader->setFilesDispersion(false);
+                            $uploader->setAllowRenameFiles(true);
+                            // phpcs:ignore Magento2.Functions.DiscouragedFunction
+                            $isUploaded = $uploader->save($path, pathinfo($dst, PATHINFO_FILENAME));
+                        }
 
-                        $path = dirname($dst);
-
-                        try {
-                            $this->_filesystem->createDirectory($path, 0777);
-                        } catch (\Magento\Filesystem\Exception $e) {
-                            throw new \Magento\Core\Exception(
-                                __("We can't create writeable directory \"%1\".", $path)
+                        if (empty($src) || empty($dst) || !$isUploaded) {
+                            throw new \Magento\Framework\Exception\LocalizedException(
+                                __('The file upload failed. Try to upload again.')
                             );
                         }
-
-                        $uploader->setDestination($path);
-
-                        if (empty($src) || empty($dst) || !$uploader->receive($src)) {
-                            /**
-                             * @todo: show invalid option
-                             */
-                            if (isset($queueOptions['option'])) {
-                                $queueOptions['option']->setIsValid(false);
-                            }
-                            throw new \Magento\Core\Exception(__("The file upload failed."));
-                        }
-                        $this->_fileStorageDb->saveFile($dst);
-                        break;
-                    case 'move_uploaded_file':
-                        $src = $queueOptions['src_name'];
-                        $dst = $queueOptions['dst_name'];
-                        move_uploaded_file($src, $dst);
                         $this->_fileStorageDb->saveFile($dst);
                         break;
                     default:
@@ -540,13 +530,16 @@ abstract class AbstractType
 
         return $this;
     }
+    //phpcs:enable
 
     /**
      * Add file to File Queue
-     * @param array $queueOptions   Array of File Queue
+     *
+     * @param array $queueOptions Array of File Queue
      *                              (eg. ['operation'=>'move',
      *                                    'src_name'=>'filename',
      *                                    'dst_name'=>'filename2'])
+     * @return void
      */
     public function addFileQueue($queueOptions)
     {
@@ -567,46 +560,73 @@ abstract class AbstractType
     /**
      * Retrieve message for specify option(s)
      *
-     * @return string
+     * @return \Magento\Framework\Phrase
      */
     public function getSpecifyOptionMessage()
     {
-        return __('Please specify the product\'s required option(s).');
+        return __("The product's required option(s) weren't entered. Make sure the options are entered and try again.");
     }
 
     /**
      * Process custom defined options for product
      *
-     * @param \Magento\Object $buyRequest
+     * @param \Magento\Framework\DataObject $buyRequest
      * @param \Magento\Catalog\Model\Product $product
      * @param string $processMode
      * @return array
+     * @throws LocalizedException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    protected function _prepareOptions(\Magento\Object $buyRequest, $product, $processMode)
+    protected function _prepareOptions(\Magento\Framework\DataObject $buyRequest, $product, $processMode)
     {
-        $transport = new \StdClass;
-        $transport->options = array();
-        foreach ($product->getOptions() as $_option) {
-            /* @var $_option \Magento\Catalog\Model\Product\Option */
-            $group = $_option->groupFactory($_option->getType())
-                ->setOption($_option)
-                ->setProduct($product)
-                ->setRequest($buyRequest)
-                ->setProcessMode($processMode)
-                ->validateUserValue($buyRequest->getOptions());
+        $transport = new \stdClass();
+        $transport->options = [];
+        $options = null;
+        if ($product->getHasOptions()) {
+            $options = $product->getOptions();
+        }
+        if ($options !== null) {
+            $results = [];
+            $optionsFromRequest = $buyRequest->getOptions();
+            foreach ($options as $option) {
+                /* @var $option \Magento\Catalog\Model\Product\Option */
+                try {
+                    $group = $option->groupFactory($option->getType())
+                        ->setOption($option)
+                        ->setProduct($product)
+                        ->setRequest($buyRequest)
+                        ->setProcessMode($processMode);
 
-            $preparedValue = $group->prepareForCart();
-            if ($preparedValue !== null) {
-                $transport->options[$_option->getId()] = $preparedValue;
+                    if ($product->getSkipCheckRequiredOption() !== true) {
+                        $group->validateUserValue($optionsFromRequest);
+                    } elseif ($optionsFromRequest !== null && isset($optionsFromRequest[$option->getId()])) {
+                        if (is_array($optionsFromRequest[$option->getId()])) {
+                            $group->validateUserValue($optionsFromRequest);
+                        } else {
+                            $transport->options[$option->getId()] = $optionsFromRequest[$option->getId()];
+                        }
+                    }
+
+                } catch (LocalizedException $e) {
+                    $results[] = $e->getMessage();
+                    continue;
+                }
+
+                $preparedValue = $group->prepareForCart();
+                if ($preparedValue !== null) {
+                    $transport->options[$option->getId()] = $preparedValue;
+                }
+            }
+            if (count($results) > 0) {
+                throw new LocalizedException(__(implode("\n", array_unique($results))));
             }
         }
 
         $eventName = sprintf('catalog_product_type_prepare_%s_options', $processMode);
-        $this->_eventManager->dispatch($eventName, array(
-            'transport'   => $transport,
-            'buy_request' => $buyRequest,
-            'product' => $product
-        ));
+        $this->_eventManager->dispatch(
+            $eventName,
+            ['transport' => $transport, 'buy_request' => $buyRequest, 'product' => $product]
+        );
         return $transport->options;
     }
 
@@ -614,19 +634,20 @@ abstract class AbstractType
      * Check if product can be bought
      *
      * @param  \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
-     * @throws \Magento\Core\Exception
+     * @return $this
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function checkProductBuyState($product)
     {
-        if (!$product->getSkipCheckRequiredOption()) {
-            foreach ($product->getOptions() as $option) {
+        if (!$product->getSkipCheckRequiredOption() && $product->getHasOptions()) {
+            $options = $product->getProductOptionsCollection();
+            foreach ($options as $option) {
                 if ($option->getIsRequire()) {
                     $customOption = $product->getCustomOption(self::OPTION_PREFIX . $option->getId());
                     if (!$customOption || strlen($customOption->getValue()) == 0) {
                         $product->setSkipCheckRequiredOption(true);
-                        throw new \Magento\Core\Exception(
-                            __('The product has required options.')
+                        throw new \Magento\Framework\Exception\LocalizedException(
+                            __('The product has required options. Enter the options and try again.')
                         );
                     }
                 }
@@ -637,18 +658,17 @@ abstract class AbstractType
     }
 
     /**
-     * Prepare additional options/information for order item which will be
-     * created from this product
+     * Prepare additional options/information for order item which will be created from this product
      *
      * @param \Magento\Catalog\Model\Product $product
      * @return array
      */
     public function getOrderOptions($product)
     {
-        $optionArr = array();
+        $optionArr = [];
         $info = $product->getCustomOption('info_buyRequest');
         if ($info) {
-            $optionArr['info_buyRequest'] = unserialize($info->getValue());
+            $optionArr['info_buyRequest'] = $this->serializer->unserialize($info->getValue());
         }
 
         $optionIds = $product->getCustomOption('option_ids');
@@ -663,26 +683,26 @@ abstract class AbstractType
                         ->setProduct($product)
                         ->setConfigurationItemOption($confItemOption);
 
-                    $optionArr['options'][] = array(
+                    $optionArr['options'][] = [
                         'label' => $option->getTitle(),
                         'value' => $group->getFormattedOptionValue($confItemOption->getValue()),
                         'print_value' => $group->getPrintableOptionValue($confItemOption->getValue()),
                         'option_id' => $option->getId(),
                         'option_type' => $option->getType(),
                         'option_value' => $confItemOption->getValue(),
-                        'custom_view' => $group->isCustomizedView()
-                    );
+                        'custom_view' => $group->isCustomizedView(),
+                    ];
                 }
             }
         }
 
         $productTypeConfig = $product->getCustomOption('product_type');
         if ($productTypeConfig) {
-            $optionArr['super_product_config'] = array(
-                'product_code'  => $productTypeConfig->getCode(),
-                'product_type'  => $productTypeConfig->getValue(),
-                'product_id'    => $productTypeConfig->getProductId()
-            );
+            $optionArr['super_product_config'] = [
+                'product_code' => $productTypeConfig->getCode(),
+                'product_type' => $productTypeConfig->getValue(),
+                'product_id' => $productTypeConfig->getProductId(),
+            ];
         }
 
         return $optionArr;
@@ -692,14 +712,15 @@ abstract class AbstractType
      * Save type related data
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
      */
     public function save($product)
     {
         if ($product->dataHasChangedFor('type_id') && $product->getOrigData('type_id')) {
             $oldTypeProduct = clone $product;
-            $oldTypeInstance = $this->_catalogProductType
-                ->factory($oldTypeProduct->setTypeId($product->getOrigData('type_id')));
+            $oldTypeInstance = $this->_catalogProductType->factory(
+                $oldTypeProduct->setTypeId($product->getOrigData('type_id'))
+            );
             $oldTypeProduct->setTypeInstance($oldTypeInstance);
             $oldTypeInstance->deleteTypeSpecificData($oldTypeProduct);
         }
@@ -710,13 +731,13 @@ abstract class AbstractType
      * Remove don't applicable attributes data
      *
      * @param \Magento\Catalog\Model\Product $product
+     * @return void
      */
     protected function _removeNotApplicableAttributes($product)
     {
         $entityType = $product->getResource()->getEntityType();
-        foreach ($this->_eavConfig->getEntityAttributeCodes($entityType, $product) as $attributeCode) {
-            $attribute = $this->_eavConfig->getAttribute($entityType, $attributeCode);
-            $applyTo   = $attribute->getApplyTo();
+        foreach ($this->_eavConfig->getEntityAttributes($entityType, $product) as $attribute) {
+            $applyTo = $attribute->getApplyTo();
             if (is_array($applyTo) && count($applyTo) > 0 && !in_array($product->getTypeId(), $applyTo)) {
                 $product->unsetData($attribute->getAttributeCode());
             }
@@ -727,7 +748,7 @@ abstract class AbstractType
      * Before save type related data
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
      */
     public function beforeSave($product)
     {
@@ -737,10 +758,11 @@ abstract class AbstractType
     }
 
     /**
-     * Check if product is composite (grouped, configurable, etc)
+     * Check if product is composite
      *
      * @param \Magento\Catalog\Model\Product $product
      * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function isComposite($product)
     {
@@ -748,10 +770,11 @@ abstract class AbstractType
     }
 
     /**
-     * Check if product is configurable
+     * Check if product can be configured
      *
      * @param \Magento\Catalog\Model\Product $product
      * @return bool
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function canConfigure($product)
     {
@@ -790,7 +813,7 @@ abstract class AbstractType
      * @param string $sku Product SKU without option
      * @return string
      */
-    public function getOptionSku($product, $sku='')
+    public function getOptionSku($product, $sku = '')
     {
         $skuDelimiter = '-';
         if (empty($sku)) {
@@ -801,11 +824,11 @@ abstract class AbstractType
             foreach (explode(',', $optionIds->getValue()) as $optionId) {
                 $option = $product->getOptionById($optionId);
                 if ($option) {
-
                     $confItemOption = $product->getCustomOption(self::OPTION_PREFIX . $optionId);
 
                     $group = $option->groupFactory($option->getType())
-                        ->setOption($option)->setListener(new \Magento\Object());
+                        ->setOption($option)
+                        ->setListener(new \Magento\Framework\DataObject());
 
                     $optionSku = $group->getOptionSku($confItemOption->getValue(), $skuDelimiter);
                     if ($optionSku) {
@@ -820,11 +843,12 @@ abstract class AbstractType
         }
         return $sku;
     }
+
     /**
      * Default action to get weight of product
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return decimal
+     * @return float
      */
     public function getWeight($product)
     {
@@ -839,13 +863,7 @@ abstract class AbstractType
      */
     public function hasOptions($product)
     {
-        if ($product->getHasOptions()) {
-            return true;
-        }
-        if ($product->isRecurring()) {
-            return true;
-        }
-        return false;
+        return $product->getHasOptions();
     }
 
     /**
@@ -855,13 +873,14 @@ abstract class AbstractType
      * so need to change configuration item qty option value too.
      *
      * @param array $options
-     * @param \Magento\Object $option
-     * @param mixed $value
+     * @param \Magento\Framework\DataObject $option
+     * @param int|float|null $value
      * @param \Magento\Catalog\Model\Product $product
      *
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function updateQtyOption($options, \Magento\Object $option, $value, $product)
+    public function updateQtyOption($options, \Magento\Framework\DataObject $option, $value, $product)
     {
         return $this;
     }
@@ -884,7 +903,7 @@ abstract class AbstractType
      * Retrieve store filter for associated products
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return int|\Magento\Core\Model\Store
+     * @return int|\Magento\Store\Model\Store
      */
     public function getStoreFilter($product)
     {
@@ -895,9 +914,9 @@ abstract class AbstractType
     /**
      * Set store filter for associated products
      *
-     * @param $store int|\Magento\Core\Model\Store
+     * @param int|\Magento\Store\Model\Store $store
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
      */
     public function setStoreFilter($store, $product)
     {
@@ -908,10 +927,13 @@ abstract class AbstractType
 
     /**
      * Allow for updates of children qty's
+     *
      * (applicable for complicated product types. As default returns false)
      *
      * @param \Magento\Catalog\Model\Product $product
      * @return boolean false
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings(PHPMD.BooleanGetMethodName)
      */
     public function getForceChildItemQtyChanges($product)
     {
@@ -921,23 +943,25 @@ abstract class AbstractType
     /**
      * Prepare Quote Item Quantity
      *
-     * @param mixed $qty
+     * @param int|float $qty
      * @param \Magento\Catalog\Model\Product $product
      * @return float
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function prepareQuoteItemQty($qty, $product)
     {
-        return floatval($qty);
+        return (float)$qty;
     }
 
     /**
      * Implementation of product specify logic of which product needs to be assigned to option.
+     *
      * For example if product which was added to option already removed from catalog.
      *
      * @param \Magento\Catalog\Model\Product $optionProduct
-     * @param \Magento\Sales\Model\Quote\Item\Option $option
+     * @param \Magento\Quote\Model\Quote\Item\Option $option
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
      */
     public function assignProductToOption($optionProduct, $option, $product)
     {
@@ -954,16 +978,16 @@ abstract class AbstractType
      * Setting specified product type variables
      *
      * @param array $config
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
      */
     public function setConfig($config)
     {
         if (isset($config['composite'])) {
-            $this->_isComposite = (bool) $config['composite'];
+            $this->_isComposite = (bool)$config['composite'];
         }
 
         if (isset($config['can_use_qty_decimals'])) {
-            $this->_canUseQtyDecimals = (bool) $config['can_use_qty_decimals'];
+            $this->_canUseQtyDecimals = (bool)$config['can_use_qty_decimals'];
         }
 
         return $this;
@@ -971,6 +995,7 @@ abstract class AbstractType
 
     /**
      * Retrieve additional searchable data from type instance
+     *
      * Using based on product id and store_id data
      *
      * @param \Magento\Catalog\Model\Product $product
@@ -978,10 +1003,12 @@ abstract class AbstractType
      */
     public function getSearchableData($product)
     {
-        $searchData = array();
+        $searchData = [];
         if ($product->getHasOptions()) {
-            $searchData = $this->_catalogProductOption
-                ->getSearchableData($product->getId(), $product->getStoreId());
+            $searchData = $this->_catalogProductOption->getSearchableData(
+                $product->getEntityId(),
+                $product->getStoreId()
+            );
         }
 
         return $searchData;
@@ -989,6 +1016,7 @@ abstract class AbstractType
 
     /**
      * Retrieve products divided into groups required to purchase
+     *
      * At least one product in each group has to be purchased
      *
      * @param \Magento\Catalog\Model\Product $product
@@ -997,33 +1025,34 @@ abstract class AbstractType
     public function getProductsToPurchaseByReqGroups($product)
     {
         if ($this->isComposite($product)) {
-            return array();
+            return [];
         }
-        return array(array($product));
+        return [[$product]];
     }
 
     /**
      * Prepare selected options for product
      *
      * @param  \Magento\Catalog\Model\Product $product
-     * @param  \Magento\Object $buyRequest
+     * @param  \Magento\Framework\DataObject $buyRequest
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function processBuyRequest($product, $buyRequest)
     {
-        return array();
+        return [];
     }
 
     /**
      * Check product's options configuration
      *
      * @param  \Magento\Catalog\Model\Product $product
-     * @param  \Magento\Object $buyRequest
+     * @param  \Magento\Framework\DataObject $buyRequest
      * @return array
      */
     public function checkProductConfiguration($product, $buyRequest)
     {
-        $errors = array();
+        $errors = [];
 
         try {
             /**
@@ -1036,26 +1065,14 @@ abstract class AbstractType
             if (is_string($result)) {
                 $errors[] = $result;
             }
-        } catch (\Magento\Core\Exception $e) {
-            $errors[] = $e->getMessages();
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
+            $errors[] = $e->getMessage();
         } catch (\Exception $e) {
-            $this->_logger->logException($e);
+            $this->_logger->critical($e);
             $errors[] = __('Something went wrong while processing the request.');
         }
 
         return $errors;
-    }
-
-    /**
-     * Check if Minimum advertise price is enabled at least in one option
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     * @param int $visibility
-     * @return bool
-     */
-    public function isMapEnabledInOptions($product, $visibility = null)
-    {
-        return false;
     }
 
     /**
@@ -1072,10 +1089,47 @@ abstract class AbstractType
      * Set image for product without image if possible
      *
      * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product\Type\AbstractType
+     * @return $this
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function setImageFromChildProduct(\Magento\Catalog\Model\Product $product)
     {
         return $this;
+    }
+
+    /**
+     * Return array of specific to type product entities
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function getIdentities(\Magento\Catalog\Model\Product $product)
+    {
+        return [];
+    }
+
+    /**
+     * Get Associated Products
+     *
+     * @param \Magento\Catalog\Model\Product\Type\AbstractType $product
+     * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function getAssociatedProducts($product)
+    {
+        return [];
+    }
+
+    /**
+     * Check if product can be potentially buyed from the category page or some other list
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return bool
+     * @since 101.0.11
+     */
+    public function isPossibleBuyFromList($product)
+    {
+        return !$this->hasRequiredOptions($product);
     }
 }

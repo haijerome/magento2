@@ -1,37 +1,29 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Backend
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Helper\Dashboard;
 
+use Magento\Backend\Model\Dashboard\Period;
+use Magento\Framework\App\DeploymentConfig;
+use Magento\Framework\App\Helper\AbstractHelper;
+use Magento\Framework\App\Helper\Context;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Config\ConfigOptionsListConstants;
+use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Store\Model\StoreManagerInterface;
+
 /**
  * Data helper for dashboard
+ *
+ * @api
+ * @since 100.0.2
  */
-class Data extends \Magento\Core\Helper\Data
+class Data extends AbstractHelper
 {
     /**
-     * @var \Magento\Data\Collection\Db
+     * @var AbstractDb
      */
     protected $_stores;
 
@@ -41,38 +33,39 @@ class Data extends \Magento\Core\Helper\Data
     protected $_installDate;
 
     /**
-     * @param \Magento\App\Helper\Context $context
-     * @param \Magento\Core\Model\Store\Config $coreStoreConfig
-     * @param \Magento\Core\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Core\Model\Locale $locale
-     * @param \Magento\App\State $appState
-     * @param $installDate
-     * @param bool $dbCompatibleMode
+     * @var StoreManagerInterface
+     */
+    private $_storeManager;
+
+    /**
+     * @var Period
+     */
+    private $period;
+
+    /**
+     * @param Context $context
+     * @param StoreManagerInterface $storeManager
+     * @param DeploymentConfig $deploymentConfig
+     * @param Period|null $period
+     * @throws \Magento\Framework\Exception\FileSystemException
+     * @throws \Magento\Framework\Exception\RuntimeException
      */
     public function __construct(
-        \Magento\App\Helper\Context $context,
-        \Magento\Core\Model\Store\Config $coreStoreConfig,
-        \Magento\Core\Model\StoreManagerInterface $storeManager,
-        \Magento\Core\Model\Locale $locale,
-        \Magento\App\State $appState,
-        $installDate,
-        $dbCompatibleMode = true
+        Context $context,
+        StoreManagerInterface $storeManager,
+        DeploymentConfig $deploymentConfig,
+        ?Period $period = null
     ) {
-        parent::__construct(
-            $context,
-            $coreStoreConfig,
-            $storeManager,
-            $locale,
-            $appState,
-            $dbCompatibleMode
-        );
-        $this->_installDate = $installDate;
+        parent::__construct($context);
+        $this->_installDate = $deploymentConfig->get(ConfigOptionsListConstants::CONFIG_PATH_INSTALL_DATE);
+        $this->_storeManager = $storeManager;
+        $this->period = $period ?? ObjectManager::getInstance()->get(Period::class);
     }
 
     /**
      * Retrieve stores configured in system.
      *
-     * @return array
+     * @return \Magento\Framework\Data\Collection\AbstractDb
      */
     public function getStores()
     {
@@ -89,28 +82,24 @@ class Data extends \Magento\Core\Helper\Data
      */
     public function countStores()
     {
-        return sizeof($this->_stores->getItems());
+        return count($this->_stores->getItems());
     }
 
     /**
      * Prepare array with periods for dashboard graphs
      *
+     * @deprecated 102.0.0 periods were moved to it's own class
+     * @see Period::getDatePeriods()
+     *
      * @return array
      */
     public function getDatePeriods()
     {
-        return array(
-            '24h' => __('Last 24 Hours'),
-            '7d'  => __('Last 7 Days'),
-            '1m'  => __('Current Month'),
-            '1y'  => __('YTD'),
-            '2y'  => __('2YTD')
-        );
+        return $this->period->getDatePeriods();
     }
 
     /**
-     * Create data hash to ensure that we got valid
-     * data and it is not changed by some one else.
+     * Create data hash to ensure that we got valid data and it is not changed by some one else.
      *
      * @param string $data
      * @return string
@@ -118,6 +107,7 @@ class Data extends \Magento\Core\Helper\Data
     public function getChartDataHash($data)
     {
         $secret = $this->_installDate;
+        // phpcs:disable Magento2.Security.InsecureFunction.FoundWithAlternative
         return md5($data . $secret);
     }
 }

@@ -1,40 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    Magento
- * @package     Magento_Catalog
- * @copyright   Copyright (c) 2013 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
  */
-
 
 /**
  * Catalog Product List Sortable allowed sortable attributes source
  *
- * @category   Magento
- * @package    Magento_Catalog
  * @author     Magento Core Team <core@magentocommerce.com>
  */
 namespace Magento\Catalog\Model\Config\Source;
 
-class ListSort implements \Magento\Core\Model\Option\ArrayInterface
+class ListSort implements \Magento\Framework\Option\ArrayInterface
 {
     /**
      * Catalog config
@@ -48,9 +25,8 @@ class ListSort implements \Magento\Core\Model\Option\ArrayInterface
      *
      * @param \Magento\Catalog\Model\Config $catalogConfig
      */
-    public function __construct(
-        \Magento\Catalog\Model\Config $catalogConfig
-    ) {
+    public function __construct(\Magento\Catalog\Model\Config $catalogConfig)
+    {
         $this->_catalogConfig = $catalogConfig;
     }
 
@@ -61,16 +37,10 @@ class ListSort implements \Magento\Core\Model\Option\ArrayInterface
      */
     public function toOptionArray()
     {
-        $options = array();
-        $options[] = array(
-            'label' => __('Position'),
-            'value' => 'position'
-        );
+        $options = [];
+        $options[] = ['label' => __('Position'), 'value' => 'position'];
         foreach ($this->_getCatalogConfig()->getAttributesUsedForSortBy() as $attribute) {
-            $options[] = array(
-                'label' => __($attribute['frontend_label']),
-                'value' => $attribute['attribute_code']
-            );
+            $options[] = ['label' => __($attribute['frontend_label']), 'value' => $attribute['attribute_code']];
         }
         return $options;
     }
@@ -80,7 +50,8 @@ class ListSort implements \Magento\Core\Model\Option\ArrayInterface
      *
      * @return \Magento\Catalog\Model\Config
      */
-    protected function _getCatalogConfig() {
+    protected function _getCatalogConfig()
+    {
         return $this->_catalogConfig;
     }
 }
